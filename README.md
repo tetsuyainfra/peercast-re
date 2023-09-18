@@ -30,6 +30,15 @@ cd client
 npm run dev
 ```
 
+## Test
+```
+# prepare
+ffmpeg \
+ -f lavfi -i testsrc2=1280x720:r=30:d=30 \
+ -f lavfi -i sine=frequency=220:beep_factor=4:duration=30 \
+ ./tmp/output.mp4
+
+```
 
 ## Cross Compile(on Linux build Win-Binary)
 
