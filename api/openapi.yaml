@@ -1,0 +1,388 @@
+openapi: "3.0.3"
+
+info:
+  title: PeerCast-RE API
+  description: PeerCast-RE is written by Rust, PeerCast is P2P Based livestreaming software.
+  license:
+    name: Unknown
+    # identifier: Unknown
+  contact:
+    url: https://github.com/tetsuyainfra/peercast-re
+  version: "0.1.0"
+
+servers:
+  - url: "http://localhost:17144/api"
+    description: Local development API Server
+    variables:
+      api_version:
+        default: "v1"
+        enum:
+          - "v1"
+
+components:
+  schemas:
+    GnuIdString:
+      type: string
+      maximum: 32
+      minimum: 32
+      example: "11223344556677889900AABBCCDDEEFF"
+      description: 16bytes(128bit) Uniqu Id
+    ChannelType:
+      type: object
+      properties:
+        typ:
+          type: string
+          enum: [Broadcast, Relay]
+        option:
+          type: string
+      required: [typ, option]
+      example:
+        typ: Broadcast
+        option: "app1/password"
+
+    ChannelInfo:
+      type: object
+      properties:
+        typ:
+          description: typ means type (it's Reserved word)
+          type: string
+          example: "FLV"
+        name:
+          type: string
+          example: "配信テストちゃんねる"
+        genre:
+          type: string
+          example: "sp?@@@プログラミング"
+        desc:
+          type: string
+          example: "PeerCast-RTのテスト"
+        comment:
+          type: string
+          example: "コメント欄"
+        url:
+          type: string
+          example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
+        stream_type:
+          type: string
+          example: "video/x-flv"
+        stream_ext:
+          type: string
+          example: ".flv"
+        bitrate:
+          type: integer
+          example: 2048000
+      required:
+        [typ, name, genre, desc, comment, url, stream_type, stream_ext, bitrate]
+    ChannelTrack:
+      type: object
+      properties:
+        title:
+          type: string
+        creator:
+          type: string
+        url:
+          type: string
+        album:
+          type: string
+        # genre:
+        #   type: string
+      required: [title, creator, url, album]
+      # required: [title, creator, url, album, genre]
+    ChannelStatus:
+      type: string
+      enum: [idle, playing, finished, error]
+
+    ReqCreateChannel:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: "配信テストちゃんねる"
+        genre:
+          type: string
+          example: "sp?@@@プログラミング"
+        desc:
+          type: string
+          example: "PeerCast-RTのテスト"
+        comment:
+          type: string
+          example: "コメント欄"
+        url:
+          type: string
+          example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
+
+    ReqPatchChannel:
+      oneOf:
+        - type: object
+          properties:
+            info:
+              $ref: "#/components/schemas/ReqPatchChannelInfo"
+        - type: object
+          properties:
+            status:
+              $ref: "#/components/schemas/ReqPatchChannelStatus"
+
+    ReqPatchChannelInfo:
+      type: object
+      properties:
+        genre:
+          type: string
+          example: "sp?@@@プログラミング"
+        desc:
+          type: string
+          example: "PeerCast-RTのテスト"
+        comment:
+          type: string
+          example: "コメント欄"
+        url:
+          type: string
+          example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
+    ReqPatchChannelStatus:
+      type: string
+      enum: [pause, stop]
+
+    RespChannel:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/GnuIdString"
+        channel_type:
+          $ref: "#/components/schemas/ChannelType"
+        info:
+          $ref: "#/components/schemas/ChannelInfo"
+        track:
+          $ref: "#/components/schemas/ChannelTrack"
+        status:
+          $ref: "#/components/schemas/ChannelStatus"
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - channel_type
+        - info
+        - track
+        - status
+        - created_at
+
+    ConfigFileText:
+      $ref: "config/config_file_text.yaml"
+
+    ApiInfo:
+      type: object
+      properties:
+        hostname:
+          type: string
+          example: "localhost"
+        port:
+          type: integer
+          format: u16
+          example: 17144
+
+tags:
+  - name: channel
+    description: Access to Channel
+  - name: config
+    description: Access to Channel
+  # - name: relay
+  #   description: Access to Relay
+  - name: test
+    description: Just testing
+  - name: base
+    description: use api in SPA
+
+paths:
+  #
+  # Chanels
+  #
+  /channels:
+    get:
+      description: "get All Channels"
+      tags: [channel]
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RespChannel"
+    post:
+      description: "create New Channel"
+      tags: [channel]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReqCreateChannel"
+      responses:
+        "201":
+          description: Channel created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespChannel"
+
+  /channels/{broadcast_id}:
+    parameters:
+      - schema:
+          $ref: "#/components/schemas/GnuIdString"
+        name: broadcast_id
+        in: path
+        description: Id of an existing channle id.
+        required: true
+    get:
+      tags: [channel]
+      description: "get Channel infomations"
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespChannel"
+    patch:
+      description: "update Channel Infomation"
+      tags: [channel]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReqPatchChannel"
+            examples:
+              change_info:
+                value:
+                  info:
+                    comment: 終わりました。
+                    url: http://google.co.jp/
+              change_status:
+                value:
+                  status: idle
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespChannel"
+
+    delete:
+      description: "stop and delete this Channel"
+      tags: [channel]
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    $ref: "#/components/schemas/GnuIdString"
+  # /channels/{broadcast_id}/stop:
+  #   parameters:
+  #     - schema:
+  #         $ref: "#/components/schemas/GnuIdString"
+  #       name: broadcast_id
+  #       in: path
+  #       description: Id of an existing channle id.
+  #       required: true
+  #   post:
+  #     tags: [channel]
+  #     description: 'delete this Channel'
+  #     responses:
+  #       "200":
+  #         description: "success"
+  #         content:
+  #           application/json:
+  #             schema:
+  #               type: object
+  #               properties:
+  #                 status:
+  #                   type: string
+  #                   example: stop
+  #                 id:
+  #                   $ref: "#/components/schemas/GnuIdString"
+
+  #
+  # Config
+  #
+  "/config":
+    get:
+      tags: [config]
+      operationId: config_get
+      responses:
+        "200":
+          description: get config file as text
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/ConfigFileText"
+    put:
+      tags: [config]
+      operationId: config_save
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              $ref: "#/components/schemas/ConfigFileText"
+      responses:
+        "200":
+          description: get config file as text
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/ConfigFileText"
+        "300":
+          description: get config file as text
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Describe why error occured.
+
+  #
+  # Test
+  #
+  "/ping":
+    get:
+      tags: [test]
+      parameters: # リクエストパラメータ
+        - in: query
+          name: pong
+          description: pong value
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        "200":
+          description: "test-ok"
+          content:
+            application/json:
+              schema:
+                description: "return add one to pong value that you send."
+                type: object
+                properties:
+                  pong:
+                    type: integer
+                    example: 2
+
+  #
+  # Api
+  #
+  "/info":
+    get:
+      tags: [base]
+      responses:
+        "200":
+          description: "ok"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiInfo"
+                description: "return add one to pong value that you send."

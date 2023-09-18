@@ -1,0 +1,12 @@
+/* @theme base */
+@import "uncover";
+/* @import "default"; */
+
+
+section {
+    text-align: left;
+}
+
+section ul {
+    margin: 0;
+}

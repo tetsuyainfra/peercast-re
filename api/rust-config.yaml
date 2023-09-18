@@ -1,0 +1,13 @@
+# This directory specifies the path seen in Docker
+templateDir: /local/api/rust-config
+additionalProperties:
+  packageName: peercast-re-api
+files:
+  lib.mustache:
+    folder: "src"
+    destinationFilename: "lib.rs"
+    templateType: SupportingFiles
+
+
+
+# https://github.com/OpenAPITools/openapi-generator/blob/5ee18156db17eddc632a56ed9d82842c7759447d/modules/openapi-generator/src/main/java/org/openapitools/codegen/languages/RustClientCodegen.java#L333C1-L334C1

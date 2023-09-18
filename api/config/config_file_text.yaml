@@ -1,0 +1,12 @@
+# config/config_file_text.yaml
+type: string
+example: |
+    # this is ini file
+    [Server]
+    server_address=
+    server_port=17144
+    rtmp_port=11935
+    root_mode=false
+    [Privacy]
+    username=
+    password=

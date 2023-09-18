@@ -1,0 +1,8 @@
+
+[build]
+default-target = "x86_64-pc-windows-gnu"
+
+[target.x86_64-pc-windows-gnu]
+dockerfile = "./docker/Dockerfile.x86_64-pc-windows-gnu"
+context = "./docker"
+#build-args = { http_proxy = "http://10.0.0.1:3128" } # https://docs.docker.com/engine/reference/builder/#arg
