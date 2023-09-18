@@ -19,12 +19,12 @@ rm -f ./publish/*
 
 pushd target/release
     cp -a ${PROJECT_DIR}/HOW_TO_USE.md ./
-    tar zcvf ${PROJECT_DIR}/publish/peercast-re_v${PACKAGE_VERSION}_x64.tar.gz peercast-re HOW_TO_USE.md
+    tar zcvf ${PROJECT_DIR}/publish/peercast-re_v${PACKAGE_VERSION}_x64-linux.tar.gz peercast-re HOW_TO_USE.md
 popd
 
 pushd target/x86_64-pc-windows-gnu/release
     cp -a ${PROJECT_DIR}/HOW_TO_USE.md ./
-    zip      ${PROJECT_DIR}/publish/peercast-re_v${PACKAGE_VERSION}_x64.zip peercast-re.exe HOW_TO_USE.md
+    zip      ${PROJECT_DIR}/publish/peercast-re_v${PACKAGE_VERSION}_x64-win.zip peercast-re.exe HOW_TO_USE.md
 popd
 
 ls -lh target/release
