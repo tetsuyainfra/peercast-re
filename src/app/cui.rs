@@ -183,8 +183,8 @@ impl CuiApp {
         let listener = tokio::net::TcpListener::bind(server_addr).await?;
 
         // RTMP
-        let rtmp_addr = format!("{}:{}", c.server_address.to_ipaddr(), c.rtmp_port);
-        info!("rtmp server -> rtmp://{rtmp_addr}");
+        let rtmp_addr = format!("{}:{}", "127.0.0.1", c.rtmp_port); // FIXME: config.rtmp_addressの追加が必要かな？
+        info!("rtmp server -> rtmp://localhost:{}", c.rtmp_port);
         let rtmp_listener = tokio::net::TcpListener::bind(rtmp_addr.clone()).await?;
         let _rtmp_handle = tokio::spawn(Self::spawn_rtmp_server(
             manager_sender.clone(),
