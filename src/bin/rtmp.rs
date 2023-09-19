@@ -35,7 +35,6 @@ async fn main() -> Result<(), std::io::Error> {
         Ok::<_, std::io::Error>(())
     });
 
-    // tokio::time::sleep(Duration::from_secs(5)).await;
     let mut conn = RtmpConnection::new(manager_sender.clone(), ConnectionId::new(), "req1", "");
     let r = conn.connect().await;
     println!("connect: {r}");
