@@ -57,7 +57,10 @@ cross build --relase profile
 ls target/x86_64-pc-windows-gnu/release
 ```
 
-### Api
+### DockerでApiを確認する時
+```
+docker compose -f docker-compose.openapi.yml up
+```
 
 | name                 |          URL           |
 | :------------------- | :--------------------: |
@@ -66,3 +69,8 @@ ls target/x86_64-pc-windows-gnu/release
 | ~~Swagger API mock~~ | http://localhost:8003/ |
 
 
+
+# ライセンス
+今現在の表記はMITになっていますが、PCPについてのコードは[PeerCastStation](https://github.com/kumaryu/peercaststation), [PeerCast-YT](https://github.com/plonk/peercast-yt)のコードを多々参考にしています
+PCP以下のフォルダはGPL2 or GPL3にした方が良いかと考えています。追々キッチリしていくので少々お待ちください。
+※ 意訳：ライセンス汚染の可能性あるのでまだソースコードを他に流用するべからず

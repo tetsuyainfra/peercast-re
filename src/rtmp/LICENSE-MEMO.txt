@@ -1,0 +1,8 @@
+there files belong to under LICENSE of MIT or Apache2.
+- stream_manager/
+- connection.rs
+
+original code is here
+
+rust-media-libs
+https://github.com/KallDrexx/rust-media-libs
