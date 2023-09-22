@@ -23,7 +23,7 @@
     "clsx": "^2.0.0",
     "flv.js": "^1.6.2",
     "localforage": "^1.10.0",
-    "peercast-rt-api": "file:../gen/ts-fetch",
+    "peercast-re-api": "file:../gen/ts-fetch",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.46.1",
