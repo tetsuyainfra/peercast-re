@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::SystemTime};
+use std::{net::SocketAddr, str::FromStr, time::SystemTime};
 
 use axum::{
     extract::{self, Path, State},
@@ -13,9 +13,11 @@ use tracing::debug;
 
 use crate::pcp::{Channel, ChannelInfo, ChannelType, GnuId, TaskStatus, TrackInfo};
 use peercast_re_api::models::{
-    channel_info, channel_type::Typ as ChannelTypeEnum, ChannelInfo as RespChannelInfo,
-    ChannelStatus, ChannelTrack as RespChannelTrack, ChannelType as RespChannelType,
-    ReqCreateChannel, ReqPatchChannel, ReqPatchChannelInfo, ReqPatchChannelStatus, RespChannel,
+    channel_info,
+    channel_type::{self, Typ as ChannelTypeEnum},
+    ChannelInfo as RespChannelInfo, ChannelStatus, ChannelTrack as RespChannelTrack,
+    ChannelType as RespChannelType, ReqCreateChannel, ReqCreateRelayChannel, ReqPatchChannel,
+    ReqPatchChannelInfo, ReqPatchChannelStatus, RespChannel,
 };
 
 use super::AppState;
@@ -26,6 +28,7 @@ impl ChannelsSvc {
     pub(super) fn new() -> Router<AppState> {
         Router::new()
             .route("/", get(Self::list).post(Self::create))
+            .route("/relay", post(Self::create_relay))
             .route("/:id", patch(Self::patch).delete(Self::delete))
     }
 
@@ -62,6 +65,28 @@ impl ChannelsSvc {
             channel_info.into(),
             TrackInfo::default().into(),
         ) else {
+            return (StatusCode::BAD_REQUEST).into_response();
+        };
+
+        (StatusCode::CREATED, Json(RespChannel::from(&ch))).into_response()
+    }
+
+    async fn create_relay(
+        State(AppState {
+            channel_manager, ..
+        }): State<AppState>,
+        extract::Json(info): extract::Json<ReqCreateRelayChannel>,
+    ) -> impl IntoResponse {
+        debug!("json ch_info: {info:#?}");
+        let Ok(channel_id) = GnuId::from_str(&info.id) else {
+            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
+        };
+        let Ok(addr) = info.host.parse::<SocketAddr>() else {
+            return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
+        };
+
+        let channel_type = ChannelType::Relay(addr);
+        let Some(ch) = channel_manager.create(channel_id, channel_type, None, None) else {
             return (StatusCode::BAD_REQUEST).into_response();
         };
 

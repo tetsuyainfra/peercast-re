@@ -39,7 +39,7 @@ docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_
     -i /local/api/openapi.yaml \
     -g rust-server \
     -o /local/gen/rust-server \
-    -p packageName=peercast-rt-api-server \
+    -p packageName=peercast-re-api-server \
     -p packageVersion=${PACKAGE_VERSION}
 
 # rm -rf ./gen/js

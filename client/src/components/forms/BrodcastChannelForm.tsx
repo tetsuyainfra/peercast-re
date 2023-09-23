@@ -56,7 +56,7 @@ export default function BrodcastChannelButton() {
     let api = new ChannelApi(api_config())
 
     api
-      .channelsPost({
+      .createBroadcastChannel({
         reqCreateChannel: {
           name: values.name,
           genre: values.genre,
