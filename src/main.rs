@@ -1,9 +1,10 @@
 use clap::Parser;
 use std::path::PathBuf;
+use tracing::info;
 
 use peercast_re::{
     app::cui::{self, CuiError},
-    config::{Config, ConfigLoader, ConfigPath},
+    config::{Config, ConfigLoader},
     error::ConfigError,
 };
 
@@ -18,6 +19,14 @@ use peercast_re::{
     )]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 struct Cli {
+    #[clap(
+        short = 'C',
+        long = "config",
+        value_name = "CONFIG_FILE",
+        env = "PEERCAST_RE_CONFIG"
+    )]
+    config_file: Option<PathBuf>,
+
     #[clap(
         short = 'b',
         long = "bind",
@@ -48,32 +57,16 @@ impl Cli {
     }
 }
 
-// Cliクラスで引数を受け取って処理しても良いのではないか
-// default_value, dafault_environmentってあるっぽい
-// #[clap(
-//     short = 'c',
-//     long = "config",
-//     value_name = "CONFIG_FILE",
-//     env = "PEERCAST_RT_CONFIG"
-// )]
-// config_file: Option<PathBuf>,
-fn load_config() -> Result<(PathBuf, Config), ConfigError> {
-    fn env_str() -> &'static str {
-        if cfg!(debug_assersion) {
-            "DEBUG_PEERCAST_RT_CONFIG"
-        } else {
-            "PEERCAST_RT_CONFIG"
-        }
-    }
+fn load_config(env_or_args: Option<PathBuf>) -> Result<(PathBuf, Config), ConfigError> {
+    let exe_dir = PathBuf::from(std::env::current_exe().unwrap().parent().unwrap());
 
     let (path, config) = ConfigLoader::<Config>::new()
-        .add_source(ConfigPath::Env(env_str().into()))
-        .add_source(ConfigPath::Path("peercast-re.ini".into()))
-        .default_source(ConfigPath::PathBuf(
-            dirs::config_dir().unwrap().join("peercast/peercast-re.ini"),
-        )) // これでいいのか？
+        .env_or_args(env_or_args)
+        .add_source(exe_dir.join("peercast-re.ini"))
+        .default_source(dirs::config_dir().unwrap().join("peercast/peercast-re.ini")) // これでいいのか？
         .load();
 
+    info!(?config);
     Ok((path, config?))
 }
 
@@ -114,7 +107,7 @@ fn main() {
     let cli = Cli::parse();
     println!("{:#?}", &cli);
 
-    let Ok((config_path, config)) = load_config() else {
+    let Ok((config_path, config)) = load_config(cli.config_file.clone()) else {
         std::process::exit(exitcode::CONFIG);
     };
     let config = cli.merge_with(&config);

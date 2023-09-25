@@ -174,7 +174,7 @@ impl Config {
 
 impl ConfigTrait for Config {
     type ErrorType = ConfigError;
-    fn load_file(path: &Path) -> Result<Self, Self::ErrorType> {
+    fn load_file(path: &PathBuf) -> Result<Self, Self::ErrorType> {
         let file_str = fs::read_to_string(path)?;
         let mut config = Self::load_str(&file_str)?;
 
@@ -182,7 +182,7 @@ impl ConfigTrait for Config {
         Ok(config)
     }
 
-    fn save_file(&self, path: &Path) -> Result<(), Self::ErrorType> {
+    fn save_file(&self, path: &PathBuf) -> Result<(), Self::ErrorType> {
         let buf = self.save_str();
         let mut file = File::create(path)?;
         let _r = file.write_all(&buf)?;
