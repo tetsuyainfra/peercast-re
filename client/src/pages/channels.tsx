@@ -9,6 +9,7 @@ import { RespChannel } from "../../../gen/ts-fetch/models"
 import ChannelCard from "@/components/ChannelCard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { env } from "process"
 
 export default function Channels() {
   const urlInputId = React.useId()
@@ -74,9 +75,7 @@ export default function Channels() {
                 type="url"
                 id={urlInputId}
                 name="source_url"
-                defaultValue={
-                  "http://localhost:61744/pls/5DBE5A40E75191CC014B558178F25BE6?tip=180.60.52.139:27726"
-                }
+                defaultValue={import.meta.env.VITE_DEBUG_URL}
               />
               <Button type="submit">Play</Button>
             </form>

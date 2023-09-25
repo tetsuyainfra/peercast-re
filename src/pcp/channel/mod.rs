@@ -5,7 +5,7 @@ mod channel;
 mod channel_stream;
 mod manager;
 mod node_pool;
-mod task;
+mod src_task;
 
 pub(self) use broker::ChannelBrokerMessage;
 pub use broker::{ChannelMessage, ChannelReciever};
@@ -13,7 +13,8 @@ pub use channel::{Channel, ChannelType};
 pub use manager::ChannelManager;
 pub use node_pool::{Node, NodePool};
 use serde::Serialize;
-pub use task::{BroadcastTaskConfig, RelayTaskConfig, SourceTaskConfig, TaskStatus};
+pub use src_task::{BroadcastTaskConfig, RelayTaskConfig, SourceTaskConfig, TaskStatus};
+use tracing::error;
 
 use crate::pcp::{atom, Id4};
 
@@ -42,7 +43,7 @@ pub struct TrackInfo {
     pub creator: String,
     pub url: String,
     pub album: String,
-    // pub genre: String, // PeerCastStation Only?
+    pub genre: String, // PeerCastStation Only?
 }
 
 macro_rules! def_accessor {
@@ -128,7 +129,7 @@ impl TrackInfo {
     def_accessor!(album);
     def_accessor!(creator);
     def_accessor!(url);
-    // def_accessor!(genre);
+    def_accessor!(genre);
 }
 
 impl From<&Atom> for TrackInfo {
@@ -149,10 +150,11 @@ impl From<&Atom> for TrackInfo {
                 Id4::PCP_CHAN_TRACK_URL => {
                     i.set_url(_in::to_string(&a.as_child().payload()));
                 }
-                // Id4::PCP_CHAN_TRACK_GENRE => {
-                //     i.set_genre(_in::to_string(&a.as_child().payload()));
-                // }
+                Id4::PCP_CHAN_TRACK_GENRE => {
+                    i.set_genre(_in::to_string(&a.as_child().payload()));
+                }
                 _ => {
+                    error!("atom: {:#?}", a);
                     panic!("Not implemented. and may be no needs...");
                 }
             }

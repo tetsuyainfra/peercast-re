@@ -84,13 +84,13 @@ components:
           type: string
         album:
           type: string
-        # genre:
-        #   type: string
+        genre:
+          type: string
       required: [title, creator, url, album]
       # required: [title, creator, url, album, genre]
     ChannelStatus:
       type: string
-      enum: [idle, playing, finished, error]
+      enum: [Init, Searching, Receiving, Idle, Finish, Error]
 
     ReqCreateRelayChannel:
       type: object

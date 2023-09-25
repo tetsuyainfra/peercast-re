@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::debug;
 
-use crate::pcp::{Channel, ChannelInfo, ChannelType, GnuId, TaskStatus, TrackInfo};
+use crate::{
+    pcp::{Channel, ChannelInfo, ChannelType, GnuId, RelayTaskConfig, TaskStatus, TrackInfo},
+    ConnectionId,
+};
 use peercast_re_api::models::{
     channel_info,
     channel_type::{self, Typ as ChannelTypeEnum},
@@ -53,10 +56,7 @@ impl ChannelsSvc {
         extract::Json(info): extract::Json<ReqCreateChannel>,
     ) -> impl IntoResponse {
         debug!("json ch_info: {info:#?}");
-        let ch_type = ChannelType::Broadcast {
-            app: "ch1".into(),
-            pass: "".into(),
-        };
+        let ch_type = ChannelType::Broadcast;
         let channel_info = ChannelInfo::from(info);
 
         let Some(ch) = channel_manager.create(
@@ -85,10 +85,15 @@ impl ChannelsSvc {
             return (StatusCode::INTERNAL_SERVER_ERROR).into_response();
         };
 
-        let channel_type = ChannelType::Relay(addr);
+        let channel_type = ChannelType::Relay;
         let Some(ch) = channel_manager.create(channel_id, channel_type, None, None) else {
             return (StatusCode::BAD_REQUEST).into_response();
         };
+        let session_id = GnuId::new();
+        let r = ch.connect(
+            ConnectionId::new(),
+            crate::pcp::SourceTaskConfig::Relay(RelayTaskConfig { addr }),
+        );
 
         (StatusCode::CREATED, Json(RespChannel::from(&ch))).into_response()
     }
@@ -183,14 +188,14 @@ impl From<&TrackInfo> for RespChannelTrack {
             creator,
             url,
             album,
-            // genre,
+            genre,
         } = value.clone();
         Self {
             title: title,
             creator: creator,
             url: url,
             album: album,
-            // genre: genre,
+            genre: Some(genre),
         }
     }
 }
@@ -226,9 +231,11 @@ impl From<&ChannelInfo> for RespChannelInfo {
 impl From<&TaskStatus> for ChannelStatus {
     fn from(value: &TaskStatus) -> Self {
         match value {
+            TaskStatus::Init => ChannelStatus::Init,
+            TaskStatus::Searching { searched, all } => ChannelStatus::Searching,
+            TaskStatus::Receiving => ChannelStatus::Receiving,
             TaskStatus::Idle => ChannelStatus::Idle,
-            TaskStatus::Running => ChannelStatus::Playing,
-            TaskStatus::Stopped => ChannelStatus::Finished,
+            TaskStatus::Finish => ChannelStatus::Finish,
             TaskStatus::Error => ChannelStatus::Error,
         }
     }
@@ -237,12 +244,8 @@ impl From<&TaskStatus> for ChannelStatus {
 impl From<&ChannelType> for RespChannelType {
     fn from(value: &ChannelType) -> Self {
         match value {
-            ChannelType::Broadcast { app, pass } => {
-                RespChannelType::new(ChannelTypeEnum::Broadcast, format!("{app}/{pass}"))
-            }
-            ChannelType::Relay(addr) => {
-                RespChannelType::new(ChannelTypeEnum::Relay, addr.to_string())
-            }
+            ChannelType::Broadcast => RespChannelType::new(ChannelTypeEnum::Broadcast, "".into()),
+            ChannelType::Relay => RespChannelType::new(ChannelTypeEnum::Relay, "".into()),
         }
     }
 }
@@ -256,7 +259,7 @@ impl From<&Channel> for RespChannel {
             channel_type: Box::new(RespChannelType::from(&value.channel_type())),
             info: Box::new(RespChannelInfo::from(&info)),
             track: Box::new(RespChannelTrack::from(&track)),
-            status: ChannelStatus::from(&value.source_task_status()),
+            status: ChannelStatus::from(&value.status()),
             created_at: value.created_at().to_rfc3339(),
         }
     }

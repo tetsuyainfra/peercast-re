@@ -8,9 +8,12 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use num::complex::ComplexFloat;
-use tokio::sync::{
-    mpsc::{self, UnboundedReceiver, UnboundedSender},
-    watch,
+use tokio::{
+    sync::{
+        mpsc::{self, UnboundedReceiver, UnboundedSender},
+        watch,
+    },
+    task::JoinHandle,
 };
 use tracing::{debug, info, trace};
 
@@ -22,7 +25,7 @@ use crate::{
 use super::{
     broker::ChannelBroker,
     channel_stream::ChannelStream,
-    task::{BroadcastTask, RelayTask, SourceTaskConfig, SourceTaskTrait, TaskStatus},
+    src_task::{BroadcastTask, RelayTask, SourceTask, SourceTaskConfig, TaskStatus},
     ChannelInfo, ChannelReciever, TrackInfo,
 };
 
@@ -31,8 +34,8 @@ use super::{
 //
 #[derive(Debug, Clone)]
 pub enum ChannelType {
-    Broadcast { app: String, pass: String }, // 配信チャンネル(このPCで配信している)
-    Relay(SocketAddr),                       // 中継チャンネル
+    Broadcast, // { app: String, pass: String }, // 配信チャンネル(このPCで配信している)
+    Relay,     //(SocketAddr),                       // 中継チャンネル
 }
 
 //------------------------------------------------------------------------------
@@ -40,15 +43,18 @@ pub enum ChannelType {
 //
 #[derive(Debug, Clone)]
 pub struct Channel {
+    session_id: GnuId,
     id: GnuId,
-    ch_type: ChannelType, // 作成したら状態は変わらない
+    ch_type: ChannelType, // 作成したら状態は変わらないで良いともうけども・・・Configは変わる可能性あるか？
     channel_info: Arc<RwLock<Option<ChannelInfo>>>,
     track_info: Arc<RwLock<Option<TrackInfo>>>,
 
     // manager
     broker_task: Arc<ChannelBroker>,
     // SourceTask
-    source_task: Arc<RwLock<Option<Pin<Box<dyn SourceTaskTrait + 'static>>>>>,
+    // source_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    // source_task: Arc<RwLock<Option<Pin<Box<dyn SourceTask>>>>>,
+    source_task: Arc<RwLock<Option<Box<dyn SourceTask>>>>,
     //
     // shutdown: Arc<RwLock<Shutdown>>,
     //
@@ -61,6 +67,7 @@ pub struct Channel {
 
 impl Channel {
     pub(super) fn new(
+        session_id: GnuId,
         id: GnuId,
         ch_type: ChannelType,
         channel_info: Option<ChannelInfo>,
@@ -69,10 +76,12 @@ impl Channel {
         let channel_info = Arc::new(RwLock::new(channel_info));
         let track_info = Arc::new(RwLock::new(track_info));
         Channel {
+            session_id,
             id,
             ch_type,
             //
             broker_task: Arc::new(ChannelBroker::new(
+                ChannelType::Broadcast,
                 id,
                 Arc::clone(&channel_info),
                 Arc::clone(&track_info),
@@ -121,32 +130,54 @@ impl Channel {
         // TOOD: send info to task
     }
 
-    pub fn connect(
-        &self,
-        connection_id: ConnectionId,
-        session_id: GnuId,
-        config: SourceTaskConfig,
-    ) -> bool {
+    pub fn connect(&self, connection_id: ConnectionId, config: SourceTaskConfig) -> bool {
         let mut opt_task = self.source_task.write().unwrap();
         let mut broker_sender = self.broker_task.sender();
         match opt_task.as_ref() {
             Some(c) => false,
             None => {
-                let pinned_task: Pin<Box<dyn SourceTaskTrait>> = match config {
-                    SourceTaskConfig::Broadcast(c) => Box::pin(BroadcastTask::new(
-                        self.id(),
-                        connection_id,
-                        c,
-                        broker_sender,
-                    )),
+                // *opt_task = Some(pinned_task);
+                *opt_task = match &config {
+                    SourceTaskConfig::Broadcast(c) => {
+                        //
+                        let mut task = BroadcastTask::new(self.id(), connection_id, broker_sender);
+                        let _ = task.connect(config);
+                        // let task: Pin<Box<dyn SourceTask>> = Box::pin(task);
+                        Some(Box::new(task))
+                    }
                     SourceTaskConfig::Relay(c) => {
-                        Box::pin(RelayTask::new(self.id(), connection_id, c, broker_sender))
+                        let mut task = RelayTask::new(self.session_id, self.id(), broker_sender);
+                        let _ = task.connect(config);
+                        // let task: Pin<Box<dyn SourceTask>> = Box::pin(task);
+                        Some(Box::new(task))
                     }
                 };
-                // 接続する
-                *opt_task = Some(pinned_task);
                 true
             }
+        }
+    }
+
+    pub fn stop(&self) {
+        let mut opt_task = self.source_task.write().unwrap();
+        match opt_task.take() {
+            None => {}
+            Some(task) => task.stop(),
+        }
+    }
+
+    pub fn retry(&self) -> bool {
+        let mut opt_task = self.source_task.write().unwrap();
+        match opt_task.as_mut() {
+            None => false,
+            Some(task) => task.retry(),
+        }
+    }
+
+    pub fn status(&self) -> TaskStatus {
+        let mut opt_task = self.source_task.read().unwrap();
+        match &(*opt_task) {
+            Some(task) => task.status(),
+            None => TaskStatus::Idle,
         }
     }
 
@@ -157,24 +188,6 @@ impl Channel {
     pub fn channel_stream(&self, connection_id: ConnectionId) -> ChannelStream {
         let reciever = self.broker_task.channel_reciever(connection_id);
         ChannelStream::new(self.id.clone(), reciever)
-    }
-
-    pub fn source_task_status(&self) -> TaskStatus {
-        let mut opt_task = self.source_task.read().unwrap();
-        match &(*opt_task) {
-            Some(task) => task.status(),
-            None => TaskStatus::Idle,
-        }
-    }
-
-    pub async fn source_task_stop(&self) {
-        debug!("task_stop");
-        let mut opt_task = self.source_task.write().unwrap();
-        match opt_task.take() {
-            Some(task) => task.stop().await,
-            None => {}
-        };
-        debug!("task_stop end");
     }
 }
 

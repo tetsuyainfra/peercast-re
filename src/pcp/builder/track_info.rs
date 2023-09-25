@@ -14,7 +14,7 @@ impl TrackInfoBuilder {
             creator,
             url,
             album,
-            // genre,
+            genre,
         } = self.track;
         ParentAtom::from((
             Id4::PCP_CHAN_TRACK,
@@ -23,6 +23,7 @@ impl TrackInfoBuilder {
                 ChildAtom::from((Id4::PCP_CHAN_TRACK_CREATOR, creator)).into(),
                 ChildAtom::from((Id4::PCP_CHAN_TRACK_URL, url)).into(),
                 ChildAtom::from((Id4::PCP_CHAN_TRACK_ALBUM, album)).into(),
+                ChildAtom::from((Id4::PCP_CHAN_TRACK_GENRE, genre)).into(),
             ],
         ))
         .into()

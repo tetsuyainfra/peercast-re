@@ -119,9 +119,9 @@ impl HttpSvc {
                     tracing::debug!("streaming {} bytes", chunk.len());
                 },
             ))
-            .layer(RestrictIpLayer {
-                white_nets: allow_ips,
-            })
+            // .layer(RestrictIpLayer {
+            //     white_nets: allow_ips,
+            // })
             .layer(
                 CorsLayer::new()
                     .allow_origin(origins)
@@ -186,23 +186,20 @@ impl HttpSvc {
                     error!("tipに接続先のIpアドレスが含まれていません");
                     return Err(StatusCode::INTERNAL_SERVER_ERROR);
                 };
-                let ch_type = ChannelType::Relay(connect_to);
+                let ch_type = ChannelType::Relay;
                 channel_manager.create_or_get(channel_id, ch_type, None, None)
             }
         };
 
         // TODO: Channelから情報もってきて適宜処理する
-        match ch.source_task_status() {
-            TaskStatus::Running => { /* pass */ }
+        match ch.status() {
+            TaskStatus::Receiving => { /* pass */ }
             // FIXME: session_idをどこかで管理すること
             _ => {
                 // let _ = ch.connect(ConnectionId::new(), session_id, connect_to);
                 let connect_to = "192.168.10.230:61744".parse().unwrap();
-                let task_config = SourceTaskConfig::Relay(RelayTaskConfig {
-                    session_id, // これ SessionIDだからChannelManager側にあるべき
-                    addr: connect_to,
-                });
-                let _ = ch.connect(ConnectionId::new(), session_id, task_config);
+                let task_config = SourceTaskConfig::Relay(RelayTaskConfig { addr: connect_to });
+                let _ = ch.connect(connection_id, task_config);
             }
         };
         drop(ch);

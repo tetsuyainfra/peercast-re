@@ -1,5 +1,5 @@
 use bytes::{Buf, Bytes};
-use tracing::info;
+use tracing::{error, info, trace};
 
 use super::util::atom as _in;
 use super::{Atom, ChannelInfo, GnuId, Id4, TrackInfo};
@@ -16,16 +16,16 @@ use super::{Atom, ChannelInfo, GnuId, Id4, TrackInfo};
 // ])
 
 pub enum ClassifyAtom {
-    HeadData {
+    ChanPktHead {
         atom: Atom,
-        head_data: Bytes,
+        payload: Bytes,
         pos: u32,
         info: Option<ChannelInfo>,
         track: Option<TrackInfo>,
     },
-    Data {
+    ChanPktData {
         atom: Atom,
-        data: Bytes,
+        payload: Bytes,
         pos: u32,
         continuation: Option<bool>,
     },
@@ -60,13 +60,13 @@ impl ClassifyAtom {
                 };
                 let info = get_info(atoms);
                 let track = get_track(atoms);
-                return match typ_ {
+                match typ_ {
                     //
                     ChanPktDataType::Head => {
                         info!(info=?info, track=?track);
-                        ClassifyAtom::HeadData {
+                        ClassifyAtom::ChanPktHead {
                             atom,
-                            head_data: data,
+                            payload: data,
                             pos,
                             info,
                             track,
@@ -76,22 +76,20 @@ impl ClassifyAtom {
                     ChanPktDataType::Data => {
                         //
                         // info!("atom {:#?}", &atom);
-                        ClassifyAtom::Data {
+                        ClassifyAtom::ChanPktData {
                             atom: atom,
-                            data: data,
+                            payload: data,
                             pos: pos,
                             continuation,
                         }
                     }
-                };
+                }
             }
             _ => {
-                panic!("not implement! atom classify");
+                error!("atom: {:#?}", &atom);
+                Self::Unknown { atom }
             }
         }
-
-        // trace!("atom: {:#?}", &atom);
-        Self::Unknown { atom }
     }
 }
 

@@ -34,7 +34,10 @@ use crate::{
     config::Config,
     error,
     http::{HttpSvc, MyConnectInfo, MyIncomingStream, ShutdownAndNotifySet},
-    pcp::{BroadcastTaskConfig, ChannelInfo, ChannelManager, GnuId, TrackInfo},
+    pcp::{
+        BroadcastTaskConfig, ChannelInfo, ChannelManager, ChannelType, GnuId, RelayTaskConfig,
+        SourceTaskConfig, TrackInfo,
+    },
     rtmp::{
         connection,
         stream_manager::{self, StreamManagerMessage},
@@ -165,7 +168,7 @@ impl CuiApp {
     // TODO: ApplicationをRestartする機能を付けるならResult<ShutdownOrRestart, TuiError>っていう変数を返せばよさそう
     async fn main(&mut self) -> Result<(), CuiError> {
         let session_id = GnuId::new();
-        let channel_manager = ChannelManager::new();
+        let channel_manager = ChannelManager::new(&session_id);
         let manager_sender = stream_manager::start();
         let http_svc = HttpSvc::new(
             self.config_path.clone(),
@@ -192,26 +195,43 @@ impl CuiApp {
             rtmp_addr,
         ));
 
-        // debugging
-        let ch = channel_manager.create(
-            GnuId::from_str("00112233445566778899AABBCCDDEEFF").unwrap(),
-            crate::pcp::ChannelType::Broadcast {
-                app: "req1".into(),
-                pass: "".into(),
-            },
-            ChannelInfo::new().name("Test".into()).into(),
-            TrackInfo::default().into(),
-        );
-        ch.unwrap().connect(
-            ConnectionId::new(),
-            session_id,
-            BroadcastTaskConfig {
-                app_key: "req1".into(),
-                stream_key: "".into(),
-                rtmp_manager: manager_sender.clone(),
-            }
-            .into(),
-        );
+        // debugging(Broadcast)
+        // let ch = channel_manager.create(
+        //     GnuId::from_str("00112233445566778899AABBCCDDEEFF").unwrap(),
+        //     crate::pcp::ChannelType::Broadcast {
+        //         app: "req1".into(),
+        //         pass: "".into(),
+        //     },
+        //     ChannelInfo::new().name("Test".into()).into(),
+        //     TrackInfo::default().into(),
+        // );
+        // ch.unwrap().connect(
+        //     ConnectionId::new(),
+        //     session_id,
+        //     BroadcastTaskConfig {
+        //         app_key: "req1".into(),
+        //         stream_key: "".into(),
+        //         rtmp_manager: manager_sender.clone(),
+        //     }
+        //     .into(),
+        // );
+        // ;=http://localhost:61744/pls/B0B1E437470085684B2F25925A4D8F61?tip=202.70.178.252:7144
+
+        // debugging(Relay)
+        // let url = match std::env::var("PEERCAST_RE_DEBUG_URL") {
+        //     Ok(s) => url::Url::parse(&s).unwrap(),
+        //     Err(_) => todo!(),
+        // };
+        // let id = GnuId::from_str(url.path().split("/").last().unwrap()).unwrap();
+        // let (key, val) = url.query_pairs().find(|(k, v)| k == "tip").unwrap();
+        // let addr = val.parse().unwrap();
+        // let ch = channel_manager
+        //     .create(id, ChannelType::Relay, None, None)
+        //     .unwrap();
+        // ch.connect(
+        //     ConnectionId::new(),
+        //     SourceTaskConfig::Relay(RelayTaskConfig { addr: addr }),
+        // );
 
         'accept_loop: loop {
             let mut connection_id = ConnectionId::new();
