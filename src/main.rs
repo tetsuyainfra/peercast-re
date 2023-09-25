@@ -68,9 +68,9 @@ fn load_config() -> Result<(PathBuf, Config), ConfigError> {
 
     let (path, config) = ConfigLoader::<Config>::new()
         .add_source(ConfigPath::Env(env_str().into()))
-        .add_source(ConfigPath::Path("peercast-rt.ini".into()))
+        .add_source(ConfigPath::Path("peercast-re.ini".into()))
         .default_source(ConfigPath::PathBuf(
-            dirs::config_dir().unwrap().join("peercast/peercast-rt.ini"),
+            dirs::config_dir().unwrap().join("peercast/peercast-re.ini"),
         )) // これでいいのか？
         .load();
 
