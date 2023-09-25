@@ -119,9 +119,9 @@ impl HttpSvc {
                     tracing::debug!("streaming {} bytes", chunk.len());
                 },
             ))
-            // .layer(RestrictIpLayer {
-            //     white_nets: allow_ips,
-            // })
+            .layer(RestrictIpLayer {
+                white_nets: allow_ips,
+            })
             .layer(
                 CorsLayer::new()
                     .allow_origin(origins)

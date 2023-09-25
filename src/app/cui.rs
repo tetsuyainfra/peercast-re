@@ -28,7 +28,7 @@ use tokio::{
     time::{sleep, Instant},
 };
 use tower::Service;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::{
     config::Config,
@@ -71,6 +71,7 @@ impl CuiApp {
     const WAIT_FORCE_SHUTDOWN_CTRLC_TIMES: usize = 3;
 
     pub fn run(config_path: PathBuf, config: Config) -> Result<(), CuiError> {
+        debug!(?config);
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .worker_threads(4)

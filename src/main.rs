@@ -1,6 +1,6 @@
 use clap::Parser;
 use std::path::PathBuf;
-use tracing::info;
+use tracing::{debug, info};
 
 use peercast_re::{
     app::cui::{self, CuiError},
@@ -31,12 +31,15 @@ struct Cli {
         short = 'b',
         long = "bind",
         value_name = "IP_ADDRESS",
-        default_value = "0.0.0.0"
+        // default_value = "0.0.0.0"
     )]
     server_address: Option<std::net::IpAddr>,
 
-    #[clap(short='p', long="port", value_name = "PORT", default_value = "17144",
-                    value_parser = clap::value_parser!(u16).range(5000..))]
+    #[clap(
+        short='p', long="port", value_name = "PORT",
+    //  default_value = "17144",
+        value_parser = clap::value_parser!(u16).range(5000..)
+    )]
     server_port: Option<u16>,
 }
 
@@ -63,10 +66,14 @@ fn load_config(env_or_args: Option<PathBuf>) -> Result<(PathBuf, Config), Config
     let (path, config) = ConfigLoader::<Config>::new()
         .env_or_args(env_or_args)
         .add_source(exe_dir.join("peercast-re.ini"))
-        .default_source(dirs::config_dir().unwrap().join("peercast/peercast-re.ini")) // これでいいのか？
+        .default_source(
+            dirs::config_dir()
+                .unwrap()
+                .join("peercast-re/peercast-re.ini"),
+        ) // これでいいのか？
         .load();
 
-    info!(?config);
+    debug!(?config);
     Ok((path, config?))
 }
 

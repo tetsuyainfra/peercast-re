@@ -12,7 +12,8 @@ use pbkdf2::{
     Pbkdf2,
 };
 use rand_core::OsRng;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+use tracing_subscriber::field::debug;
 
 use crate::error::{AuthError, ConfigError, ParseVariableError};
 
