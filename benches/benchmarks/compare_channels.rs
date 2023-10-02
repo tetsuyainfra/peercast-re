@@ -22,9 +22,9 @@ fn compare_channels(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Channels");
     for i in [size].iter() {
-        group.bench_with_input(BenchmarkId::new("mpsc", i), i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("mpsc", i), i, |b, _i| {
             b.to_async(FuturesExecutor).iter_custom(|iters| async move {
-                let (tx, mut rx) = mpsc::unbounded_channel();
+                let (_tx, mut rx) = mpsc::unbounded_channel();
                 let start = Instant::now();
                 for _i in 0..iters {
                     mpsc_recv(&mut rx).await;
@@ -32,9 +32,9 @@ fn compare_channels(c: &mut Criterion) {
                 start.elapsed()
             })
         });
-        group.bench_with_input(BenchmarkId::new("watch", i), i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("watch", i), i, |b, _i| {
             b.to_async(FuturesExecutor).iter_custom(|iters| async move {
-                let (tx, mut rx) = watch::channel(());
+                let (_tx, mut rx) = watch::channel(());
                 let start = Instant::now();
                 for _i in 0..iters {
                     watch_recv(&mut rx).await;
@@ -42,9 +42,9 @@ fn compare_channels(c: &mut Criterion) {
                 start.elapsed()
             })
         });
-        group.bench_with_input(BenchmarkId::new("broadcast", i), i, |b, i| {
+        group.bench_with_input(BenchmarkId::new("broadcast", i), i, |b, _i| {
             b.to_async(FuturesExecutor).iter_custom(|iters| async move {
-                let (tx, mut rx) = broadcast::channel::<()>(1);
+                let (_tx, mut rx) = broadcast::channel::<()>(1);
                 let start = Instant::now();
                 for _i in 0..iters {
                     broadcast_recv(&mut rx).await;
