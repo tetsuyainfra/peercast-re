@@ -20,6 +20,15 @@ services:
     environment:
       SWAGGER_JSON: /api/openapi.yaml # Swagger File
 
+  swagger-ui-ppc:
+    image: swaggerapi/swagger-ui
+    # container_name: "swagger-ui"
+    ports:
+      - "8003:8080"
+    volumes:
+      - ./api:/api # Swagger File
+    environment:
+      SWAGGER_JSON: /api/peercast-port-checkerd.yaml # Swagger File
 
   # swagger-api:
   #   image: stoplight/prism:latest

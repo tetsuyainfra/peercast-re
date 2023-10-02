@@ -15,6 +15,7 @@ use std::{
 };
 
 use axum_core::{extract::Request, response::Response};
+use bytes::BytesMut;
 use futures_util::{stream, task::SpawnExt, Future, FutureExt};
 use hyper_util::client::connect;
 use ipnet::IpNet;
@@ -35,8 +36,8 @@ use crate::{
     error,
     http::{HttpSvc, MyConnectInfo, MyIncomingStream, ShutdownAndNotifySet},
     pcp::{
-        BroadcastTaskConfig, ChannelInfo, ChannelManager, ChannelType, GnuId, RelayTaskConfig,
-        SourceTaskConfig, TrackInfo,
+        procedure::PcpHandshake, BroadcastTaskConfig, ChannelInfo, ChannelManager, ChannelType,
+        GnuId, RelayTaskConfig, SourceTaskConfig, TrackInfo,
     },
     rtmp::{
         connection,
@@ -168,18 +169,18 @@ impl CuiApp {
 
     // TODO: ApplicationをRestartする機能を付けるならResult<ShutdownOrRestart, TuiError>っていう変数を返せばよさそう
     async fn main(&mut self) -> Result<(), CuiError> {
-        let session_id = GnuId::new();
-        let channel_manager = ChannelManager::new(&session_id);
+        let self_session_id = GnuId::new();
+        let channel_manager = ChannelManager::new(&self_session_id);
         let manager_sender = stream_manager::start();
         let http_svc = HttpSvc::new(
             self.config_path.clone(),
             self.config.clone(),
-            session_id,
+            self_session_id,
             Arc::clone(&channel_manager),
             Arc::new(manager_sender.clone()),
         );
 
-        // RTMP
+        // PCP/HTTP
         let c = &self.config;
         let server_addr: String = format!("{}:{}", c.server_address.to_ipaddr(), c.server_port);
         info!("bind server -> {server_addr}");
@@ -195,6 +196,17 @@ impl CuiApp {
             rtmp_listener,
             rtmp_addr,
         ));
+
+        // PORT CHECK
+        let server_port = c.server_port;
+        let port_check_handle = tokio::spawn(async move {
+            info!("port check");
+            let res = reqwest::get(format!(
+                "http://ppc-v4.tetsuyainfra.dev/ppc/portcheck?port={server_port}"
+            ))
+            .await;
+            info!("res: {:?}", res);
+        });
 
         // debugging(Broadcast)
         // let ch = channel_manager.create(
@@ -219,20 +231,25 @@ impl CuiApp {
         // ;=http://localhost:61744/pls/B0B1E437470085684B2F25925A4D8F61?tip=202.70.178.252:7144
 
         // debugging(Relay)
-        // let url = match std::env::var("PEERCAST_RE_DEBUG_URL") {
-        //     Ok(s) => url::Url::parse(&s).unwrap(),
-        //     Err(_) => todo!(),
-        // };
-        // let id = GnuId::from_str(url.path().split("/").last().unwrap()).unwrap();
-        // let (key, val) = url.query_pairs().find(|(k, v)| k == "tip").unwrap();
+        /*
+        let url = match std::env::var("PEERCAST_RE_DEBUG_URL") {
+            Ok(s) => url::Url::parse(&s).unwrap(),
+            Err(_) => todo!(),
+        };
+        let id = GnuId::from_str(url.path().split("/").last().unwrap()).unwrap();
+        let (key, val) = url.query_pairs().find(|(k, v)| k == "tip").unwrap();
         // let addr = val.parse().unwrap();
-        // let ch = channel_manager
-        //     .create(id, ChannelType::Relay, None, None)
-        //     .unwrap();
-        // ch.connect(
-        //     ConnectionId::new(),
-        //     SourceTaskConfig::Relay(RelayTaskConfig { addr: addr }),
-        // );
+        let addr = "192.168.10.230:61744".parse().unwrap();
+        let ch = channel_manager
+            .create(id, ChannelType::Relay, None, None)
+            .unwrap();
+        ch.connect(
+            ConnectionId::new(),
+            SourceTaskConfig::Relay(RelayTaskConfig {
+                addr: addr,
+                self_addr: None,
+            }),
+        ); */
 
         'accept_loop: loop {
             let mut connection_id = ConnectionId::new();
@@ -259,15 +276,24 @@ impl CuiApp {
                     }
                 };
                 match &protocol {
-                    ConnectionProtocol::PeerCast | ConnectionProtocol::PeerCastHttp => {
-                        Self::spawn_pcp_server(
+                    ConnectionProtocol::PeerCast => {
+                        Self::spawn_pcp_portcheck(
                             cloned_channel_manager,
-                            cloned_manager_sender,
-                            // cloned_local_address,
+                            //
                             connection_id,
                             tcp_stream,
                             remote_addr,
-                            protocol,
+                            shutdown_set,
+                        )
+                        .await;
+                    }
+                    ConnectionProtocol::PeerCastHttp => {
+                        Self::spawn_pcp_server(
+                            cloned_channel_manager,
+                            cloned_manager_sender,
+                            connection_id,
+                            tcp_stream,
+                            remote_addr,
                             shutdown_set,
                         )
                         .await;
@@ -311,20 +337,44 @@ impl CuiApp {
         }
     }
 
-    async fn spawn_pcp_server(
+    // https://github.com/plonk/peercast-yt/blob/787be6405cc2d82a5d26c0023aaa5d1973c13802/core/common/servent.cpp#L1250
+    async fn spawn_pcp_portcheck(
         channel_manager: Arc<ChannelManager>,
-        rtmp_stream_manager: UnboundedSender<StreamManagerMessage>,
-        // local_address: Arc<Vec<IpNet>>,
         //
         connection_id: ConnectionId,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
-        protocol: ConnectionProtocol,
         shutdown_set: ShutdownAndNotifySet,
     ) {
-        let channel_manager = channel_manager.clone();
-
         let handle = tokio::task::spawn(async move {
+            info!("incomming PCP Port Check");
+
+            let x = PcpHandshake::new(
+                connection_id,
+                tcp_stream,
+                None,
+                remote_addr,
+                BytesMut::with_capacity(4096),
+                channel_manager.session_id(),
+            )
+            .incoming(channel_manager)
+            .await;
+
+            drop(shutdown_set)
+        });
+    }
+
+    async fn spawn_pcp_server(
+        channel_manager: Arc<ChannelManager>,
+        rtmp_stream_manager: UnboundedSender<StreamManagerMessage>,
+        //
+        connection_id: ConnectionId,
+        tcp_stream: TcpStream,
+        remote_addr: SocketAddr,
+        shutdown_set: ShutdownAndNotifySet,
+    ) {
+        let handle = tokio::task::spawn(async move {
+            // channel_manager.get(co);
             info!("incomming PCP Protocol");
             // connection.start_negotiation(stream).await
             drop(shutdown_set)

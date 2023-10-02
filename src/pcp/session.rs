@@ -197,6 +197,9 @@ impl AtomDeserializer {
             Err(e) => match e {
                 AtomParseError::NotEnoughRecievedBuffer(_) => Ok(None),
                 AtomParseError::Unknown => Err(e),
+                AtomParseError::NotFoundValue => Err(e),
+                AtomParseError::IdError => Err(e),
+                AtomParseError::ValueError => Err(e),
             },
         }
     }

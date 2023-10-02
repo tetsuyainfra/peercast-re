@@ -25,6 +25,10 @@ impl ChannelManager {
         })
     }
 
+    pub fn session_id(&self) -> GnuId {
+        self.session_id.clone()
+    }
+
     pub fn channels_lock(&self, func: fn(channels: &mut HashMap<GnuId, Channel>)) {
         let mut lock = self.channels.lock().unwrap();
         func(&mut (*lock));

@@ -5,8 +5,9 @@ edition = "2021"
 repository = "https://github.com/tetsuyainfra/peercast-re"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-default-run = "peercast-re"
+# default-run = "peercast-re"
 # default-run = "rtmp"
+default-run = "relay"
 build = "build.rs"
 
 
@@ -71,6 +72,8 @@ hyper = { version = "1.0.0-rc.4", features = ["full"] }
 hyper-util = { git = "https://github.com/hyperium/hyper-util", rev = "f898015", features = [
     "full",
 ] }
+
+
 
 # HTML Template engine
 askama = { version = "0.12.0", features = ["mime", "mime_guess"] }
@@ -169,6 +172,18 @@ bitflags = "2.4.0"
 # utoipa-redoc = { version = "0.1.0", features = ["axum"] }
 # utoipa-rapidoc = { version = "0.1.0", features = ["axum"] }
 
+#
+#  Use for peercast-port-checkerd
+#
+# axum-client-ip = { version ="0.4.2", optional = true }
+axum-client-ip = { version ="0.4.2" }
+
+#
+#  Use for daemon
+#
+# daemonize ={ version = "*", optional = true }
+# daemonize ={ version = "*" }
+tracing-journald = "0.3.0"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["stable", "async_tokio"] }
@@ -177,6 +192,17 @@ criterion = { version = "0.5.1", features = ["stable", "async_tokio"] }
 npm_rs = { version = "1.0.0" }
 embed-resource = "2.3"
 
+[features]
+# ppc-server = ["dep:axum-client-ip"]
+# daemon = ["dep:daemonize"]
+
+# [[bin]]
+# name = "peercast-port-checkerd"
+# required-features = ["ppc-server"]
+
+# [[bin]]
+# name = "daemon-example"
+# required-features = ["daemon"]
 
 [[bench]]
 name = "bench_main"

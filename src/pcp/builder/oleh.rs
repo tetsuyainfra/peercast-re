@@ -77,7 +77,7 @@ impl OlehInfo {
                         //MEMO: IPのデータ構造(BE, LE)どうするか決めてないよねおそらく
                         let ipaddr = match c.len() {
                             4 => {
-                                let ip_u32 = c.payload().get_u32();
+                                let ip_u32 = c.payload().get_u32_le();
                                 IpAddr::V4(Ipv4Addr::from(ip_u32))
                             }
                             16 => {

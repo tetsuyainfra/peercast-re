@@ -198,7 +198,10 @@ impl HttpSvc {
             _ => {
                 // let _ = ch.connect(ConnectionId::new(), session_id, connect_to);
                 let connect_to = "192.168.10.230:61744".parse().unwrap();
-                let task_config = SourceTaskConfig::Relay(RelayTaskConfig { addr: connect_to });
+                let task_config = SourceTaskConfig::Relay(RelayTaskConfig {
+                    addr: connect_to,
+                    self_addr: todo!(),
+                });
                 let _ = ch.connect(connection_id, task_config);
             }
         };

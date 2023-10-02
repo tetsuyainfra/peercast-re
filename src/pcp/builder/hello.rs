@@ -1,4 +1,11 @@
-use crate::pcp::{gnuid::GnuId, Atom, Id4};
+use std::pin::Pin;
+
+use bytes::Buf;
+
+use crate::{
+    error::AtomParseError,
+    pcp::{classify::get_by_id, gnuid::GnuId, Atom, Id4},
+};
 
 /// Helloパケット群を作成する
 ///
@@ -45,12 +52,17 @@ impl HelloBuilder {
         vec.push(Atom::Child((Id4::PCP_HELO_BCID, self.broadcast_id).into()));
 
         if let Some(port_no) = self.port_no {
+            // portはu16だがAtomパケットではu32で送られる・・・
             vec.push(Atom::Child((Id4::PCP_HELO_PORT, port_no).into()))
         }
         if let Some(ping_to_port_no) = self.ping_no {
+            // portはu16だがAtomパケットではu32で送られる・・・
             vec.push(Atom::Child((Id4::PCP_HELO_PING, ping_to_port_no).into()))
         }
 
         Atom::Parent((Id4::PCP_HELO, vec).into())
     }
 }
+
+#[derive(Debug)]
+pub struct HeloInfo {}

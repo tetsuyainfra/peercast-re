@@ -38,6 +38,16 @@ pub enum AtomParseError {
     #[error("at least, recieve {0} bytes. but not enough for the atom.")]
     NotEnoughRecievedBuffer(usize),
 
+    // 少なくとも処理を進めるために必要なバイト数(このバイト数があればパースできるとは限らない)
+    #[error("Not found need value")]
+    NotFoundValue,
+
+    #[error("invalid atom id")]
+    IdError,
+
+    #[error("invalid atom value")]
+    ValueError,
+
     #[error("unknown parse error")]
     Unknown,
 }

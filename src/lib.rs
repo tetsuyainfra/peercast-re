@@ -36,7 +36,7 @@ pub mod pcp {
     mod gnuid;
     mod id4;
     mod node;
-    mod procedure;
+    pub mod procedure;
     mod session;
     mod stream;
     mod util;

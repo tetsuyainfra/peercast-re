@@ -42,7 +42,7 @@ components:
         ip:
           type: string
         port:
-          type: number
+          type: integer
         result:
           type: boolean
       required: [ip, port, result]
@@ -84,7 +84,7 @@ paths:
       tags: [default]
       parameters:
         - name: port
-          schema: { type: number }
+          schema: { type: integer }
           in: query
           description: Id of an existing channle id.
           required: true

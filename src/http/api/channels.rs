@@ -92,7 +92,10 @@ impl ChannelsSvc {
         let session_id = GnuId::new();
         let r = ch.connect(
             ConnectionId::new(),
-            crate::pcp::SourceTaskConfig::Relay(RelayTaskConfig { addr }),
+            crate::pcp::SourceTaskConfig::Relay(RelayTaskConfig {
+                addr,
+                self_addr: todo!(),
+            }),
         );
 
         (StatusCode::CREATED, Json(RespChannel::from(&ch))).into_response()

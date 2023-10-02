@@ -93,6 +93,12 @@ impl ClassifyAtom {
     }
 }
 
+pub fn get_by_id(id: Id4, atoms: &Vec<Atom>) -> Option<&Atom> {
+    atoms
+        .iter()
+        .find_map(|a| if a.id() == id { Some(a) } else { None })
+}
+
 fn _get_by_id(id: Id4, atoms: &Vec<Atom>) -> Option<&Atom> {
     atoms
         .iter()
@@ -154,4 +160,26 @@ fn split_pkt(atoms: &Vec<Atom>) -> Option<(ChanPktDataType, u32, Bytes, Option<b
     let continuing = get_pkt_continuing(atoms);
 
     Some((typ, pos, data, continuing))
+}
+
+#[cfg(test)]
+mod t {
+    use bytes::Buf;
+
+    use crate::pcp::{builder::HelloBuilder, GnuId, Id4};
+
+    use super::get_by_id;
+
+    #[test]
+    fn test_utils() {
+        let sid = GnuId::new();
+        let bid = GnuId::new();
+        let a = HelloBuilder::new(sid.clone(), bid).build();
+
+        let r = get_by_id(Id4::PCP_SESSIONID, a.as_parent().childs());
+        assert!(r.is_some());
+        let a = r.unwrap();
+        let sid_u = a.as_child().payload().get_u128();
+        assert_eq!(sid.0, sid_u);
+    }
 }

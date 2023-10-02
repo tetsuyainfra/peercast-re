@@ -39,6 +39,7 @@ impl QuitBuilder {
     }
 }
 
+#[derive(Debug)]
 pub struct QuitInfo {
     quit_code: u32,
 }

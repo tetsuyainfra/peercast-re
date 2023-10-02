@@ -6,6 +6,7 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use clap::builder::UnknownArgumentValueParser;
 use once_cell::sync::Lazy;
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tracing::{info, trace};
@@ -717,9 +718,12 @@ where
             Err(AtomParseError::NotEnoughRecievedBuffer(_)) => {
                 // 読み込み途中
             }
-            Err(AtomParseError::Unknown) => {
-                return Err(io::Error::from(io::ErrorKind::InvalidData))
-            }
+            Err(
+                AtomParseError::NotFoundValue
+                | AtomParseError::IdError
+                | AtomParseError::Unknown
+                | AtomParseError::ValueError,
+            ) => return Err(io::Error::from(io::ErrorKind::InvalidData)),
         }
 
         let result: Result<usize, std::io::Error> = stream.read_buf(buf).await;
