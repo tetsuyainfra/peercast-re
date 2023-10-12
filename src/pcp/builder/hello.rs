@@ -1,10 +1,16 @@
 use std::pin::Pin;
 
 use bytes::Buf;
+use tracing::info;
 
 use crate::{
     error::AtomParseError,
-    pcp::{classify::get_by_id, gnuid::GnuId, Atom, Id4},
+    pcp::{
+        builder::broadcast,
+        classify::{get_by_id, get_gnuid, get_string, get_u16_le, get_u32_le},
+        gnuid::GnuId,
+        session, Atom, Id4,
+    },
 };
 
 /// Helloパケット群を作成する
@@ -33,12 +39,17 @@ impl HelloBuilder {
         }
     }
 
-    pub fn port(mut self, port_no: u16) -> Self {
-        self.port_no = Some(port_no);
+    // 解放が確認されているポート番号
+    // Confirmed Open Port Number
+    pub fn port(mut self, open_confiremed_port_no: u16) -> Self {
+        self.port_no = Some(open_confiremed_port_no);
         self
     }
-    pub fn ping(mut self, ping_no: u16) -> Self {
-        self.ping_no = Some(ping_no);
+
+    // 相手に解放してるか確認してほしいポート番号
+    // I would like you to confirm Port Number as Open
+    pub fn ping(mut self, ping_port_no: u16) -> Self {
+        self.ping_no = Some(ping_port_no);
         self
     }
 
@@ -65,4 +76,71 @@ impl HelloBuilder {
 }
 
 #[derive(Debug)]
-pub struct HeloInfo {}
+pub struct HeloInfo {
+    ///
+    pub session_id: GnuId,
+    ///
+    /// example: "PeerCast"
+    pub agent: String,
+    ///
+    /// example: 1218
+    pub version: u32,
+    /// 自己申告してきたPort番号
+    pub port: Option<u16>,
+    /// 自己申告してきたPingして欲しい番号
+    pub ping: Option<u16>,
+    /// 接続したいチャンネルID
+    pub broadcast_id: Option<GnuId>,
+}
+
+impl HeloInfo {
+    // #[rustfmt::skip]
+    pub fn parse(atom: &Atom) -> Result<Self, AtomParseError> {
+        if atom.id() != Id4::PCP_HELO {
+            return Err(AtomParseError::IdError);
+        }
+        if atom.is_parent() {
+            return Err(AtomParseError::IdError);
+        }
+
+        let mut session_id = None;
+        let mut agent = None;
+        let mut version = None;
+        let mut port = None;
+        let mut ping = None;
+        let mut broadcast_id = None;
+        for a in atom.as_parent().childs() {
+            if a.is_parent() {
+                return Err(AtomParseError::ValueError);
+            }
+            let a = a.as_child();
+            match a.id() {
+                Id4::PCP_HELO_AGENT => agent = Some(get_string(a)?),
+                Id4::PCP_HELO_VERSION => version = Some(get_u32_le(a)?),
+                Id4::PCP_HELO_SESSIONID => session_id = Some(get_gnuid(a)?),
+                Id4::PCP_HELO_PORT => port = Some(get_u16_le(a)?),
+                Id4::PCP_HELO_PING => ping = Some(get_u16_le(a)?),
+                Id4::PCP_HELO_BCID => broadcast_id = Some(get_gnuid(a)?),
+                _ => {
+                    info!("UNKWON ATOM {:#?}", a);
+                }
+            }
+        }
+        let (agent, version, session_id) = match (agent, version, session_id) {
+            (Some(a), Some(v), Some(s)) => (a, v, s),
+            (_, _, _) => {
+                return Err(AtomParseError::NotFoundValue);
+            }
+        };
+
+        Ok(HeloInfo {
+            session_id,
+            agent,
+            version,
+            //
+            port,
+            ping,
+            broadcast_id,
+        })
+    }
+}
