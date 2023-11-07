@@ -1,8 +1,14 @@
+use std::net::IpAddr;
+
 use bytes::{Buf, Bytes};
+use ipnet::IpAdd;
 use tracing::{error, info, trace};
 
+use crate::error::AtomParseError;
+
+use super::atom::decode::{PcpChannelInfo, PcpTrackInfo};
 use super::util::atom as _in;
-use super::{Atom, ChannelInfo, GnuId, Id4, TrackInfo};
+use super::{Atom, ChannelInfo, ChildAtom, GnuId, Id4, TrackInfo};
 
 // ChannelPacketのデータ構造
 // Parent(PCP_CHAN, vec[
@@ -93,7 +99,7 @@ impl ClassifyAtom {
     }
 }
 
-pub fn get_by_id(id: Id4, atoms: &Vec<Atom>) -> Option<&Atom> {
+fn get_by_id(id: Id4, atoms: &Vec<Atom>) -> Option<&Atom> {
     atoms
         .iter()
         .find_map(|a| if a.id() == id { Some(a) } else { None })
@@ -119,10 +125,17 @@ fn get_chan_pkt(atoms: &Vec<Atom>) -> Option<&Atom> {
     _get_by_id(Id4::PCP_CHAN_PKT, atoms)
 }
 fn get_info(atoms: &Vec<Atom>) -> Option<ChannelInfo> {
-    _get_by_id(Id4::PCP_CHAN_INFO, atoms).map(|a| ChannelInfo::from(a))
+    _get_by_id(Id4::PCP_CHAN_INFO, atoms).map(|a| {
+        //
+        let p = PcpChannelInfo::parse(a);
+        ChannelInfo::from(&p.unwrap_or_default())
+    })
 }
 fn get_track(atoms: &Vec<Atom>) -> Option<TrackInfo> {
-    _get_by_id(Id4::PCP_CHAN_TRACK, atoms).map(|a| TrackInfo::from(a))
+    _get_by_id(Id4::PCP_CHAN_TRACK, atoms).map(|a| {
+        let p = PcpTrackInfo::parse(a);
+        TrackInfo::from(&p.unwrap_or_default())
+    })
 }
 //
 // in PKT ATOM

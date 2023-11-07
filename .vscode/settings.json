@@ -32,5 +32,7 @@
   "[typescriptreact]": {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+
+  "markdown-preview-enhanced.plantumlServer": "http://localhost:18080/svg/"
 }

@@ -10,7 +10,7 @@ mod quit;
 mod root;
 mod track_info;
 
-pub use broadcast::{broadcast_yp_builder, BroadcastBuilder, BroadcastGroup};
+pub use broadcast::BroadcastBuilder;
 pub use channel_info::ChannelInfoBuilder;
 pub use hello::{HelloBuilder, HeloInfo};
 pub use host::{HostBuilder, HostInfo};

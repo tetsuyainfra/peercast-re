@@ -129,6 +129,7 @@ def_id4! {
 
   PCP_HOST           = b"host",
   PCP_HOST_ID        = b"id\0\0",
+  PCP_HOST_BCID      = b"bcid", // PeerCast Stationだけ？
   PCP_HOST_IP        = b"ip\0\0",
   PCP_HOST_PORT      = b"port",
   PCP_HOST_NUML      = b"numl",

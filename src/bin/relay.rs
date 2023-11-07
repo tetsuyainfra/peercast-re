@@ -54,7 +54,7 @@ async fn main() {
             ))
             .await?;
 
-            let body = res.bytes().await?;
+            let _body = res.bytes().await?;
 
             let mut is_port_open = is_port_open_cloned.write().unwrap();
             *is_port_open = true;

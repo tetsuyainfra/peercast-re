@@ -7,7 +7,8 @@ repository = "https://github.com/tetsuyainfra/peercast-re"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # default-run = "peercast-re"
 # default-run = "rtmp"
-default-run = "relay"
+#default-run = "relay"
+default-run = "peercast-root"
 build = "build.rs"
 
 

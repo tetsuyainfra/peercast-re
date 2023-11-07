@@ -17,9 +17,17 @@ use crate::error;
 pub struct GnuId(pub u128);
 
 impl GnuId {
+    pub const NONE: GnuId = GnuId(0_u128);
+
     pub fn new() -> Self {
         // GnuId(uuid::Uuid::now_v7().as_u128())
-        GnuId(uuid::Uuid::new_v4().as_u128())
+        let v = uuid::Uuid::new_v4().as_u128();
+        debug_assert_ne!(v, Self::NONE.0);
+        GnuId(v)
+    }
+
+    pub fn is_none(&self) -> bool {
+        self.0 == Self::NONE.0
     }
 
     #[cfg(debug_assertions)]

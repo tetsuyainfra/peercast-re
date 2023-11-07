@@ -2,7 +2,7 @@ use bytes::Buf;
 
 use crate::{
     error::AtomParseError,
-    pcp::{classify::get_by_id, Atom, GnuId, Id4},
+    pcp::{atom::decode::decode_gnuid, Atom, GnuId, Id4},
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,20 +36,26 @@ pub struct PingInfo {
 
 impl PingInfo {
     pub fn parse(atom: &Atom) -> Result<Self, AtomParseError> {
-        if atom.id() != Id4::PCP_HELO {
+        if !(atom.id() == Id4::PCP_HELO && atom.is_parent()) {
             return Err(AtomParseError::IdError);
         }
-        let p = match atom {
-            Atom::Child(_) => return Err(AtomParseError::NotFoundValue),
-            Atom::Parent(p) => p,
-        };
-        let Some(id_atom) = get_by_id(Id4::PCP_SESSIONID, p.childs()) else {
+        let mut session_id = None;
+        for a in atom.as_parent().childs() {
+            if a.is_parent() {
+                return Err(AtomParseError::ValueError);
+            }
+            let a = a.as_child();
+            match a.id() {
+                Id4::PCP_SESSIONID => session_id = Some(decode_gnuid(a)?),
+                _ => {}
+            }
+        }
+        if session_id.is_none() {
             return Err(AtomParseError::NotFoundValue);
-        };
-        let session_id = id_atom.as_child().payload().get_u128();
+        }
 
         Ok(PingInfo {
-            session_id: GnuId::from(session_id),
+            session_id: GnuId::from(session_id.unwrap()),
         })
     }
 }
@@ -85,20 +91,27 @@ pub struct PongInfo {
 
 impl PongInfo {
     pub fn parse(atom: &Atom) -> Result<Self, AtomParseError> {
-        if atom.id() != Id4::PCP_OLEH {
+        if !(atom.id() == Id4::PCP_OLEH && atom.is_parent()) {
             return Err(AtomParseError::IdError);
         }
-        let p = match atom {
-            Atom::Child(_) => return Err(AtomParseError::NotFoundValue),
-            Atom::Parent(p) => p,
-        };
-        let Some(id_atom) = get_by_id(Id4::PCP_HELO_SESSIONID, p.childs()) else {
+
+        let mut session_id = None;
+        for a in atom.as_parent().childs() {
+            if a.is_parent() {
+                return Err(AtomParseError::ValueError);
+            }
+            let a = a.as_child();
+            match a.id() {
+                Id4::PCP_HELO_SESSIONID => session_id = Some(decode_gnuid(a)?),
+                _ => {}
+            }
+        }
+        if session_id.is_none() {
             return Err(AtomParseError::NotFoundValue);
-        };
-        let session_id = id_atom.as_child().payload().get_u128();
+        }
 
         Ok(PongInfo {
-            session_id: GnuId::from(session_id),
+            session_id: GnuId::from(session_id.unwrap()),
         })
     }
 }

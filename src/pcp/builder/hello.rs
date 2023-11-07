@@ -1,13 +1,13 @@
 use std::pin::Pin;
 
 use bytes::Buf;
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::{
     error::AtomParseError,
     pcp::{
+        atom::decode::{decode_gnuid, decode_string, decode_u16, decode_u32},
         builder::broadcast,
-        classify::{get_by_id, get_gnuid, get_string, get_u16_le, get_u32_le},
         gnuid::GnuId,
         session, Atom, Id4,
     },
@@ -89,7 +89,7 @@ pub struct HeloInfo {
     pub port: Option<u16>,
     /// 自己申告してきたPingして欲しい番号
     pub ping: Option<u16>,
-    /// 接続したいチャンネルID
+    /// 配信時に使うID（認証に使う？）
     pub broadcast_id: Option<GnuId>,
 }
 
@@ -99,7 +99,7 @@ impl HeloInfo {
         if atom.id() != Id4::PCP_HELO {
             return Err(AtomParseError::IdError);
         }
-        if atom.is_parent() {
+        if atom.is_child() {
             return Err(AtomParseError::IdError);
         }
 
@@ -110,22 +110,26 @@ impl HeloInfo {
         let mut ping = None;
         let mut broadcast_id = None;
         for a in atom.as_parent().childs() {
+            trace!(atom = ?a);
             if a.is_parent() {
                 return Err(AtomParseError::ValueError);
             }
             let a = a.as_child();
             match a.id() {
-                Id4::PCP_HELO_AGENT => agent = Some(get_string(a)?),
-                Id4::PCP_HELO_VERSION => version = Some(get_u32_le(a)?),
-                Id4::PCP_HELO_SESSIONID => session_id = Some(get_gnuid(a)?),
-                Id4::PCP_HELO_PORT => port = Some(get_u16_le(a)?),
-                Id4::PCP_HELO_PING => ping = Some(get_u16_le(a)?),
-                Id4::PCP_HELO_BCID => broadcast_id = Some(get_gnuid(a)?),
+                Id4::PCP_HELO_AGENT => agent = Some(decode_string(a)?),
+                Id4::PCP_HELO_VERSION => version = Some(decode_u32(a)?),
+                Id4::PCP_HELO_SESSIONID => session_id = Some(decode_gnuid(a)?),
+                Id4::PCP_HELO_PORT => port = Some(decode_u16(a)?),
+                Id4::PCP_HELO_PING => ping = Some(decode_u16(a)?),
+                Id4::PCP_HELO_BCID => broadcast_id = Some(decode_gnuid(a)?),
                 _ => {
                     info!("UNKWON ATOM {:#?}", a);
                 }
             }
         }
+
+        trace!(?agent, ?version, ?session_id, ?port, ?ping, ?broadcast_id);
+
         let (agent, version, session_id) = match (agent, version, session_id) {
             (Some(a), Some(v), Some(s)) => (a, v, s),
             (_, _, _) => {

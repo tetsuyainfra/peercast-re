@@ -226,7 +226,7 @@ impl From<&ChannelInfo> for RespChannelInfo {
             url: url,
             stream_type: stream_type,
             stream_ext: stream_ext,
-            bitrate: i32::from_u32(value.bitrate).unwrap_or(i32::MAX),
+            bitrate: i32::from_i32(value.bitrate).unwrap_or(i32::MAX),
         }
     }
 }

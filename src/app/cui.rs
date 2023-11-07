@@ -26,7 +26,7 @@ use tokio::{
         broadcast,
         mpsc::{self, UnboundedSender},
     },
-    time::{sleep, Instant},
+    time::{error::Elapsed, sleep, Instant},
 };
 use tower::Service;
 use tracing::{debug, info, warn};
@@ -113,21 +113,33 @@ impl CuiApp {
                 AfterPeriod,
                 UserForce,
             }
+
             let gracefull_reason = tokio::select! {
-                // gracefull シャットダウンを待つ
-                _ = async move {
-                     // シャットダウン通知を待つ(正確には全ての送信者が閉じられるのを待ち、Noneが帰って来るのを待つ)
-                    let r = shutdown_complete_rx.recv().await;
+                r = tokio::time::timeout(Duration::from_secs(Self::WAIT_FORCE_SHUTDOWN_SEC), async move {}) => {
+                    // Timeout待ちの終了
                     match r {
-                        Some(_) => panic!("shutdown_complete_rx never send values"),
-                        None => {},
-                    };
-                } => {
-                    println!("Gracefull shutdown completly.");
-                    GarcefullShutdownReason::Success
+                        Ok(r) => {
+                            println!("Gracefull shutdown completly.");
+                            GarcefullShutdownReason::Success
+                        },
+                        Err(_) => {
+                            println!("{}sec pass. will force shutdown", Self::WAIT_FORCE_SHUTDOWN_SEC);
+                            GarcefullShutdownReason::AfterPeriod
+                        },
+                    }
                 }
-                // 5秒毎に経過時間を表示(終わることはない)
                 _ = async {
+                    // Ctrl+c 3回
+                    for i in 0..Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES {
+                        tokio::signal::ctrl_c().await;
+                        println!("Ctrl+c detected {}/{}", i+1, Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES);
+                    }
+                }=> {
+                    println!("Ctrl+c {} times detected. will force shutdown", Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES);
+                    GarcefullShutdownReason::UserForce
+                },
+                _ = async {
+                    // 5秒毎に経過時間を表示(終わることはない)
                     let start = Instant::now() + Duration::from_secs(5);
                     let mut interval = tokio::time::interval_at(start, Duration::from_secs(5));
                     let mut count = 0;
@@ -138,26 +150,8 @@ impl CuiApp {
                     }
                 }=> {
                     unreachable!()
-                }
-                // 指定時間終了を待つ
-                _ = async {
-                    tokio::time::sleep(Duration::from_secs(Self::WAIT_FORCE_SHUTDOWN_SEC)).await;
-                }=> {
-                    println!("{}sec pass. will force shutdown", Self::WAIT_FORCE_SHUTDOWN_SEC);
-                    GarcefullShutdownReason::AfterPeriod
-                }
-                // Ctrl+c 3回
-                _ = async {
-                    for i in 0..Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES {
-                        tokio::signal::ctrl_c().await;
-                        println!("Ctrl+c detected {}/{}", i+1, Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES);
-                    }
-                }=> {
-                    println!("Ctrl+c {} times detected. will force shutdown", Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES);
-                    GarcefullShutdownReason::UserForce
                 },
             };
-
 
             match gracefull_reason {
                 GarcefullShutdownReason::Success => Ok(()),

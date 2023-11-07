@@ -95,6 +95,9 @@ impl PcpHandshake {
         let _header_buf: BytesMut = self.read_buf.split_to(http_header_bytes_len); // ヘッダー分のバッファを解放
         trace!(CID=?&self.connection_id, response=?response, read_buf_len=?&self.read_buf.len());
 
+        // https://github.com/kumaryu/peercaststation/blob/6184647e600ec3a388462169ab7118314114252e/PeerCastStation/PeerCastStation.PCP/PCPSourceStream.cs#L284
+        // FIXME: IPv6対応 GetPCPVersionの値が100ならIp V6
+
         match response.status().as_u16() {
             200 => {
                 // 200: チャンネルはあってリレー可能？

@@ -74,3 +74,7 @@ docker compose -f docker-compose.openapi.yml up
 今現在の表記はMITになっていますが、PCPについてのコードは[PeerCastStation](https://github.com/kumaryu/peercaststation), [PeerCast-YT](https://github.com/plonk/peercast-yt)のコードを多々参考にしています
 PCP以下のフォルダはGPL2 or GPL3にした方が良いかと考えています。追々キッチリしていくので少々お待ちください。
 ※ 意訳：ライセンス汚染の可能性あるのでまだソースコードを他に流用するべからず
+
+
+## 結構疑問
+- processIncomingPCP@YTで RemoteID（GnuID）を見てるけどIPを共有する環境で大丈夫なのか
