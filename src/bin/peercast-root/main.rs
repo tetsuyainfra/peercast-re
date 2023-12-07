@@ -3,7 +3,11 @@
 /// PeerCastのポートが開いているか確認してくれるAPIサーバー
 /// IPv4/IPv6の両方のポートを開いて待つ
 ///
-///
+/// API Serverの仕様
+/// HTTP Headerに X-Request-Id を持っていればそれを利用し、無ければ自動で生成する
+mod api;
+mod error;
+
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
@@ -11,9 +15,10 @@ use std::{
     sync::{mpsc::channel, Arc, RwLock},
 };
 
+use chrono::{DateTime, Utc};
 use clap::Parser;
 use futures_util::{
-    future::{select_all, BoxFuture},
+    future::{join_all, select_all, BoxFuture},
     FutureExt,
 };
 use http::header::SEC_WEBSOCKET_ACCEPT;
@@ -32,7 +37,7 @@ use peercast_re::{
 use rml_rtmp::messages;
 use thiserror::Error;
 use tokio::sync::mpsc::{self, unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[allow(dead_code)]
@@ -66,10 +71,13 @@ async fn main() {
     let registry = tracing_subscriber::registry()
         // .with(tracing_subscriber::fmt::layer().with_target(false))
         .with(tracing_subscriber::fmt::layer().with_target(true))
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            println!("RUST_LOG=info");
-            "info".into()
-        }));
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "peercast_root=info".into())
+                .add_directive("hyper=info".parse().unwrap())
+                .add_directive("tower_http=info".parse().unwrap())
+                .add_directive("axum::rejection=trace".parse().unwrap()),
+        );
     registry.init();
 
     let exename = std::env::current_exe()
@@ -80,6 +88,8 @@ async fn main() {
         .unwrap()
         .to_string();
     info!("START {}", exename);
+    debug!("logging debug");
+    trace!("logging trace");
 
     let args = Args::parse();
 
@@ -87,20 +97,34 @@ async fn main() {
         connect_timeout: args.connect_timeout,
     });
 
+    let channel_manager: ChannelManager<TrackerChannel> = ChannelManager::new(None, None);
+    let arc_channel_manager = Arc::new(channel_manager);
+
     let listener = tokio::net::TcpListener::bind((args.bind, args.port))
         .await
         .unwrap();
     info!("listening on pcp://{}", listener.local_addr().unwrap(),);
 
-    let _ = tokio::spawn(main_pcp(listener)).await;
+    let api_listener = tokio::net::TcpListener::bind((args.api_bind, args.api_port))
+        .await
+        .unwrap();
+    info!("listening on http://{}", api_listener.local_addr().unwrap(),);
+
+    let fut_pcp = tokio::spawn(start_pcp_server(arc_channel_manager.clone(), listener));
+    let fut_api = tokio::spawn(api::start_api_server(arc_channel_manager, api_listener));
+    join_all(vec![fut_pcp, fut_api]).await;
 }
 
-async fn main_pcp(listener: tokio::net::TcpListener) {
+////////////////////////////////////////////////////////////////////////////////
+/// PCP Server
+///
+async fn start_pcp_server(
+    arc_channel_manager: Arc<ChannelManager<TrackerChannel>>,
+    listener: tokio::net::TcpListener,
+) {
+    info!("START PCP SERVER");
     let self_session_id = GnuId::new();
     let factory = PcpConnectionFactory::new(self_session_id);
-
-    let channel_manager: ChannelManager<TrackerChannel> = ChannelManager::new(None, None);
-    let arc_channel_manager = Arc::new(channel_manager);
 
     loop {
         let channel_manager = arc_channel_manager.clone();
@@ -177,8 +201,10 @@ async fn main_pcp(listener: tokio::net::TcpListener) {
     }
 }
 
+async fn handle_connection() {}
+
 #[derive(Debug)]
-struct ChannelManager<C: ChannelTrait> {
+pub struct ChannelManager<C: ChannelTrait> {
     session_id: Arc<GnuId>,
     broadcast_id: Arc<GnuId>,
     channels: Arc<RwLock<HashMap<GnuId, C>>>,
@@ -192,7 +218,7 @@ impl<C: ChannelTrait> Clone for ChannelManager<C> {
         }
     }
 }
-trait ChannelTrait: Clone {
+pub trait ChannelTrait: Clone {
     type Config;
     fn new(
         self_session_id: Arc<GnuId>,
@@ -243,6 +269,15 @@ impl<C: ChannelTrait> ChannelManager<C> {
             .map(|c| c.clone())
     }
 
+    fn get_channels(&self) -> Vec<C> {
+        self.channels
+            .read()
+            .unwrap()
+            .values()
+            .map(|c| c.clone())
+            .collect()
+    }
+
     fn remove(&mut self, channel_id: &GnuId) {
         let ch = self.channels.write().unwrap().remove(channel_id);
         ch.map(|mut c| c.before_remove());
@@ -250,13 +285,14 @@ impl<C: ChannelTrait> ChannelManager<C> {
 }
 
 #[derive(Debug, Clone)]
-struct TrackerChannel {
+pub struct TrackerChannel {
     self_session_id: Arc<GnuId>,
     channel_id: Arc<GnuId>,
     broadcast: Arc<PcpBroadcast>,
     config: Arc<TrackerChannelConifg>,
     manager_sender: UnboundedSender<RootManagerMessage>,
 
+    created_at: Arc<DateTime<Utc>>,
     _called_before_remove: bool,
 }
 
@@ -277,7 +313,7 @@ impl TrackerChannel {
 }
 
 #[derive(Debug, Clone)]
-struct TrackerChannelConifg {
+pub struct TrackerChannelConifg {
     broadcast_id: Arc<GnuId>,
     broadcast: Arc<PcpBroadcast>,
 }
@@ -299,6 +335,7 @@ impl ChannelTrait for TrackerChannel {
             broadcast: config.broadcast.clone(),
             config: Arc::new(config),
             manager_sender,
+            created_at: Arc::new(Utc::now()),
             _called_before_remove: false,
         }
     }
@@ -595,7 +632,7 @@ impl TrackerConnection {
         match atom.id() {
             Id4::PCP_BCST => {}
             Id4::PCP_QUIT => {
-                info!("{} ARRIVED QUIT {:?}", self.connection_id, atom);
+                info!("{} ARRIVED_QUIT {:?}", self.connection_id, atom);
             }
             _ => {
                 warn!("{} UNKNOWN ATOM: {:#?}", self.connection_id, atom);
@@ -617,31 +654,35 @@ async fn read_routine(
     mut tx: UnboundedSender<Atom>,
     mut read_half: PcpConnectionReadHalf,
 ) -> Result<(), std::io::Error> {
-    info!("START READ HALF {}", read_half.connection_id());
+    let conn_id = read_half.connection_id();
+    info!("{conn_id} START READ HALF");
     loop {
         let Ok(atom) = read_half.read_atom().await else {
             break;
         };
+        debug!("{conn_id} ARRIVED_ATOM {:?}", atom);
         mpsc_send(&mut tx, atom);
     }
-    info!("STOP READ HALF {}", read_half.connection_id());
+    info!("{conn_id} STOP READ HALF");
     Ok(())
 }
 async fn write_routine(
     mut rx: UnboundedReceiver<Atom>,
     mut write_half: PcpConnectionWriteHalf,
 ) -> Result<(), std::io::Error> {
-    info!("START WRITE HALF {}", write_half.connection_id());
+    let conn_id = write_half.connection_id();
+    info!("{conn_id} START WRITE HALF");
     loop {
         let atom = rx.recv().await;
         match atom {
             None => break,
             Some(atom) => {
+                debug!("{conn_id} WRITE_ATOM {}", atom);
                 let _ = write_half.write_atom(atom).await;
             }
         };
     }
-    info!("STOP WRITE HALF {}", write_half.connection_id());
+    info!("{conn_id} STOP WRITE HALF");
     Ok(())
 }
 
