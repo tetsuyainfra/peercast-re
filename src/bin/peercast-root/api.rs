@@ -9,7 +9,7 @@ use axum::{
     http::{HeaderMap, Request},
     response::{Html, Response},
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
@@ -76,9 +76,13 @@ async fn index() -> Result<Html<&'static str>, AppError> {
     ",
     ))
 }
-async fn status() -> Result<Json<AppStatus>, AppError> {
+async fn status(headers: HeaderMap) -> Result<Json<AppStatus>, AppError> {
     info!("status!!!");
-    let status: AppStatus = AppStatus {};
+    let x_id = headers.get("x-request-id").unwrap().to_str().unwrap();
+    info!("x_id: {x_id:?}");
+    let status: AppStatus = AppStatus {
+        x_request_id: x_id.into(),
+    };
     Ok(status.into())
 }
 
@@ -94,7 +98,9 @@ async fn channels(
 }
 
 #[derive(Debug, Serialize)]
-struct AppStatus {}
+struct AppStatus {
+    x_request_id: String,
+}
 
 #[derive(Debug, Serialize)]
 struct JsonChannel {

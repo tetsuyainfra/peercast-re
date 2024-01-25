@@ -244,6 +244,11 @@ impl CuiApp {
             }),
         ); */
 
+        // Serviceを作るためのひな形を作成する
+        let mut make_service = http_svc
+            .clone()
+            .into_make_service_with_connect_info::<MyConnectInfo>();
+
         'accept_loop: loop {
             let mut connection_id = ConnectionId::new();
             let shutdown = Shutdown::new(self.notify_shutdown_tx.subscribe());
@@ -292,16 +297,26 @@ impl CuiApp {
                         .await;
                     }
                     ConnectionProtocol::Http | ConnectionProtocol::Unknown => {
-                        Self::spawn_http_server(
-                            // cloned_local_address,
-                            connection_id,
-                            tcp_stream,
-                            remote_addr,
-                            shutdown_set,
-                            cloned_http_service
-                                .into_make_service_with_connect_info::<MyConnectInfo>(),
-                        )
-                        .await;
+                        // let m = MyIncomingStream {
+                        //     connection_id,
+                        //     tcp_stream: &tcp_stream,
+                        //     remote_addr,
+                        //     shutdown: Arc::new(Mutex::new(Some(shutdown_set))),
+                        // };
+                        // let x = make_service.call(m).await;
+                        // let tower_service = unwrap_infallible(make_service.call(remote_addr).await);
+
+                        // Self::spawn_http_server(
+                        //     // cloned_local_address,
+                        //     connection_id,
+                        //     tcp_stream,
+                        //     remote_addr,
+                        //     shutdown_set,
+                        //     cloned_http_service
+                        //         .into_make_service_with_connect_info::<MyConnectInfo>(),
+                        //     // make_service,
+                        // )
+                        // .await;
                     }
                 };
             });
@@ -386,103 +401,107 @@ impl CuiApp {
         S: Service<Request, Response = Response, Error = Infallible> + Clone + Send + 'static,
         S::Future: Send,
     {
+        use hyper_util::rt::{TokioExecutor, TokioIo};
+
+        let stream = TokioIo::new(tcp_stream);
+
         todo!()
     }
 
     /*
-       async fn spawn_http_server<M, S>(
-           // local_address: Arc<Vec<IpNet>>,
-           //
-           connection_id: ConnectionId,
-           tcp_stream: TcpStream,
-           remote_addr: SocketAddr,
-           shutdown_set: ShutdownAndNotifySet,
-           mut make_service: M,
-       ) where
-           M: for<'a> Service<MyIncomingStream<'a>, Error = Infallible, Response = S>,
-           S: Service<Request, Response = Response, Error = Infallible> + Clone + Send + 'static,
-           S::Future: Send,
-       {
-           use axum_core::body::Body;
-           use futures_util::future::poll_fn;
-           use hyper::{self as hyper1, server::conn::http1};
-           use hyper_util::rt::TokioIo;
-           use tower_hyper_http_body_compat::TowerService03HttpServiceAsHyper1HttpService;
-           use tower_hyper_http_body_compat::{HttpBody04ToHttpBody1, HttpBody1ToHttpBody04};
+    async fn Xspawn_http_server<M, S>(
+        // local_address: Arc<Vec<IpNet>>,
+        //
+        connection_id: ConnectionId,
+        tcp_stream: TcpStream,
+        remote_addr: SocketAddr,
+        shutdown_set: ShutdownAndNotifySet,
+        mut make_service: M,
+    ) where
+        M: for<'a> Service<MyIncomingStream<'a>, Error = Infallible, Response = S>,
+        S: Service<Request, Response = Response, Error = Infallible> + Clone + Send + 'static,
+        S::Future: Send,
+    {
+        use axum_core::body::Body;
+        use futures_util::future::poll_fn;
+        use hyper::{self as hyper1, server::conn::http1};
+        use hyper_util::rt::TokioIo;
+        // use tower_hyper_http_body_compat::TowerService03HttpServiceAsHyper1HttpService;
+        // use tower_hyper_http_body_compat::{HttpBody04ToHttpBody1, HttpBody1ToHttpBody04};
 
-           let tcp_stream = TokioIo::new(tcp_stream);
-           poll_fn(|cx| make_service.poll_ready(cx))
-               .await
-               .unwrap_or_else(|err| match err {});
+        let tcp_stream = TokioIo::new(tcp_stream);
+        poll_fn(|cx| make_service.poll_ready(cx))
+            .await
+            .unwrap_or_else(|err| match err {});
 
-           let service = make_service
-               .call(MyIncomingStream {
-                   connection_id,
-                   tcp_stream: &tcp_stream,
-                   remote_addr,
-                   shutdown: Arc::new(Mutex::new(Some(shutdown_set))),
-               })
-               .await
-               .unwrap_or_else(|err| match err {});
+        let service = make_service
+            .call(MyIncomingStream {
+                connection_id,
+                tcp_stream: &tcp_stream,
+                remote_addr,
+                shutdown: Arc::new(Mutex::new(Some(shutdown_set))),
+            })
+            .await
+            .unwrap_or_else(|err| match err {});
 
-           let service = hyper1::service::service_fn(move |req: Request<hyper1::body::Incoming>| {
-               // `hyper1::service::service_fn` takes an `Fn` closure. So we need an owned service in
-               // order to call `poll_ready` and `call` which need `&mut self`
-               let mut service = service.clone();
+        let service = hyper1::service::service_fn(move |req: Request<hyper1::body::Incoming>| {
+            // `hyper1::service::service_fn` takes an `Fn` closure. So we need an owned service in
+            // order to call `poll_ready` and `call` which need `&mut self`
+            let mut service = service.clone();
 
-               let req = req.map(|body| {
-                   // wont need this when axum uses http-body 1.0
-                   let http_body_04 = HttpBody1ToHttpBody04::new(body);
-                   Body::new(http_body_04)
-               });
+            let req = req.map(|body| {
+                // wont need this when axum uses http-body 1.0
+                let http_body_04 = HttpBody1ToHttpBody04::new(body);
+                Body::new(http_body_04)
+            });
 
-               // doing this saves cloning the service just to await the service being ready
-               //
-               // services like `Router` are always ready, so assume the service
-               // we're running here is also always ready...
-               match poll_fn(|cx| service.poll_ready(cx)).now_or_never() {
-                   Some(Ok(())) => {}
-                   Some(Err(err)) => match err {},
-                   None => {
-                       // ...otherwise load shed
-                       let mut res = Response::new(HttpBody04ToHttpBody1::new(Body::empty()));
-                       *res.status_mut() = hyper::StatusCode::SERVICE_UNAVAILABLE;
-                       return std::future::ready(Ok(res)).left_future();
-                   }
-               }
+            // doing this saves cloning the service just to await the service being ready
+            //
+            // services like `Router` are always ready, so assume the service
+            // we're running here is also always ready...
+            match poll_fn(|cx| service.poll_ready(cx)).now_or_never() {
+                Some(Ok(())) => {}
+                Some(Err(err)) => match err {},
+                None => {
+                    // ...otherwise load shed
+                    let mut res = Response::new(HttpBody04ToHttpBody1::new(Body::empty()));
+                    *res.status_mut() = hyper::StatusCode::SERVICE_UNAVAILABLE;
+                    return std::future::ready(Ok(res)).left_future();
+                }
+            }
 
-               let future = service.call(req);
+            let future = service.call(req);
 
-               async move {
-                   let response = future
-                       .await
-                       .unwrap_or_else(|err| match err {})
-                       // wont need this when axum uses http-body 1.0
-                       .map(HttpBody04ToHttpBody1::new);
+            async move {
+                let response = future
+                    .await
+                    .unwrap_or_else(|err| match err {})
+                    // wont need this when axum uses http-body 1.0
+                    .map(HttpBody04ToHttpBody1::new);
 
-                   Ok::<_, Infallible>(response)
-               }
-               .right_future()
-           }); // let service = hyper1::service::service_fn(...)
+                Ok::<_, Infallible>(response)
+            }
+            .right_future()
+        }); // let service = hyper1::service::service_fn(...)
 
-           let _handle = tokio::task::spawn(async move {
-               match http1::Builder::new()
-                   .serve_connection(tcp_stream, service)
-                   // for websockets
-                   // .with_upgrades()
-                   .await
-               {
-                   Ok(()) => {}
-                   Err(_err) => {
-                       // This error only appears when the client doesn't send a request and
-                       // terminate the connection.
-                       //
-                       // If client sends one request then terminate connection whenever, it doesn't
-                       // appear.
-                   }
-               }
-           });
-       }
+        let _handle = tokio::task::spawn(async move {
+            match http1::Builder::new()
+                .serve_connection(tcp_stream, service)
+                // for websockets
+                // .with_upgrades()
+                .await
+            {
+                Ok(()) => {}
+                Err(_err) => {
+                    // This error only appears when the client doesn't send a request and
+                    // terminate the connection.
+                    //
+                    // If client sends one request then terminate connection whenever, it doesn't
+                    // appear.
+                }
+            }
+        });
+    }
     */
 }
 
