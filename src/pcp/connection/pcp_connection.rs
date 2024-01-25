@@ -169,7 +169,7 @@ pub struct PcpHandshake {
 }
 
 impl PcpHandshake {
-    const PCP_MAGIC_HEAD: &[u8; 4] = b"pcp\n";
+    const PCP_MAGIC_HEAD: &'static [u8; 4] = b"pcp\n";
     pub(super) fn new(inner: Inner, factory: PcpConnectionFactory) -> Self {
         Self { inner, factory }
     }
@@ -210,7 +210,7 @@ impl PcpHandshake {
         info!("COMMING PCP");
 
         let atom = self.inner.read_atom().await?;
-        info!("ARRIVED ATOM: {:?}", &atom);
+        info!("ARRIVED_ATOM: {:?}", &atom);
         if !(atom.id() == Id4::PCP_CONNECT && atom.is_child() && atom.len() == 4) {
             return Err(HandshakeError::Failed);
         }
@@ -220,7 +220,7 @@ impl PcpHandshake {
 
         // PCP_HELO
         let atom = self.inner.read_atom().await?;
-        info!("ARRIVED ATOM: {:?}", &atom);
+        info!("ARRIVED_ATOM: {:?}", &atom);
         if atom.len() == 1 {
             // PingはPCP_HELOが親でchildにSESSION_IDしかないハズ。。。
             // PCP_HELO(PING)
@@ -234,7 +234,7 @@ impl PcpHandshake {
         } else {
             // PCP_HELO(normal)を主体とする接続のハズ
             let helo_info = HeloInfo::parse(&atom)?;
-            info!("ARRIVED HELO: {:#?}", &helo_info);
+            info!("ARRIVED_HELO: {:#?}", &helo_info);
             // Send Oleh, Root, Ok
             let remote_port = self._incoming_pcp_root(&helo_info).await?;
             Ok(PcpConnection::new(

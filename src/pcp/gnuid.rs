@@ -20,10 +20,10 @@ impl GnuId {
     pub const NONE: GnuId = GnuId(0_u128);
 
     pub fn new() -> Self {
-        // GnuId(uuid::Uuid::now_v7().as_u128())
-        let v = uuid::Uuid::new_v4().as_u128();
-        debug_assert_ne!(v, Self::NONE.0);
-        GnuId(v)
+        // let v = uuid::Uuid::new_v4().as_u128();
+        // debug_assert_ne!(v, Self::NONE.0);
+        // GnuId(v)
+        GnuId(uuid::Uuid::now_v7().as_u128())
     }
 
     pub fn is_none(&self) -> bool {

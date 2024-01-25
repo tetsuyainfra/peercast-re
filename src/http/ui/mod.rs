@@ -1,5 +1,6 @@
 use axum::{
     extract::{ConnectInfo, Path, State},
+    http::{HeaderMap, HeaderName, HeaderValue},
     response::Html,
     routing::{get, Route},
     Router,
@@ -9,7 +10,7 @@ use axum_core::{
     extract::Request,
     response::{IntoResponse, Response},
 };
-use http::{header, Method, StatusCode};
+use hyper::StatusCode;
 use rust_embed::RustEmbed;
 use serde::de::IntoDeserializer;
 use tracing::{debug, info, trace};
@@ -88,6 +89,8 @@ async fn file_serve(
 
 #[cfg(debug_assertions)]
 async fn proxy_file_serve(path: &str) -> Response {
+    use hyper::StatusCode;
+
     let url = format!("{VITE_URL}{path}");
     info!(requesttoUrl = ?url);
     let client = reqwest::Client::builder().http1_only().build().unwrap();
@@ -100,8 +103,14 @@ async fn proxy_file_serve(path: &str) -> Response {
         }
     };
 
-    let mut response_builder = Response::builder().status(reqwest_response.status());
-    *response_builder.headers_mut().unwrap() = reqwest_response.headers().clone();
+    let mut response_builder = Response::builder().status(reqwest_response.status().as_u16());
+    let mut headers = HeaderMap::with_capacity(reqwest_response.headers().len());
+    headers.extend(reqwest_response.headers().into_iter().map(|(name, value)| {
+        let name = HeaderName::from_bytes(name.as_ref()).unwrap();
+        let value = HeaderValue::from_bytes(value.as_ref()).unwrap();
+        (name, value)
+    }));
+    *response_builder.headers_mut().unwrap() = headers;
 
     response_builder
         .body(Body::from_stream(reqwest_response.bytes_stream()))
@@ -122,7 +131,7 @@ async fn embed_file_serve(path: &str) -> Response {
     match ASSETS::get(path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+            ([(hyper::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
             if path.contains('.') {
@@ -241,7 +250,7 @@ where
         if let Some(content) = ASSETS::get(path) {
             trace!("StaticFile(path: {path}) discovered");
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            return ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response();
+            return ([(hyper::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response();
         }
         let dir_filename = path.split("/").last().unwrap();
         (StatusCode::NOT_FOUND, "404 Not Found").into_response()

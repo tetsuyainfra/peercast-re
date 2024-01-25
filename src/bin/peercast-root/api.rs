@@ -1,4 +1,7 @@
-use std::sync::{mpsc::channel, Arc};
+use std::{
+    net::SocketAddr,
+    sync::{mpsc::channel, Arc},
+};
 
 use async_trait::async_trait;
 use axum::{
@@ -81,8 +84,8 @@ async fn status() -> Result<Json<AppStatus>, AppError> {
 
 async fn channels(
     State(manager): State<Arc<ChannelManager<TrackerChannel>>>,
-) -> Result<Json<Vec<ChannelJson>>, AppError> {
-    let channels: Vec<ChannelJson> = manager
+) -> Result<Json<Vec<JsonChannel>>, AppError> {
+    let channels: Vec<JsonChannel> = manager
         .get_channels()
         .into_iter()
         .map(|c| c.into())
@@ -94,17 +97,41 @@ async fn channels(
 struct AppStatus {}
 
 #[derive(Debug, Serialize)]
-struct ChannelJson {
+struct JsonChannel {
     id: GnuId,
     title: String,
+    title_escaped: String,
+    addr: SocketAddr,
+    contact_url: String,
+    genre: String,
+    desc: String,
+    number_of_listener: i32,
+    number_of_relay: i32,
+    bitrate: i32,
+    filetype: String,
+    status: String,
+    comment: String,
     created_at: DateTime<Utc>,
 }
 
-impl From<TrackerChannel> for ChannelJson {
+impl From<TrackerChannel> for JsonChannel {
     fn from(ch: TrackerChannel) -> Self {
-        ChannelJson {
+        let _details = ch.detail_reciever.borrow().clone();
+
+        JsonChannel {
             id: ch.channel_id.as_ref().clone(),
             title: String::from("example"),
+            title_escaped: todo!(),
+            addr: todo!(),
+            contact_url: todo!(),
+            genre: todo!(),
+            desc: todo!(),
+            number_of_listener: todo!(),
+            number_of_relay: todo!(),
+            bitrate: todo!(),
+            filetype: todo!(),
+            status: todo!(),
+            comment: todo!(),
             created_at: ch.created_at.as_ref().clone(),
         }
     }

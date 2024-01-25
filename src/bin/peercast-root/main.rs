@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, unused)]
 /// peercast-port-checkerd
 /// PeerCastのポートが開いているか確認してくれるAPIサーバー
 /// IPv4/IPv6の両方のポートを開いて待つ
@@ -7,6 +7,7 @@
 /// HTTP Headerに X-Request-Id を持っていればそれを利用し、無ければ自動で生成する
 mod api;
 mod error;
+mod manager;
 
 use std::{
     collections::HashMap,
@@ -23,7 +24,6 @@ use futures_util::{
 };
 use http::header::SEC_WEBSOCKET_ACCEPT;
 use hyper::client::conn;
-use hyper_util::client::connect::Connection;
 use minijinja::filters::first;
 use peercast_re::{
     error::{AtomParseError, HandshakeError},
@@ -36,7 +36,10 @@ use peercast_re::{
 };
 use rml_rtmp::messages;
 use thiserror::Error;
-use tokio::sync::mpsc::{self, unbounded_channel, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{
+    mpsc::{self, unbounded_channel, UnboundedReceiver, UnboundedSender},
+    watch,
+};
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -135,7 +138,7 @@ async fn start_pcp_server(
             let mut pcp_connection = pcp_handshake.incoming_pcp().await?;
             println!("{:#?}", &pcp_connection);
 
-            let tracker_connection = match &pcp_connection.con_type {
+            let tracker_connection: TrackerConnection = match &pcp_connection.con_type {
                 PcpConnectType::Outgoing => unreachable!(),
                 PcpConnectType::IncomingPing(_ping) => {
                     // pingを返す(まー必要ないはずなんだけどあり得る通信なので)
@@ -160,7 +163,7 @@ async fn start_pcp_server(
                     let Ok(first_broadcast) = PcpBroadcast::parse(&first_atom).map(|p| Arc::new(p))
                     else {
                         error!(
-                            "first PCPPacket must be Broadcast CID: {}",
+                            "First PCPPacket must be BroadcastAtom(id=bcst): {}",
                             pcp_connection.connection_id()
                         );
                         debug!("first atom: {:#?}", first_atom);
@@ -174,16 +177,16 @@ async fn start_pcp_server(
                         return Err(HandshakeError::Failed);
                     };
 
-                    let ch = channel_manager.create_or_get(
+                    let channel = channel_manager.create_or_get(
                         channel_id,
-                        TrackerChannelConifg {
+                        TrackerChannelConfig {
                             broadcast_id: broadcast_id.clone(),
-                            broadcast: first_broadcast.clone(),
+                            first_broadcast: first_broadcast.clone(),
                         },
                     );
 
                     // TrackerConnectionを返す
-                    ch.tracker_connection(
+                    channel.tracker_connection(
                         pcp_connection.connection_id(),
                         broadcast_id,
                         first_broadcast,
@@ -289,8 +292,9 @@ pub struct TrackerChannel {
     self_session_id: Arc<GnuId>,
     channel_id: Arc<GnuId>,
     broadcast: Arc<PcpBroadcast>,
-    config: Arc<TrackerChannelConifg>,
+    config: Arc<TrackerChannelConfig>,
     manager_sender: UnboundedSender<RootManagerMessage>,
+    detail_reciever: tokio::sync::watch::Receiver<TrackerDetail>,
 
     created_at: Arc<DateTime<Utc>>,
     _called_before_remove: bool,
@@ -305,6 +309,7 @@ impl TrackerChannel {
     ) -> TrackerConnection {
         TrackerConnection::new(
             connection_id,
+            self.config.clone(),
             self.manager_sender.clone(),
             remote_broadcast_id,
             first_broadcast,
@@ -313,13 +318,13 @@ impl TrackerChannel {
 }
 
 #[derive(Debug, Clone)]
-pub struct TrackerChannelConifg {
+pub struct TrackerChannelConfig {
     broadcast_id: Arc<GnuId>,
-    broadcast: Arc<PcpBroadcast>,
+    first_broadcast: Arc<PcpBroadcast>,
 }
 
 impl ChannelTrait for TrackerChannel {
-    type Config = TrackerChannelConifg;
+    type Config = TrackerChannelConfig;
 
     fn new(
         self_session_id: Arc<GnuId>,
@@ -327,14 +332,19 @@ impl ChannelTrait for TrackerChannel {
         channel_id: Arc<GnuId>,
         config: Self::Config,
     ) -> Self {
+        let (detail_sender, detail_reciever) = tokio::sync::watch::channel(TrackerDetail {});
+
         // self_broadcast_idはいらないので無視する
-        let manager_sender = RootManager::start(channel_id.clone());
+        let manager_sender = RootManager::start(channel_id.clone(), detail_sender);
+
         TrackerChannel {
             channel_id,
             self_session_id,
-            broadcast: config.broadcast.clone(),
+            broadcast: config.first_broadcast.clone(),
             config: Arc::new(config),
             manager_sender,
+            detail_reciever,
+
             created_at: Arc::new(Utc::now()),
             _called_before_remove: false,
         }
@@ -350,6 +360,7 @@ impl ChannelTrait for TrackerChannel {
 struct RootManager {
     channel_id: Arc<GnuId>,
     broadcast: Option<Arc<PcpBroadcast>>,
+    detail_sender: watch::Sender<TrackerDetail>,
     // connection_idとSenderを組み合わせた物
     sender_by_connection_id: HashMap<ConnectionId, mpsc::UnboundedSender<ConnectionMessage>>,
     new_disconnect_futures: Vec<BoxFuture<'static, FutureResult>>,
@@ -366,8 +377,8 @@ impl std::fmt::Debug for RootManager {
     }
 }
 
-#[derive(Debug)]
-struct TrackerDetails {}
+#[derive(Debug, Clone)]
+struct TrackerDetail {}
 
 enum FutureResult {
     Disconnection {
@@ -380,12 +391,17 @@ enum FutureResult {
 }
 
 impl RootManager {
-    fn start(channel_id: Arc<GnuId>) -> mpsc::UnboundedSender<RootManagerMessage> {
+    fn start(
+        channel_id: Arc<GnuId>,
+        detail_sender: watch::Sender<TrackerDetail>,
+    ) -> mpsc::UnboundedSender<RootManagerMessage> {
         let (tx, rx) = mpsc::unbounded_channel();
 
         let manager: RootManager = RootManager {
             channel_id,
             broadcast: None,
+            detail_sender,
+            //
             sender_by_connection_id: HashMap::new(),
             new_disconnect_futures: Vec::new(),
         };
@@ -474,6 +490,7 @@ impl RootManager {
         }
     }
 
+    // チャンネルに新規チャンネルが接続された
     fn handle_new_connection(
         &mut self,
         connection_id: ConnectionId,
@@ -484,11 +501,24 @@ impl RootManager {
         self.new_disconnect_futures
             .push(wait_for_client_disconnection(connection_id, disconnection).boxed());
     }
+
+    // チャンネルの配信開始
     fn handle_publish_channel(&mut self, frst_broadcast: Arc<PcpBroadcast>) {
         // if fistbroad cast arrived. we should check broadcast_id is same
     }
 
-    fn handle_update_channel(&mut self, broadcast: Arc<PcpBroadcast>) {}
+    // PcpBroadcastを元にチャンネル情報を更新する
+    fn handle_update_channel(&mut self, broadcast: Arc<PcpBroadcast>) {
+        let Some(group) = &broadcast.broadcast_group else {
+            return;
+        };
+        match group.has_root() {
+            true => (),
+            false => return,
+        };
+
+        let _ = self.detail_sender.send(TrackerDetail {});
+    }
 }
 
 async fn wait_for_client_disconnection(
@@ -508,6 +538,7 @@ pub enum State {
 
 struct TrackerConnection {
     connection_id: ConnectionId,
+    config: Arc<TrackerChannelConfig>,
     manager_sender: UnboundedSender<RootManagerMessage>,
     remote_broadcast_id: Arc<GnuId>,
     /// Handshake後、最初のパケット
@@ -518,18 +549,22 @@ struct TrackerConnection {
 impl TrackerConnection {
     fn new(
         connection_id: ConnectionId,
+        config: Arc<TrackerChannelConfig>,
         manager_sender: UnboundedSender<RootManagerMessage>,
         remote_broadcast_id: Arc<GnuId>,
         first_broadcast: Arc<PcpBroadcast>,
     ) -> Self {
         Self {
             connection_id,
+            config,
             manager_sender,
             remote_broadcast_id,
             first_broadcast: Some(first_broadcast),
             state: State::Waiting,
         }
     }
+
+    /// ConnectionManagerとの接続を開始する
     async fn start_connection_manager(
         mut self,
         connection: PcpConnection,
@@ -557,6 +592,7 @@ impl TrackerConnection {
         let _ = tokio::spawn(write_routine(writer_rx, write_half));
 
         // Publish Request
+        // Handshake後、最初のパケット(本当はstart_connection_managerに引数で与えたいけど複雑になるのでOptionで渡している)
         let first_broadcast = self.first_broadcast.take().unwrap();
         let message = RootManagerMessage::PublishChannel {
             session_id: remote_session_id,
@@ -586,7 +622,7 @@ impl TrackerConnection {
                         Some(a) => { results = self.handle_arrived_atom(a)?; }
                     };
                 },
-                // Managerから何かメッセージが来たら処理
+                // Managerからメッセージが来たら処理
                 manager_message = message_receiver.recv() => {
                     info!("action: {:#?}",&action);
                     match manager_message {
@@ -630,15 +666,19 @@ impl TrackerConnection {
     /// 通信相手から到着したAtomを処理する
     fn handle_arrived_atom(&self, atom: Atom) -> Result<Vec<SessionResult>, RootError> {
         match atom.id() {
-            Id4::PCP_BCST => {}
+            Id4::PCP_BCST => {
+                info!("{} ARRIVED_BCST {:?}", self.connection_id, atom);
+                Ok(vec![])
+            }
             Id4::PCP_QUIT => {
                 info!("{} ARRIVED_QUIT {:?}", self.connection_id, atom);
+                Ok(vec![])
             }
             _ => {
                 warn!("{} UNKNOWN ATOM: {:#?}", self.connection_id, atom);
+                Ok(vec![])
             }
         }
-        todo!()
     }
 
     /// StreamManagerから到着したメッセージを処理する
@@ -731,7 +771,10 @@ enum ServerSessionEvent {
         atom: Arc<Atom>,
         broadcast: Arc<PcpBroadcast>,
     },
-    PublishChannelFinished(),
+    PublishChannelFinished {},
+    UpdateChannel {
+        atom: Arc<Atom>,
+    },
 }
 
 /// Session操作等を実行した後の動作

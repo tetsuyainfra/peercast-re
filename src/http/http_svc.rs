@@ -7,6 +7,7 @@ use askama::filters::format;
 use axum::{
     body::{self, Body},
     extract::{connect_info::Connected, ConnectInfo, Host, Path, Query, Request, State},
+    http::HeaderValue,
     response::{Html, IntoResponse, Redirect, Response},
     routing::{self, get},
     Router,
@@ -14,8 +15,7 @@ use axum::{
 use axum_core::BoxError;
 use bytes::Bytes;
 use futures_util::{future::Pending, task::SpawnExt, Stream};
-use http::{header, uri::Port, HeaderMap, HeaderValue, StatusCode, Uri};
-use hyper::{rt::Write, upgrade::Upgraded};
+use hyper::{rt::Write, upgrade::Upgraded, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use rml_rtmp::sessions::StreamMetadata;
 use rust_embed::RustEmbed;
@@ -96,7 +96,7 @@ impl HttpSvc {
                     .unwrap(),
             );
         }
-        let headers = [http::header::CONTENT_TYPE];
+        let headers = [hyper::header::CONTENT_TYPE];
 
         // local_address
         let allow_ips = config.local_address.clone();
@@ -241,7 +241,7 @@ impl HttpSvc {
 
         Ok((
             StatusCode::OK,
-            [(header::CONTENT_TYPE, "audio/x-mpegurl")],
+            [(hyper::header::CONTENT_TYPE, "audio/x-mpegurl")],
             m3u_str,
         ))
     }
@@ -266,7 +266,7 @@ impl HttpSvc {
 
         let resp = Response::builder()
             .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "video/x-flv")
+            .header(hyper::header::CONTENT_TYPE, "video/x-flv")
             .body(Body::from_stream(streamer))
             .unwrap();
 

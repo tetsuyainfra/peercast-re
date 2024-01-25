@@ -6,7 +6,7 @@ use axum::{
     Json, Router,
 };
 use axum_core::response::IntoResponse;
-use http::StatusCode;
+use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tracing::debug;

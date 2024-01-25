@@ -25,16 +25,16 @@ impl BroadcastGroup {
     fn has(&self, other: &BroadcastGroup) -> bool {
         (self.0 & other.0) != 0
     }
-    fn is_all(&self) -> bool {
+    pub fn is_all(&self) -> bool {
         self.0 == Self::TO_ALL.0
     }
-    fn has_root(&self) -> bool {
+    pub fn has_root(&self) -> bool {
         self.has(&Self::TO_ROOT)
     }
-    fn has_trackers(&self) -> bool {
+    pub fn has_trackers(&self) -> bool {
         self.has(&Self::TO_TRACKERS)
     }
-    fn has_relays(&self) -> bool {
+    pub fn has_relays(&self) -> bool {
         self.has(&Self::TO_RELAYS)
     }
 }
@@ -56,7 +56,7 @@ pub struct PcpBroadcast {
     pub version_ex_prefix: Option<Bytes>,
     //
     pub channel_id: Option<GnuId>,
-    pub broadcast_group: Option<u8>,
+    pub broadcast_group: Option<BroadcastGroup>,
     //
     pub channel_packet: Option<PcpChannel>,
     //
@@ -82,7 +82,7 @@ impl PcpBroadcast {
                     Id4::PCP_BCST_VERSION_EX_NUMBER => p.version_ex_number = Some(decode_i16(a)?),
                     Id4::PCP_BCST_VERSION_EX_PREFIX => p.version_ex_prefix = Some(decode_bytes(a)?), // Bytes
                     Id4::PCP_BCST_CHANID => p.channel_id = Some(decode_gnuid(a)?),
-                    Id4::PCP_BCST_GROUP => p.broadcast_group = Some(decode_u8(a)?),
+                    Id4::PCP_BCST_GROUP => p.broadcast_group = Some(decode_u8(a)?.into()),
                     _ => {
                         warn!("unkown atom arrived :{:?}", &a)
                     }
