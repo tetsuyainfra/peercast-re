@@ -29,7 +29,7 @@ use thiserror::Error;
 use tokio::net::TcpStream;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use tracing::{error, info, Level};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
