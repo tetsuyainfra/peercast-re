@@ -1,23 +1,8 @@
-use std::{
-    clone,
-    convert::Infallible,
-    net::SocketAddr,
-    path::PathBuf,
-    process::exit,
-    str::FromStr,
-    sync::{
-        atomic::{AtomicI8, Ordering},
-        mpsc::channel,
-        Arc, Mutex,
-    },
-    task::Poll,
-    time::Duration,
-};
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
+use axum::extract::connect_info::Connected;
 use axum_core::{extract::Request, response::Response};
 use bytes::BytesMut;
-use futures_util::{stream, task::SpawnExt, Future, FutureExt};
-use ipnet::IpNet;
 use thiserror::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -25,19 +10,15 @@ use tokio::{
         broadcast,
         mpsc::{self, UnboundedSender},
     },
-    time::{error::Elapsed, sleep, Instant},
+    time::Instant,
 };
 use tower::Service;
 use tracing::{debug, info, warn};
 
 use crate::{
     config::Config,
-    error,
     http::{HttpSvc, MyConnectInfo, MyIncomingStream, ShutdownAndNotifySet},
-    pcp::{
-        procedure::PcpHandshake, BroadcastTaskConfig, ChannelInfo, ChannelManager, ChannelType,
-        GnuId, RelayTaskConfig, SourceTaskConfig, TrackInfo,
-    },
+    pcp::{procedure::PcpHandshake, ChannelManager, GnuId},
     rtmp::{
         connection,
         stream_manager::{self, StreamManagerMessage},
@@ -245,9 +226,7 @@ impl CuiApp {
         ); */
 
         // Serviceを作るためのひな形を作成する
-        let mut make_service = http_svc
-            .clone()
-            .into_make_service_with_connect_info::<MyConnectInfo>();
+        // let mut make_service = http_svc.into_make_service_with_connect_info::<MyConnectInfo>();
 
         'accept_loop: loop {
             let mut connection_id = ConnectionId::new();
@@ -297,32 +276,65 @@ impl CuiApp {
                         .await;
                     }
                     ConnectionProtocol::Http | ConnectionProtocol::Unknown => {
-                        // let m = MyIncomingStream {
-                        //     connection_id,
-                        //     tcp_stream: &tcp_stream,
-                        //     remote_addr,
-                        //     shutdown: Arc::new(Mutex::new(Some(shutdown_set))),
-                        // };
-                        // let x = make_service.call(m).await;
-                        // let tower_service = unwrap_infallible(make_service.call(remote_addr).await);
+                        let mut make_service =
+                            cloned_http_service.into_make_service_with_connect_info::<NewConInfo>();
+                        // let tower_service =
+                        //     unwrap_infallible(make_service.call(NewConInfo {}).await);
+                        let tower_service = make_service
+                            .call(NewConInfo {})
+                            .await
+                            .unwrap_or_else(|err| match err {});
 
-                        // Self::spawn_http_server(
-                        //     // cloned_local_address,
-                        //     connection_id,
-                        //     tcp_stream,
-                        //     remote_addr,
-                        //     shutdown_set,
-                        //     cloned_http_service
-                        //         .into_make_service_with_connect_info::<MyConnectInfo>(),
-                        //     // make_service,
+                        let socket = hyper_util::rt::TokioIo::new(tcp_stream);
+
+                        let hyper_service = hyper::service::service_fn(
+                            move |request: Request<hyper::body::Incoming>| {
+                                use tower::ServiceExt;
+                                tower_service.clone().oneshot(request)
+                            },
+                        );
+
+                        // if let Err(err) = hyper_util::server::conn::auto::Builder::new(
+                        //     hyper_util::rt::TokioExecutor::new(),
                         // )
-                        // .await;
+                        // .serve_connection_with_upgrades(socket, hyper_service)
+                        // .await
+                        // {
+                        //     eprintln!("failed to serve connection: {err:#}");
+                        // }
+
+                        match hyper_util::server::conn::auto::Builder::new(
+                            hyper_util::rt::TokioExecutor::new(),
+                        )
+                        .serve_connection_with_upgrades(socket, hyper_service)
+                        .await
+                        {
+                            Ok(()) => {}
+                            Err(err) => {
+                                eprintln!("failed to serve connection: {err:#}");
+                            }
+                        };
+
+                        /*{
+                            Self::spawn_http_server(
+                                // cloned_local_address,
+                                connection_id,
+                                tcp_stream,
+                                remote_addr,
+                                shutdown_set,
+                                cloned_http_service
+                                    .into_make_service_with_connect_info::<SocketAddr>(),
+                            )
+                            .await;
+                        }*/
                     }
                 };
             });
+            // tokio::spawn
         }
         Ok(())
     }
+
     async fn spawn_rtmp_server(
         manager_sender: UnboundedSender<StreamManagerMessage>,
         listener: TcpListener,
@@ -397,15 +409,42 @@ impl CuiApp {
         shutdown_set: ShutdownAndNotifySet,
         mut make_service: M,
     ) where
-        M: for<'a> Service<MyIncomingStream<'a>, Error = Infallible, Response = S>,
+        // M: for<'a> Service<MyIncomingStream<'a>, Error = Infallible, Response = S>,
+        // M: Service<MyIncomingStream, Error = Infallible, Response = S>,
+        M: Service<SocketAddr, Error = Infallible, Response = S>,
         S: Service<Request, Response = Response, Error = Infallible> + Clone + Send + 'static,
         S::Future: Send,
     {
         use hyper_util::rt::{TokioExecutor, TokioIo};
+        use hyper_util::server;
+        use tower::ServiceExt;
 
         let stream = TokioIo::new(tcp_stream);
 
-        todo!()
+        let in_come = MyIncomingStream {
+            connection_id,
+            remote_addr,
+            shutdown: todo!(),
+        };
+
+        // let tower_service = unwrap_infallible(make_service.call(income).await);
+
+        let tower_service = make_service
+            .call(remote_addr)
+            .await
+            .unwrap_or_else(|err| match err {});
+
+        // let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
+        //     let x = tower_service.clone().oneshot(request);
+        //     x
+        // });
+
+        // if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
+        //     .serve_connection_with_upgrades(stream, hyper_service)
+        //     .await
+        // {
+        //     eprintln!("failed to serve connection: {err:#}");
+        // }
     }
 
     /*
@@ -503,6 +542,22 @@ impl CuiApp {
         });
     }
     */
+}
+
+#[derive(Debug, Clone)]
+struct NewConInfo {}
+
+impl Connected<NewConInfo> for NewConInfo {
+    fn connect_info(target: NewConInfo) -> Self {
+        todo!()
+    }
+}
+
+fn unwrap_infallible<T>(result: Result<T, Infallible>) -> T {
+    match result {
+        Ok(value) => value,
+        Err(err) => match err {},
+    }
 }
 
 struct TuiAppState {

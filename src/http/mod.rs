@@ -34,17 +34,20 @@ pub use ui::Ui;
 pub(crate) type ShutdownAndNotifySet = (Shutdown, tokio::sync::mpsc::Sender<()>);
 
 #[derive(Debug)]
-pub struct MyIncomingStream<'a> {
+// pub struct MyIncomingStream<'a> {
+pub struct MyIncomingStream {
     pub connection_id: ConnectionId,
-    pub tcp_stream: &'a TokioIo<TcpStream>,
+    // pub tcp_stream: &'a TokioIo<TcpStream>,
     pub remote_addr: SocketAddr,
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }
 
-impl MyIncomingStream<'_> {
+// impl MyIncomingStream<'_> {
+impl MyIncomingStream {
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
-        self.tcp_stream.inner().local_addr()
+        // self.tcp_stream.inner().local_addr()
+        todo!()
     }
 
     /// Returns the remote address that this stream is bound to.
@@ -62,8 +65,10 @@ pub struct MyConnectInfo {
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }
 
-impl Connected<MyIncomingStream<'_>> for MyConnectInfo {
-    fn connect_info(mut target: MyIncomingStream<'_>) -> Self {
+// impl Connected<MyIncomingStream<'_>> for MyConnectInfo {
+//     fn connect_info(mut target: MyIncomingStream<'_>) -> Self {
+impl Connected<MyIncomingStream> for MyConnectInfo {
+    fn connect_info(mut target: MyIncomingStream) -> Self {
         MyConnectInfo {
             local: target.local_addr().unwrap(),
             remote: target.remote_addr(),

@@ -1,4 +1,4 @@
-#![allow(unused)]
+// #![allow(unused)]
 use std::str::FromStr;
 
 use num::traits::AsPrimitive;

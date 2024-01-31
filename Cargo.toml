@@ -58,10 +58,16 @@ httparse = { version = "1.8.0" }
 
 axum-core = { version = "*" }
 axum = { version = "0.7", features = [
+    "tokio",
     "form",
     "ws",
     "tracing",
 ] }
+# axum = { git = "https://github.com/tokio-rs/axum", branch = "main", features = [
+#     "form",
+#     "ws",
+#     "tracing",
+# ] }
 tower = { version = "0.4.13" }
 tower-http = { version = "0.5.1", features = ["fs", "trace", "cors", "util", "request-id"] }
 # tower-hyper-http-body-compat = { version = "0.2.0", features = [
