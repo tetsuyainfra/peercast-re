@@ -1,6 +1,6 @@
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
-use axum::extract::connect_info::Connected;
+use axum::extract::connect_info::{Connected, IntoMakeServiceWithConnectInfo};
 use axum_core::{extract::Request, response::Response};
 use bytes::BytesMut;
 use thiserror::Error;
@@ -276,57 +276,20 @@ impl CuiApp {
                         .await;
                     }
                     ConnectionProtocol::Http | ConnectionProtocol::Unknown => {
-                        let mut make_service =
-                            cloned_http_service.into_make_service_with_connect_info::<NewConInfo>();
-                        // let tower_service =
-                        //     unwrap_infallible(make_service.call(NewConInfo {}).await);
-                        let tower_service = make_service
-                            .call(NewConInfo {})
-                            .await
-                            .unwrap_or_else(|err| match err {});
+                        // let mut make_service: IntoMakeServiceWithConnectInfo<
+                        //     axum::Router,
+                        //     NewConInfo,
+                        // > = cloned_http_service.into_make_service_with_connect_info::<NewConInfo>();
 
-                        let socket = hyper_util::rt::TokioIo::new(tcp_stream);
-
-                        let hyper_service = hyper::service::service_fn(
-                            move |request: Request<hyper::body::Incoming>| {
-                                use tower::ServiceExt;
-                                tower_service.clone().oneshot(request)
-                            },
-                        );
-
-                        // if let Err(err) = hyper_util::server::conn::auto::Builder::new(
-                        //     hyper_util::rt::TokioExecutor::new(),
-                        // )
-                        // .serve_connection_with_upgrades(socket, hyper_service)
-                        // .await
-                        // {
-                        //     eprintln!("failed to serve connection: {err:#}");
-                        // }
-
-                        match hyper_util::server::conn::auto::Builder::new(
-                            hyper_util::rt::TokioExecutor::new(),
+                        Self::spawn_http_server(
+                            // cloned_local_address,
+                            connection_id,
+                            tcp_stream,
+                            remote_addr,
+                            shutdown_set,
+                            cloned_http_service.into_make_service_with_connect_info::<NewConInfo>(),
                         )
-                        .serve_connection_with_upgrades(socket, hyper_service)
-                        .await
-                        {
-                            Ok(()) => {}
-                            Err(err) => {
-                                eprintln!("failed to serve connection: {err:#}");
-                            }
-                        };
-
-                        /*{
-                            Self::spawn_http_server(
-                                // cloned_local_address,
-                                connection_id,
-                                tcp_stream,
-                                remote_addr,
-                                shutdown_set,
-                                cloned_http_service
-                                    .into_make_service_with_connect_info::<SocketAddr>(),
-                            )
-                            .await;
-                        }*/
+                        .await;
                     }
                 };
             });
@@ -400,51 +363,39 @@ impl CuiApp {
             drop(shutdown_set)
         });
     }
-    async fn spawn_http_server<M, S>(
+
+    async fn spawn_http_server(
         // local_address: Arc<Vec<IpNet>>,
         //
         connection_id: ConnectionId,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
-        mut make_service: M,
-    ) where
-        // M: for<'a> Service<MyIncomingStream<'a>, Error = Infallible, Response = S>,
-        // M: Service<MyIncomingStream, Error = Infallible, Response = S>,
-        M: Service<SocketAddr, Error = Infallible, Response = S>,
-        S: Service<Request, Response = Response, Error = Infallible> + Clone + Send + 'static,
-        S::Future: Send,
-    {
-        use hyper_util::rt::{TokioExecutor, TokioIo};
-        use hyper_util::server;
-        use tower::ServiceExt;
+        mut make_service: IntoMakeServiceWithConnectInfo<axum::Router, NewConInfo>,
+    ) {
+        // let tower_service = make_service
+        //     .call(NewConInfo {})
+        //     .await
+        //     .unwrap_or_else(|err| match err {});
+        let tower_service = unwrap_infallible(make_service.call(NewConInfo {}).await);
 
-        let stream = TokioIo::new(tcp_stream);
+        let socket = hyper_util::rt::TokioIo::new(tcp_stream);
 
-        let in_come = MyIncomingStream {
-            connection_id,
-            remote_addr,
-            shutdown: todo!(),
-        };
+        let hyper_service =
+            hyper::service::service_fn(move |request: Request<hyper::body::Incoming>| {
+                use tower::ServiceExt;
+                tower_service.clone().oneshot(request)
+            });
 
-        // let tower_service = unwrap_infallible(make_service.call(income).await);
-
-        let tower_service = make_service
-            .call(remote_addr)
-            .await
-            .unwrap_or_else(|err| match err {});
-
-        // let hyper_service = hyper::service::service_fn(move |request: Request<Incoming>| {
-        //     let x = tower_service.clone().oneshot(request);
-        //     x
-        // });
-
-        // if let Err(err) = server::conn::auto::Builder::new(TokioExecutor::new())
-        //     .serve_connection_with_upgrades(stream, hyper_service)
+        // match hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
+        //     .serve_connection_with_upgrades(socket, hyper_service)
         //     .await
         // {
-        //     eprintln!("failed to serve connection: {err:#}");
-        // }
+        //     Ok(()) => {}
+        //     Err(err) => {
+        //         eprintln!("failed to serve connection: {err:#}");
+        //     }
+        // };
     }
 
     /*
