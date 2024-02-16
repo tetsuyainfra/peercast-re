@@ -41,7 +41,7 @@ impl BroadcastGroup {
 
 impl From<u8> for BroadcastGroup {
     fn from(value: u8) -> Self {
-        todo!()
+        Self(value)
     }
 }
 

@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use axum::extract::connect_info::Connected;
+use axum::extract::{connect_info::Connected, ConnectInfo};
 use axum_core::response::IntoResponse;
 use bytes::Bytes;
 use http::StatusCode;
@@ -58,13 +58,14 @@ impl MyIncomingStream {
 
 #[derive(Clone, Debug)]
 pub struct MyConnectInfo {
-    pub local: SocketAddr,
+    // pub local: SocketAddr,
     pub remote: SocketAddr,
     pub connection_id: ConnectionId,
     // 長い通信があり、シャットダウンを綺麗にしたいならの変数を取得する
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }
 
+/*
 // impl Connected<MyIncomingStream<'_>> for MyConnectInfo {
 //     fn connect_info(mut target: MyIncomingStream<'_>) -> Self {
 impl Connected<MyIncomingStream> for MyConnectInfo {
@@ -75,6 +76,12 @@ impl Connected<MyIncomingStream> for MyConnectInfo {
             connection_id: target.connection_id,
             shutdown: target.shutdown.clone(),
         }
+    }
+} */
+
+impl Connected<MyConnectInfo> for MyConnectInfo {
+    fn connect_info(target: MyConnectInfo) -> Self {
+        target
     }
 }
 

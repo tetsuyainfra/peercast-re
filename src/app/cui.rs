@@ -1,4 +1,10 @@
-use std::{convert::Infallible, net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    convert::Infallible,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use axum::extract::connect_info::{Connected, IntoMakeServiceWithConnectInfo};
 use axum_core::{extract::Request, response::Response};
@@ -176,7 +182,7 @@ impl CuiApp {
         let port_check_handle = tokio::spawn(async move {
             info!("port check");
             let res = reqwest::get(format!(
-                "http://ppc-v4.tetsuyainfra.dev/ppc/portcheck?port={server_port}"
+                "http://ppc-v4.tetsuyainfra.dev:7145/ppc/portcheck?port={server_port}"
             ))
             .await;
             info!("res: {:?}", res);
@@ -228,8 +234,9 @@ impl CuiApp {
         // Serviceを作るためのひな形を作成する
         // let mut make_service = http_svc.into_make_service_with_connect_info::<MyConnectInfo>();
 
+        #[allow(unused_labels)]
         'accept_loop: loop {
-            let mut connection_id = ConnectionId::new();
+            let connection_id = ConnectionId::new();
             let shutdown = Shutdown::new(self.notify_shutdown_tx.subscribe());
             let shutdown_complete_tx = self.shutdown_complete_tx.clone();
             let shutdown_set = (shutdown, shutdown_complete_tx);
@@ -241,7 +248,7 @@ impl CuiApp {
             let cloned_manager_sender = manager_sender.clone();
             // let cloned_local_address = Arc::clone(&local_address);
 
-            let (mut tcp_stream, remote_addr) = listener.accept().await?;
+            let (tcp_stream, remote_addr) = listener.accept().await?;
 
             tokio::spawn(async move {
                 info!("Next is Connection: {connection_id} {remote_addr:?}");
@@ -287,7 +294,8 @@ impl CuiApp {
                             tcp_stream,
                             remote_addr,
                             shutdown_set,
-                            cloned_http_service.into_make_service_with_connect_info::<NewConInfo>(),
+                            cloned_http_service
+                                .into_make_service_with_connect_info::<MyConnectInfo>(),
                         )
                         .await;
                     }
@@ -371,13 +379,22 @@ impl CuiApp {
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
-        mut make_service: IntoMakeServiceWithConnectInfo<axum::Router, NewConInfo>,
+        mut make_service: IntoMakeServiceWithConnectInfo<axum::Router, MyConnectInfo>,
     ) {
         // let tower_service = make_service
         //     .call(NewConInfo {})
         //     .await
         //     .unwrap_or_else(|err| match err {});
-        let tower_service = unwrap_infallible(make_service.call(NewConInfo {}).await);
+        let tower_service = unwrap_infallible(
+            make_service
+                .call(MyConnectInfo {
+                    // local: todo!(),
+                    remote: remote_addr,
+                    connection_id,
+                    shutdown: Arc::new(Mutex::new(Some(shutdown_set))),
+                })
+                .await,
+        );
 
         let socket = hyper_util::rt::TokioIo::new(tcp_stream);
 
@@ -387,15 +404,15 @@ impl CuiApp {
                 tower_service.clone().oneshot(request)
             });
 
-        // match hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
-        //     .serve_connection_with_upgrades(socket, hyper_service)
-        //     .await
-        // {
-        //     Ok(()) => {}
-        //     Err(err) => {
-        //         eprintln!("failed to serve connection: {err:#}");
-        //     }
-        // };
+        match hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
+            .serve_connection_with_upgrades(socket, hyper_service)
+            .await
+        {
+            Ok(()) => {}
+            Err(err) => {
+                eprintln!("failed to serve connection: {err:#}");
+            }
+        };
     }
 
     /*
@@ -496,11 +513,13 @@ impl CuiApp {
 }
 
 #[derive(Debug, Clone)]
-struct NewConInfo {}
+struct NewConInfo {
+    remote_addr: SocketAddr,
+}
 
 impl Connected<NewConInfo> for NewConInfo {
-    fn connect_info(target: NewConInfo) -> Self {
-        todo!()
+    fn connect_info(new_conn_info: NewConInfo) -> Self {
+        new_conn_info
     }
 }
 

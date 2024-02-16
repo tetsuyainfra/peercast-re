@@ -154,7 +154,7 @@ impl HttpSvc {
     // async fn playlist(req: Request) -> impl IntoResponse {
     async fn playlist(
         ConnectInfo(MyConnectInfo {
-            local,
+            // local,
             remote,
             connection_id,
             shutdown,

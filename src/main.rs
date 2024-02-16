@@ -37,7 +37,8 @@ struct Cli {
 
     #[clap(
         short='p', long="port", value_name = "PORT",
-    //  default_value = "17144",
+        env = "PEERCAST_RE_PORT",
+        //  default_value = "17144",
         value_parser = clap::value_parser!(u16).range(5000..)
     )]
     server_port: Option<u16>,

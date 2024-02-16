@@ -1,5 +1,5 @@
 use std::{
-    net::SocketAddr,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     sync::{mpsc::channel, Arc},
 };
 
@@ -124,20 +124,22 @@ impl From<TrackerChannel> for JsonChannel {
     fn from(ch: TrackerChannel) -> Self {
         let _details = ch.detail_reciever.borrow().clone();
 
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
+
         JsonChannel {
             id: ch.channel_id.as_ref().clone(),
             title: String::from("example"),
-            title_escaped: todo!(),
-            addr: todo!(),
-            contact_url: todo!(),
-            genre: todo!(),
-            desc: todo!(),
-            number_of_listener: todo!(),
-            number_of_relay: todo!(),
-            bitrate: todo!(),
-            filetype: todo!(),
-            status: todo!(),
-            comment: todo!(),
+            title_escaped: String::from("escaped"),
+            addr,
+            contact_url: String::from("contact_url"),
+            genre: String::from("genre"),
+            desc: String::from("desc"),
+            number_of_listener: 100_i32,
+            number_of_relay: 200_i32,
+            bitrate: 1024_i32,
+            filetype: String::from("filetype"),
+            status: String::from("status"),
+            comment: String::from("comment"),
             created_at: ch.created_at.as_ref().clone(),
         }
     }
