@@ -23,7 +23,7 @@ use tracing::{debug, info, warn};
 
 use crate::{
     config::Config,
-    http::{HttpSvc, MyConnectInfo, MyIncomingStream, ShutdownAndNotifySet},
+    http::{HttpSvc, MyConnectInfo, ShutdownAndNotifySet},
     pcp::{procedure::PcpHandshake, ChannelManager, GnuId},
     rtmp::{
         connection,
@@ -37,10 +37,10 @@ use crate::{
 pub enum CuiError {
     #[error("failed config file loading")]
     LoadConfiguration,
-    #[error("application something error occured.")]
+    #[error("application something error occurred.")]
     ApplicationError,
 
-    #[error("application is finish but failed to gracefull shutdown: {0}")]
+    #[error("application is finish but failed to graceful shutdown: {0}")]
     ShutdownFailed(String),
 
     #[error("IoError: {0}")]
@@ -104,7 +104,7 @@ impl CuiApp {
                 r = tokio::time::timeout(Duration::from_secs(Self::WAIT_FORCE_SHUTDOWN_SEC), async move {}) => {
                     // Timeout待ちの終了
                     match r {
-                        Ok(r) => {
+                        Ok(_) => {
                             println!("Gracefull shutdown completly.");
                             GarcefullShutdownReason::Success
                         },
@@ -117,7 +117,7 @@ impl CuiApp {
                 _ = async {
                     // Ctrl+c 3回
                     for i in 0..Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES {
-                        tokio::signal::ctrl_c().await;
+                        let _ = tokio::signal::ctrl_c().await;
                         println!("Ctrl+c detected {}/{}", i+1, Self::WAIT_FORCE_SHUTDOWN_CTRLC_TIMES);
                     }
                 }=> {
@@ -337,7 +337,7 @@ impl CuiApp {
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
     ) {
-        let handle = tokio::task::spawn(async move {
+        let _handle = tokio::task::spawn(async move {
             info!("incomming PCP Port Check");
 
             let x = PcpHandshake::new(
@@ -494,7 +494,7 @@ impl CuiApp {
         let _handle = tokio::task::spawn(async move {
             match http1::Builder::new()
                 .serve_connection(tcp_stream, service)
-                // for websockets
+                // for websocket
                 // .with_upgrades()
                 .await
             {
