@@ -34,5 +34,6 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
-  "markdown-preview-enhanced.plantumlServer": "http://localhost:18080/svg/"
+  "markdown-preview-enhanced.plantumlServer": "http://localhost:18080/svg/",
+  "cSpell.words": ["chrono", "Helo", "peercast", "rtmp"]
 }
