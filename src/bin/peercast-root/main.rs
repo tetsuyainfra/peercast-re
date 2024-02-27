@@ -5,7 +5,7 @@
 ///
 /// API Serverの仕様
 /// HTTP Headerに X-Request-Id を持っていればそれを利用し、無ければ自動で生成する
-mod api;
+mod api_server;
 mod error;
 mod manager;
 
@@ -114,7 +114,10 @@ async fn main() {
     info!("listening on http://{}", api_listener.local_addr().unwrap(),);
 
     let fut_pcp = tokio::spawn(start_pcp_server(arc_channel_manager.clone(), listener));
-    let fut_api = tokio::spawn(api::start_api_server(arc_channel_manager, api_listener));
+    let fut_api = tokio::spawn(api_server::start_api_server(
+        arc_channel_manager,
+        api_listener,
+    ));
     join_all(vec![fut_pcp, fut_api]).await;
 }
 
