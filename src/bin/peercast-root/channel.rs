@@ -3,7 +3,22 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-use peercast_re::pcp::GnuId;
+use chrono::{DateTime, Utc};
+use peercast_re::{
+    pcp::{decode::PcpBroadcast, GnuId},
+    ConnectionId,
+};
+use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    manager::{RootManager, RootManagerMessage},
+    TrackerConnection,
+};
+//------------------------------------------------------------------------------
+// TrackerDetail
+//
+#[derive(Debug, Clone)]
+pub struct TrackerDetail {}
 
 //------------------------------------------------------------------------------
 // ChannelTrait
@@ -91,5 +106,79 @@ impl<C: ChannelTrait> ChannelManager<C> {
     pub fn remove(&mut self, channel_id: &GnuId) {
         let ch = self.channels.write().unwrap().remove(channel_id);
         ch.map(|mut c| c.before_remove());
+    }
+}
+
+//------------------------------------------------------------------------------
+// TrackerChannel
+//
+
+#[derive(Debug, Clone)]
+pub struct TrackerChannelConfig {
+    pub broadcast_id: Arc<GnuId>,
+    pub first_broadcast: Arc<PcpBroadcast>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TrackerChannel {
+    self_session_id: Arc<GnuId>,
+    pub channel_id: Arc<GnuId>,
+    broadcast: Arc<PcpBroadcast>,
+    config: Arc<TrackerChannelConfig>,
+    manager_sender: UnboundedSender<RootManagerMessage>,
+    pub detail_reciever: tokio::sync::watch::Receiver<TrackerDetail>,
+
+    pub created_at: Arc<DateTime<Utc>>,
+    _called_before_remove: bool,
+}
+
+impl TrackerChannel {
+    pub fn tracker_connection(
+        &self,
+        connection_id: ConnectionId,
+        remote_broadcast_id: Arc<GnuId>,
+        first_broadcast: Arc<PcpBroadcast>,
+    ) -> TrackerConnection {
+        TrackerConnection::new(
+            connection_id,
+            self.config.clone(),
+            self.manager_sender.clone(),
+            remote_broadcast_id,
+            first_broadcast,
+        )
+    }
+}
+
+impl ChannelTrait for TrackerChannel {
+    type Config = TrackerChannelConfig;
+
+    fn new(
+        self_session_id: Arc<GnuId>,
+        _self_broadcast_id: Arc<GnuId>,
+        channel_id: Arc<GnuId>,
+        config: Self::Config,
+    ) -> Self {
+        let (detail_sender, detail_reciever) = tokio::sync::watch::channel(TrackerDetail {});
+
+        // self_broadcast_idはいらないので無視する
+        let manager_sender = RootManager::start(channel_id.clone(), detail_sender);
+
+        TrackerChannel {
+            channel_id,
+            self_session_id,
+            broadcast: config.first_broadcast.clone(),
+            config: Arc::new(config),
+            manager_sender,
+            detail_reciever,
+
+            created_at: Arc::new(Utc::now()),
+            _called_before_remove: false,
+        }
+    }
+
+    fn before_remove(&mut self) {
+        if !self._called_before_remove {
+            // 色々やる
+        }
     }
 }

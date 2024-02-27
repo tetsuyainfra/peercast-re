@@ -26,10 +26,7 @@ use tower_http::{
 use tracing::{info, info_span, Span};
 use uuid::Uuid;
 
-use crate::{
-    error::{AppError, UserRepoError},
-    ChannelManager, TrackerChannel,
-};
+use crate::{channel::TrackerChannel, error::AppError, ChannelManager};
 
 ////////////////////////////////////////////////////////////////////////////////
 /// API Server

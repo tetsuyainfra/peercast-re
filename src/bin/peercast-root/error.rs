@@ -1,7 +1,9 @@
 use axum::Json;
 use axum_core::response::{IntoResponse, Response};
 use hyper::StatusCode;
+use peercast_re::error::AtomParseError;
 use serde_json::json;
+use thiserror::Error;
 // error.rs
 use uuid::Uuid;
 
@@ -54,4 +56,15 @@ impl IntoResponse for AppError {
 
         (status, body).into_response()
     }
+}
+//------------------------------------------------------------------------------
+// RootError
+//
+#[derive(Debug, Error)]
+pub enum RootError {
+    #[error("initialize failed")]
+    InitFailed,
+
+    #[error("atom parse error")]
+    AtomParseError(#[from] AtomParseError),
 }
