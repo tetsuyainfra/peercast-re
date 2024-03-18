@@ -36,6 +36,12 @@ impl GnuId {
     }
 }
 
+impl Default for GnuId {
+    fn default() -> Self {
+        GnuId::new()
+    }
+}
+
 impl fmt::Debug for GnuId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "GnuId({:032X})", self.0)

@@ -1,3 +1,4 @@
+use merge::Merge;
 use serde::Serialize;
 use tracing::warn;
 
@@ -5,11 +6,12 @@ use crate::{
     error::AtomParseError,
     pcp::{
         atom::decode::{self, decode_i32, decode_string},
+        decode::macros::merge_ref,
         Atom, Channel, ChannelInfo, Id4,
     },
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Merge)]
 pub struct PcpChannelInfo {
     pub typ: Option<String>,
     pub name: Option<String>,
@@ -54,4 +56,12 @@ impl PcpChannelInfo {
 
         Ok(i)
     }
+
+    pub fn merge_ref(&mut self, other: &Self) -> bool {
+        let mut changed = false;
+        changed = merge_ref!(self, other, typ);
+        changed
+    }
 }
+
+// fn merge_ref()

@@ -1,5 +1,6 @@
 //! encode Atom to Native Literal
 
+mod macros;
 mod pcp_broadcast;
 mod pcp_channel;
 mod pcp_channel_info;
