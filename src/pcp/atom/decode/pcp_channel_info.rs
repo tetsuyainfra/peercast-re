@@ -11,6 +11,8 @@ use crate::{
     },
 };
 
+use super::macros::getter;
+
 #[derive(Debug, Clone, Default, Merge)]
 pub struct PcpChannelInfo {
     pub typ: Option<String>,
@@ -19,7 +21,9 @@ pub struct PcpChannelInfo {
     pub desc: Option<String>,
     pub comment: Option<String>,
     pub url: Option<String>,
+    //
     pub stream_type: Option<String>,
+    // .で始まる拡張子
     pub stream_ext: Option<String>,
     pub bitrate: Option<i32>,
 }
@@ -58,10 +62,33 @@ impl PcpChannelInfo {
     }
 
     pub fn merge_ref(&mut self, other: &Self) -> bool {
-        let mut changed = false;
-        changed = merge_ref!(self, other, typ);
-        changed
+        merge_ref!(
+            self,
+            other,
+            [
+                typ,
+                name,
+                genre,
+                desc,
+                comment,
+                url,
+                stream_type,
+                stream_ext,
+                bitrate
+            ]
+        )
     }
+
+    // --- Getter ---A
+    getter!(&self, typ);
+    getter!(&self, name);
+    getter!(&self, genre);
+    getter!(&self, desc);
+    getter!(&self, comment);
+    getter!(&self, url);
+    getter!(&self, stream_type);
+    getter!(&self, stream_ext);
+    getter!(&self, bitrate, i32, 0);
 }
 
 // fn merge_ref()

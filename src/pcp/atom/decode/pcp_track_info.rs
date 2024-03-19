@@ -3,8 +3,10 @@ use tracing::{error, warn};
 
 use crate::{
     error::AtomParseError,
-    pcp::{atom::decode::decode_string, Atom, Id4, TrackInfo},
+    pcp::{atom::decode::decode_string, decode::macros::merge_ref, Atom, Id4, TrackInfo},
 };
+
+use super::macros::getter;
 
 #[derive(Debug, Clone, Default)]
 pub struct PcpTrackInfo {
@@ -43,4 +45,14 @@ impl PcpTrackInfo {
 
         Ok(i)
     }
+
+    pub fn merge_ref(&mut self, other: &Self) -> bool {
+        merge_ref!(self, other, [title, creator, url, album, genre])
+    }
+
+    getter!(&self, title);
+    getter!(&self, creator);
+    getter!(&self, url);
+    getter!(&self, album);
+    getter!(&self, genre);
 }

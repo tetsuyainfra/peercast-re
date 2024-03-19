@@ -15,7 +15,6 @@ macro_rules! merge_ref {
         }
     };
 }
-
 pub(crate) use merge_ref;
 
 pub(crate) fn _merge_ref<T: Clone>(x: &mut Option<T>, y: &Option<T>) -> bool {
@@ -26,6 +25,28 @@ pub(crate) fn _merge_ref<T: Clone>(x: &mut Option<T>, y: &Option<T>) -> bool {
         true
     }
 }
+
+macro_rules! getter {
+    (&$self: ident, $prop: ident) => {
+        pub fn $prop(&$self) -> String {
+            if let Some(ref $prop) = $self.$prop {
+                $prop.clone()
+            } else {
+                String::from("")
+            }
+        }
+    };
+    (&$self: ident, $prop: ident, $TYPE: ty, $DEF_VAL: expr) => {
+        pub fn $prop(&$self) -> $TYPE {
+            if let Some(ref $prop) = $self.$prop {
+                $prop.clone()
+            } else {
+                $DEF_VAL
+            }
+        }
+    };
+}
+pub(crate) use getter;
 
 #[cfg(test)]
 mod t {
