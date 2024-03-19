@@ -48,7 +48,7 @@ use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 use crate::{
-    channel::{ChannelManager, TrackerChannel, TrackerChannelConfig},
+    channel::{ChannelStore, TrackerChannel, TrackerChannelConfig},
     connection::TrackerConnection,
 };
 
@@ -109,7 +109,7 @@ async fn main() {
         connect_timeout: args.connect_timeout,
     });
 
-    let channel_manager: ChannelManager<TrackerChannel> = ChannelManager::new(None, None);
+    let channel_manager: ChannelStore<TrackerChannel> = ChannelStore::new(None, None);
     let arc_channel_manager = Arc::new(channel_manager);
 
     let listener = tokio::net::TcpListener::bind((args.bind, args.port))
@@ -132,5 +132,3 @@ async fn main() {
     ));
     join_all(vec![fut_pcp, fut_api]).await;
 }
-
-// async fn handle_connection() {}

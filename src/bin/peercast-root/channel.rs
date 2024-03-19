@@ -1,24 +1,26 @@
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{Arc, RwLock},
 };
 
 use chrono::{DateTime, Utc};
+use clap::builder::Str;
 use peercast_re::{
-    pcp::{decode::PcpBroadcast, GnuId},
+    pcp::{
+        decode::{PcpBroadcast, PcpChannelInfo, PcpTrackInfo},
+        GnuId,
+    },
     ConnectionId,
 };
+use serde::de;
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::{debug, info};
 
 use crate::{
     manager::{RootManager, RootManagerMessage},
     TrackerConnection,
 };
-//------------------------------------------------------------------------------
-// TrackerDetail
-//
-#[derive(Debug, Clone)]
-pub struct TrackerDetail {}
 
 //------------------------------------------------------------------------------
 // ChannelTrait
@@ -41,12 +43,12 @@ pub trait ChannelTrait: Clone {
 //
 
 #[derive(Debug)]
-pub struct ChannelManager<C: ChannelTrait> {
+pub struct ChannelStore<C: ChannelTrait> {
     session_id: Arc<GnuId>,
     broadcast_id: Arc<GnuId>,
     channels: Arc<RwLock<HashMap<GnuId, C>>>,
 }
-impl<C: ChannelTrait> Clone for ChannelManager<C> {
+impl<C: ChannelTrait> Clone for ChannelStore<C> {
     fn clone(&self) -> Self {
         Self {
             session_id: Arc::clone(&self.session_id),
@@ -56,7 +58,7 @@ impl<C: ChannelTrait> Clone for ChannelManager<C> {
     }
 }
 
-impl<C: ChannelTrait> ChannelManager<C> {
+impl<C: ChannelTrait> ChannelStore<C> {
     pub fn new(self_session_id: Option<GnuId>, self_broadcast_id: Option<GnuId>) -> Self {
         let session_id = Arc::new(self_session_id.unwrap_or_else(|| GnuId::new()));
         let broadcast_id = Arc::new(self_broadcast_id.unwrap_or_else(|| GnuId::new()));
@@ -110,7 +112,7 @@ impl<C: ChannelTrait> ChannelManager<C> {
 }
 
 //------------------------------------------------------------------------------
-// TrackerChannel
+// TrackerChannel : Channelを扱うための構造体
 //
 
 #[derive(Debug, Clone)]
@@ -125,11 +127,11 @@ pub struct TrackerChannel {
     pub channel_id: Arc<GnuId>,
     broadcast: Arc<PcpBroadcast>,
     config: Arc<TrackerChannelConfig>,
-    manager_sender: UnboundedSender<RootManagerMessage>,
-    pub detail_reciever: tokio::sync::watch::Receiver<TrackerDetail>,
+    manager_sender: Arc<UnboundedSender<RootManagerMessage>>,
+    detail_receiver: Arc<tokio::sync::watch::Receiver<TrackerDetail>>,
 
     pub created_at: Arc<DateTime<Utc>>,
-    _called_before_remove: bool,
+    // _called_before_remove: bool,
 }
 
 impl TrackerChannel {
@@ -142,10 +144,14 @@ impl TrackerChannel {
         TrackerConnection::new(
             connection_id,
             self.config.clone(),
-            self.manager_sender.clone(),
+            self.manager_sender.as_ref().clone(),
             remote_broadcast_id,
             first_broadcast,
         )
+    }
+
+    pub fn detail(&self) -> TrackerDetail {
+        self.detail_receiver.borrow().clone()
     }
 }
 
@@ -158,8 +164,11 @@ impl ChannelTrait for TrackerChannel {
         channel_id: Arc<GnuId>,
         config: Self::Config,
     ) -> Self {
-        let (detail_sender, detail_reciever) = tokio::sync::watch::channel(TrackerDetail {});
+        let created_at = Arc::new(Utc::now());
+        let mut detail = TrackerDetail::new(channel_id.clone());
+        detail.created_at = created_at.clone();
 
+        let (detail_sender, detail_receiver) = tokio::sync::watch::channel(detail);
         // self_broadcast_idはいらないので無視する
         let manager_sender = RootManager::start(channel_id.clone(), detail_sender);
 
@@ -168,17 +177,67 @@ impl ChannelTrait for TrackerChannel {
             self_session_id,
             broadcast: config.first_broadcast.clone(),
             config: Arc::new(config),
-            manager_sender,
-            detail_reciever,
+            manager_sender: Arc::new(manager_sender),
+            detail_receiver: Arc::new(detail_receiver),
 
-            created_at: Arc::new(Utc::now()),
-            _called_before_remove: false,
+            created_at,
+            // _called_before_remove: false,
         }
     }
 
     fn before_remove(&mut self) {
-        if !self._called_before_remove {
-            // 色々やる
+        debug!(
+            "TrackerChannel({}) will be removed.",
+            self.channel_id.as_ref()
+        );
+        //     if !self._called_before_remove {
+        //         // 色々やる
+        //     }
+    }
+}
+
+//------------------------------------------------------------------------------
+// TrackerDetail : チェンネル詳細
+// TODO: そのうちlibに移す。
+// TODO: PcpBroadcastから変換できるようにする？
+#[derive(Debug, Clone)]
+pub struct TrackerDetail {
+    pub channel_info: PcpChannelInfo,
+    pub track_info: PcpTrackInfo,
+    //
+    pub created_at: Arc<DateTime<Utc>>,
+    pub id: Arc<GnuId>,
+}
+
+impl TrackerDetail {
+    pub fn new(id: Arc<GnuId>) -> Self {
+        TrackerDetail {
+            channel_info: Default::default(),
+            track_info: Default::default(),
+            created_at: Default::default(),
+            id,
         }
     }
+
+    pub fn id(&self) -> GnuId {
+        self.id.as_ref().clone()
+    }
+
+    // pub fn name(&self) -> String {
+    //     if let Some(ref name) = self.channel_info.name {
+    //         name.clone()
+    //     } else {
+    //         String::from("")
+    //     }
+    // }
+
+    // getter!(&self, channel_info, typ);
+    // getter!(&self, channel_info, name);
+    // getter!(&self, channel_info, genre);
+    // getter!(&self, channel_info, desc);
+    // getter!(&self, channel_info, comment);
+    // getter!(&self, channel_info, url);
+    // getter!(&self, channel_info, stream_ext);
+    // getter!(&self, channel_info, stream_type);
+    // getter!(&self, channel_info, bitrate, i32, 0);
 }

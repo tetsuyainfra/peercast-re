@@ -1,20 +1,23 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::BorrowMut, collections::HashMap, sync::Arc};
 
 use futures_util::{
     future::{select_all, BoxFuture},
     FutureExt,
 };
+use minijinja::filters::first;
 use peercast_re::{
     pcp::{decode::PcpBroadcast, GnuId},
     ConnectionId,
 };
+use peercast_re_api::models::channel_info;
+use serde_json::de;
 use tokio::sync::{
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch,
 };
 use tracing::{debug, info, trace, warn};
 
-use crate::channel::TrackerDetail;
+use crate::channel::{self, TrackerDetail};
 
 //------------------------------------------------------------------------------
 // RootManager
@@ -122,6 +125,7 @@ impl RootManager {
     }
 
     fn handle_message(&mut self, message: RootManagerMessage) {
+        debug!("RootManager::handle_message() {:?}", message);
         match message {
             RootManagerMessage::NewConnection {
                 connection_id,
@@ -152,8 +156,9 @@ impl RootManager {
     }
 
     // チャンネルの配信開始
-    fn handle_publish_channel(&mut self, frst_broadcast: Arc<PcpBroadcast>) {
-        // if fistbroad cast arrived. we should check broadcast_id is same
+    fn handle_publish_channel(&mut self, first_broadcast: Arc<PcpBroadcast>) {
+        // root checkいる？
+        self.detail_send(first_broadcast);
     }
 
     // PcpBroadcastを元にチャンネル情報を更新する
@@ -165,8 +170,32 @@ impl RootManager {
             true => (),
             false => return,
         };
+        info!("UPDATE_CHANNEL: {:#?}", broadcast);
+        self.detail_send(broadcast)
+    }
 
-        let _ = self.detail_sender.send(TrackerDetail {});
+    fn detail_send(&mut self, broadcast: Arc<PcpBroadcast>) {
+        if broadcast.channel_packet.is_none() {
+            return;
+        }
+        let ch_packet = broadcast.channel_packet.as_ref().unwrap();
+
+        self.detail_sender.send_if_modified(|detail| {
+            let mut changed_info = if ch_packet.channel_info.is_none() {
+                false
+            } else {
+                let channel_info = ch_packet.channel_info.as_ref().unwrap();
+                detail.channel_info.merge_ref(channel_info)
+            };
+
+            let mut changed_track = if ch_packet.track_info.is_none() {
+                false
+            } else {
+                let track_info = ch_packet.track_info.as_ref().unwrap();
+                detail.track_info.merge_ref(track_info)
+            };
+            changed_info || changed_track
+        });
     }
 }
 

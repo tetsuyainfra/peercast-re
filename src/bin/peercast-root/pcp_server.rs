@@ -7,7 +7,7 @@ use peercast_re::{
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    channel::{ChannelManager, TrackerChannel, TrackerChannelConfig},
+    channel::{ChannelStore, TrackerChannel, TrackerChannelConfig},
     connection::TrackerConnection,
 };
 
@@ -15,7 +15,7 @@ use crate::{
 /// PCP Server
 ///
 pub async fn start_pcp_server(
-    arc_channel_manager: Arc<ChannelManager<TrackerChannel>>,
+    arc_channel_manager: Arc<ChannelStore<TrackerChannel>>,
     listener: tokio::net::TcpListener,
 ) {
     info!("START PCP SERVER");

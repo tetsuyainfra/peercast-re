@@ -13,7 +13,7 @@ use axum::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use peercast_re::pcp::GnuId;
+use peercast_re::pcp::{decode::PcpTrackInfo, GnuId, TrackInfo};
 use peercast_re_api::models::ChannelTrack;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -26,13 +26,17 @@ use tower_http::{
 use tracing::{info, info_span, Span};
 use uuid::Uuid;
 
-use crate::{channel::TrackerChannel, error::AppError, ChannelManager};
+use crate::{
+    channel::{TrackerChannel, TrackerDetail},
+    error::AppError,
+    ChannelStore,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 /// API Server
 ///
 pub async fn start_api_server(
-    arc_channel_manager: Arc<ChannelManager<TrackerChannel>>,
+    arc_channel_manager: Arc<ChannelStore<TrackerChannel>>,
     listener: tokio::net::TcpListener,
 ) {
     info!("START API SERVER");
@@ -84,12 +88,12 @@ async fn status(headers: HeaderMap) -> Result<Json<AppStatus>, AppError> {
 }
 
 async fn channels(
-    State(manager): State<Arc<ChannelManager<TrackerChannel>>>,
+    State(manager): State<Arc<ChannelStore<TrackerChannel>>>,
 ) -> Result<Json<Vec<JsonChannel>>, AppError> {
     let channels: Vec<JsonChannel> = manager
         .get_channels()
         .into_iter()
-        .map(|c| c.into())
+        .map(|c| c.detail().into())
         .collect();
     Ok(channels.into())
 }
@@ -102,42 +106,69 @@ struct AppStatus {
 #[derive(Debug, Serialize)]
 struct JsonChannel {
     id: GnuId,
-    title: String,
-    title_escaped: String,
+    name: String,
     addr: SocketAddr,
     contact_url: String,
     genre: String,
     desc: String,
+    comment: String,
+    stream_type: String,
+    stream_ext: String,
+    bitrate: i32,
+    // filetype: String,
+    // status: String,
     number_of_listener: i32,
     number_of_relay: i32,
-    bitrate: i32,
-    filetype: String,
-    status: String,
-    comment: String,
     created_at: DateTime<Utc>,
+    track: JsonTrack,
 }
 
-impl From<TrackerChannel> for JsonChannel {
-    fn from(ch: TrackerChannel) -> Self {
-        let _details = ch.detail_reciever.borrow().clone();
-
+impl From<TrackerDetail> for JsonChannel {
+    fn from(detail: TrackerDetail) -> Self {
         let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080);
 
+        let channel_info = detail.channel_info;
+        let track_info = detail.track_info;
+        let created_at = detail.created_at.as_ref().clone();
         JsonChannel {
-            id: ch.channel_id.as_ref().clone(),
-            title: String::from("example"),
-            title_escaped: String::from("escaped"),
+            id: detail.id.as_ref().clone(),
+            //
+            name: channel_info.name(),
+            contact_url: channel_info.url(),
+            genre: channel_info.genre(),
+            desc: channel_info.desc(),
+            comment: channel_info.comment(),
+            stream_type: channel_info.stream_type(),
+            stream_ext: channel_info.stream_ext(),
+            bitrate: channel_info.bitrate(),
+            //
+            track: track_info.into(),
+            //
             addr,
-            contact_url: String::from("contact_url"),
-            genre: String::from("genre"),
-            desc: String::from("desc"),
             number_of_listener: 100_i32,
             number_of_relay: 200_i32,
-            bitrate: 1024_i32,
-            filetype: String::from("filetype"),
-            status: String::from("status"),
-            comment: String::from("comment"),
-            created_at: ch.created_at.as_ref().clone(),
+            created_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct JsonTrack {
+    title: String,
+    creator: String,
+    url: String,
+    album: String,
+    genre: String,
+}
+
+impl From<PcpTrackInfo> for JsonTrack {
+    fn from(track_info: PcpTrackInfo) -> Self {
+        JsonTrack {
+            title: track_info.title(),
+            creator: track_info.creator(),
+            url: track_info.url(),
+            album: track_info.album(),
+            genre: track_info.genre(),
         }
     }
 }

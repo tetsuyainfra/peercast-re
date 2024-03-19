@@ -211,7 +211,7 @@ async fn read_routine(
         let Ok(atom) = read_half.read_atom().await else {
             break;
         };
-        debug!("{conn_id} ARRIVED_ATOM {:?}", atom);
+        // debug!("{conn_id} ARRIVED_ATOM {:?}", atom);
         mpsc_send(&mut tx, atom);
     }
     info!("{conn_id} STOP READ HALF");
