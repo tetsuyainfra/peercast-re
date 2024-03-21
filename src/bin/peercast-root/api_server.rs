@@ -13,8 +13,9 @@ use axum::{
 };
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use http::StatusCode;
 use peercast_re::pcp::{decode::PcpTrackInfo, GnuId, TrackInfo};
-use peercast_re_api::models::ChannelTrack;
+use peercast_re_api::{apis::urlencode, models::ChannelTrack};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tower::ServiceBuilder;
@@ -48,6 +49,7 @@ pub async fn start_api_server(
         .route("/", get(index))
         .route("/status", get(status))
         .route("/channels", get(channels))
+        .route("/index.txt", get(index_txt))
         // ServiceBuilderを使ってlayerを定義した方が良いらしい：理由は不明
         // https://github.com/tokio-rs/axum/blob/main/axum/src/docs/middleware.md#applying-multiple-middleware
         .layer(
@@ -71,7 +73,8 @@ async fn index() -> Result<Html<&'static str>, AppError> {
         <h1>index</h1>
         <p>
             <a href='/status'>/status</a></br>
-            <a href='/channels'>/channels</a>
+            <a href='/channels'>/channels</a></br>
+            <a href='/index.txt'>/index.txt</a></br>
         </p>
         </div>
     ",
@@ -96,6 +99,76 @@ async fn channels(
         .map(|c| c.detail().into())
         .collect();
     Ok(channels.into())
+}
+
+async fn index_txt(
+    State(manager): State<Arc<ChannelStore<TrackerChannel>>>,
+) -> (StatusCode, String) {
+    let body = manager
+        .get_channels()
+        .into_iter()
+        .map(|c| c.detail().into())
+        .map(|c: JsonChannel| {
+            create_index_line(
+                c.name,
+                c.id,
+                c.addr,
+                c.contact_url,
+                c.genre,
+                c.desc,
+                c.number_of_listener,
+                c.number_of_relay,
+                c.bitrate,
+                c.stream_ext,
+                c.created_at,
+                c.comment,
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    let notice = "";
+    let code = StatusCode::ACCEPTED;
+    (code, body)
+}
+
+fn create_index_line(
+    name: String,
+    id: GnuId,
+    addr: SocketAddr,
+    contact_url: String,
+    genre: String,
+    desc: String,
+    number_of_listener: i32,
+    number_of_relay: i32,
+    bitrate: i32,
+    stream_ext: String,
+    created_at: DateTime<Utc>,
+    comment: String,
+) -> String {
+    let diff_time = Utc::now() - created_at;
+    let min = diff_time.num_minutes();
+    let sec = diff_time.num_seconds() % 60;
+
+    format!(
+        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>\
+        {desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{file_ext}<>\
+        <><><><>{name_escaped}<>{time_min}:{time_sec}<>click<>{comment}<>",
+        name = name.clone(),
+        id = id,
+        addr = addr,
+        contact_url = contact_url,
+        genre = genre,
+        desc = desc,
+        number_of_listener = number_of_listener,
+        number_of_relay = number_of_relay,
+        bitrate = bitrate,
+        file_ext = stream_ext,
+        name_escaped = urlencode(name),
+        time_min = min,
+        time_sec = sec,
+        comment = comment
+    )
 }
 
 #[derive(Debug, Serialize)]
