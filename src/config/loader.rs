@@ -12,85 +12,75 @@ where
     Self: Sized,
 {
     type ErrorType: std::fmt::Debug;
-    fn load_file(path: &Path) -> Result<Self, Self::ErrorType>;
-    fn save_file(&self, path: &Path) -> Result<(), Self::ErrorType>;
+    fn load_file(path: &PathBuf) -> Result<Self, Self::ErrorType>;
+    fn save_file(&self, path: &PathBuf) -> Result<(), Self::ErrorType>;
 }
 
-// ConfigPathはConfigLoaderでPathを指定するときに使う変数
-#[derive(Debug)]
-pub enum ConfigPath {
-    Env(String),
-    Path(String),
-    PathBuf(PathBuf),
-}
-
-impl ConfigPath {
-    fn to_path(&self) -> Option<PathBuf> {
-        match self {
-            ConfigPath::Env(s) => match std::env::var(s) {
-                Ok(s) => Some(PathBuf::from(s)),
-                Err(_s) => None,
-            },
-            ConfigPath::Path(s) => Some(PathBuf::from(s)),
-            ConfigPath::PathBuf(b) => Some(b.clone()),
-        }
-    }
-}
-
-/// ConfigLoaderは指定された設定ファイルを順次読み込み、指定された構造体Tを返すローダーである。
-/// ローダーは指定されたパスを順番に読み込む。読み込んだファイルがエラーになった場合、そこでエラーを返す。
-/// パスが指定されていない場合、panicが起きる
-/// 構造体TはConfigTraitとDefaultトレイトを定義する必要がある。
-/// example:
-/// let c : Config = ConfigLoader::new()
-///                     .add_source(ConfigPath::Env("HOGE_PATH"))
-///                     .add_source(ConfigPath::Path("/HOGE/peercast-rt/peercast-rt.ini"))     // 実行ファイルのパス等
-///                     .add_source(ConfigPath::Path("~/.peercast-rt.ini"))                    // デフォルトのパス等
+/// ConfigLoaderは指定された設定ファイルを順次読み込み、指定された設定ファイル構造体Tを返すローダーである。
 ///
+/// env_or_args() は値を指定していれば、読み込みエラーの場合は後続のコンフィグファイルは読み込まず、エラーを返す
+/// add_source() は読み込みはするが、エラーの場合無視をする。
+/// default_source() は必ず指定しなくてはならず、エラーの場合はpanicする
 pub struct ConfigLoader<C> {
-    paths: Vec<ConfigPath>,
+    _env_or_args: Option<PathBuf>,
+    paths: Vec<PathBuf>,
     _marker: PhantomData<C>,
 }
 
 impl<C> ConfigLoader<C> {
     pub fn new() -> Self {
         ConfigLoader {
+            _env_or_args: None,
             paths: vec![],
             _marker: PhantomData,
         }
     }
 
-    pub fn add_source(mut self, path: ConfigPath) -> Self {
+    pub fn env_or_args(mut self, path: Option<PathBuf>) -> Self {
+        self._env_or_args = path;
+        self
+    }
+
+    pub fn add_source(mut self, path: PathBuf) -> Self {
         self.paths.push(path);
         self
     }
 
-    pub fn default_source(self, path: ConfigPath) -> LoaderWithDefault<C> {
+    pub fn default_source(self, default_path: PathBuf) -> LoaderWithDefault<C> {
         LoaderWithDefault {
             _loader: self,
-            default_path: path,
+            default_path,
         }
     }
 }
 
 pub struct LoaderWithDefault<C> {
     _loader: ConfigLoader<C>,
-    default_path: ConfigPath,
+    default_path: PathBuf,
 }
 
-impl<C> LoaderWithDefault<C> {
-    pub fn load(self) -> (PathBuf, Result<C, C::ErrorType>)
-    where
-        C: ConfigTrait + Default,
-    {
-        // 読み込みオンリー
-        // FIXME: 指定読み込み対象への処理をやる
-        // self._loader.paths
+impl<C> LoaderWithDefault<C>
+where
+    C: ConfigTrait + Default,
+{
+    pub fn load(self) -> (PathBuf, Result<C, C::ErrorType>) {
+        // Env or Args
+        if self._loader._env_or_args.is_some() {
+            let path = self._loader._env_or_args.unwrap();
+            let ret = C::load_file(&path);
+            return (path, ret);
+        };
 
-        let path = self
-            .default_path
-            .to_path()
-            .unwrap_or_else(|| panic!("Please check config file path! :{:?}", &self.default_path));
+        // additional path
+        for path in self._loader.paths {
+            let ret = C::load_file(&path);
+            if ret.is_ok() {
+                return (path, ret);
+            }
+        }
+
+        // Default Path
+        let path = self.default_path;
         // folder作成して
         let _ = fs::create_dir_all(path.parent().unwrap()).unwrap();
 
@@ -104,116 +94,161 @@ impl<C> LoaderWithDefault<C> {
 
         // ファイル読み込む
         let ret = C::load_file(&path);
-        if let Err(e) = ret {
-            panic!("can't write config error:{:?}", e);
+        match ret {
+            Err(e) => {
+                panic!("can't write config error:{:?}", e);
+            }
+            Ok(config) => {
+                //
+                config.save_file(&path);
+                (path, Ok(config))
+            }
         }
-        (path, ret)
     }
 }
-
-/*
-// MEMO: 設定ファイルを読み込む順序
-// 1. 起動時に指定があればその設定ファイルを読み込む
-//    - 読み込めなければエラーを出して終了
-//    - 読み込み時に書き込み権限がなければ、ワーニングを出す
-// 2. 指定が無ければ、実行ファイルと同一ディレクトリの設定ファイルを読み込む
-//    - std::env::current_exe()
-//    - ただしフォルダへの書き込み権限が無ければ、この操作は行わない
-// 3. 設定ファイルが無ければ、個人フォルダの指定ディレクトリからファイルを読み込む
-// 4. 設定ファイルが無ければ、個人フォルダの指定ディレクトリ、ファイルを作成、新規設定を読み込む
-
-/// コンフィグを解析して読み込む
-/// その際、add_sorceに指定された順番でファイルを読み込む。
-/// 最初に存在したファイルを設定ファイルとして扱い、成功の可否にかかわらず読み込み、結果を返却する
-// pub fn load(self) -> (Option<PathBuf>, Result<C, E>) {
-// pub fn load(self) -> ConfigWithPath<C>
-// where
-//     C: ConfigTrait + Default,
-// {
-//     if self.paths.len() == 0 {
-//         panic!("Please call add_source least once.")
-//     }
-
-//     let mut candiate_file_paths: Vec<_> = self
-//         .paths
-//         .iter()
-//         .filter_map(|cpath| Some(cpath.to_path()?))
-//         .collect();
-
-//     let candidate = candiate_file_paths.iter().find_map(|path| {
-//         if path.is_file() {
-//             //
-//             let config = C::load_file(path);
-//             Some(config)
-//         } else {
-//             None
-//         }
-//     });
-
-//     match candidate {
-//         Some(_) => todo!(),
-//         None => ConfigWithPath::NewConfigCandidate(C::default()),
-//     }
-// }
-// enum ConfigWithPath<C>
-// where
-//     C: ConfigTrait,
-// {
-//     Exist(PathBuf, C),
-//     ExistButError(PathBuf, C::ErrorType),
-//     NewConfigCandidate(C),
-// }
- */
 
 #[cfg(test)]
 mod t {
     use crate::config::Config;
 
     use super::*;
+
+    const CONFIG_FILE_PATH: &str = "tests/files/config/peercast-rt.ini";
+    const DEFAULT_FILE_PATH: &str = "src/config/config.example.ini";
+    const SYNTAX_ERROR_FILE_PATH: &str = "tests/files/config/peercast-rt_error.ini";
+
     //
     // ConfigLoader
     //
-    #[ignore = "ちょっとまだ修してない"]
     #[test]
     fn test_loader() {
-        // 正常系
-        let config_file_path = "tests/files/config/peercast-rt.ini";
-        let def_config_file_path = "src/config/config.example.ini";
-        std::env::set_var("TEST_ENV_VAR1", config_file_path);
+        use clap::Parser;
+        #[derive(Debug, Parser)]
+        #[command()]
+        struct Command {
+            #[clap(
+                short = 'C',
+                long = "config",
+                value_name = "CONFIG_FILE",
+                env = "TEST_ENV_VAR1"
+            )]
+            config_file: Option<PathBuf>,
+        }
+        // envから読み取る
+        std::env::set_var("TEST_ENV_VAR1", DEFAULT_FILE_PATH);
+        let args = vec!["command"];
+        let cmd = Command::parse_from(args.iter());
+        assert_eq!(cmd.config_file, Some(DEFAULT_FILE_PATH.into()));
 
-        let config = ConfigLoader::<Config>::new()
-            .add_source(ConfigPath::Env("TEST_ENV_VAR1".into()))
-            .default_source(ConfigPath::Path(def_config_file_path.into()))
+        // コンフィグファイルの読み込み
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(cmd.config_file.clone()) // envがSomeなので読み込みを試すことになる
+            .add_source(PathBuf::from("peercast-re.ini")) // ファイルが有れば読み込む
+            .default_source(DEFAULT_FILE_PATH.into()) // 標準の設定ファイル
             .load();
+        assert_eq!(path, cmd.config_file.unwrap());
+        assert!(ret_config.is_ok());
+    }
 
-        let (load_file_path, c) = config;
-        assert_eq!(load_file_path, PathBuf::from(config_file_path));
-        assert!(c.is_ok());
+    #[test]
+    fn test_env_args() {
+        std::env::set_var("TEST_ENV_VAR1", CONFIG_FILE_PATH);
+
+        // 正常系
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(Some(PathBuf::from(CONFIG_FILE_PATH)))
+            .default_source(DEFAULT_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from(CONFIG_FILE_PATH));
+        assert!(ret_config.is_ok());
 
         // 異常系
-        // let config = ConfigLoader::<Config>::new()
-        //     .add_source(ConfigPath::Env("NOT_FOUND11111".into()))
-        //     .default_source(ConfigPath::Path("src/config.example.ini".into()))
-        //     .load();
-        // assert!(config.is_none());
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(Some(PathBuf::from("./")))
+            .default_source(DEFAULT_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from("./"));
+        assert!(ret_config.is_err());
+    }
 
-        // // 異常系 + 正常系
-        // let config = ConfigLoader::<Config>::new()
-        //     .add_source(ConfigPath::Env("NOT_FOUND11111".into()))
-        //     .add_source(ConfigPath::Path("src/config.example.ini".into()))
-        //     .load();
-        // let (p, c) = config.unwrap();
-        // assert_eq!(p, PathBuf::from("src/config.example.ini"));
-        // assert!(c.is_ok());
+    #[test]
+    fn test_add_source() {
+        // 正常系
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(None)
+            .add_source(CONFIG_FILE_PATH.into())
+            .default_source(DEFAULT_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from(CONFIG_FILE_PATH));
+        assert!(ret_config.is_ok());
 
-        // // 異常系 + 異常系 + 正常系
-        // let config = ConfigLoader::<Config>::new()
-        //     .add_source(ConfigPath::Env("NOT_FOUND11111".into()))
-        //     .add_source(ConfigPath::Path("NOT_FOUND_PATH".into()))
-        //     .add_source(ConfigPath::Path("src/config.example.ini".into()))
-        //     .load();
-        // let (p, c) = config.unwrap();
-        // assert_eq!(p, PathBuf::from("src/config.example.ini"));
-        // assert!(c.is_ok());
+        // 異常系(デフォルトソースにフォールバック)
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(None)
+            .add_source("./".into())
+            .default_source(DEFAULT_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from(DEFAULT_FILE_PATH));
+        assert!(ret_config.is_ok());
+    }
+
+    #[test]
+    fn test_default_source() {
+        // 正常系
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(None)
+            // .add_source("./") // 無し
+            .default_source(DEFAULT_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from(DEFAULT_FILE_PATH));
+        assert!(ret_config.is_ok());
+    }
+
+    #[ignore = "this test occur panic"]
+    #[test]
+    #[should_panic]
+    fn test_default_source_with_panic() {
+        // 異常系(読み込みエラー ファイルSyntax異常)
+        let (path, ret_config) = ConfigLoader::<Config>::new()
+            .env_or_args(None)
+            // .add_source("./")
+            .default_source(SYNTAX_ERROR_FILE_PATH.into())
+            .load();
+        assert_eq!(path, PathBuf::from(SYNTAX_ERROR_FILE_PATH));
+        assert!(ret_config.is_err());
+    }
+
+    #[test]
+    fn test_clap() {
+        // Clapの動作について
+        use clap::Parser;
+        #[derive(Debug, Parser)]
+        #[command()]
+        struct Command {
+            #[clap(
+                short = 'C',
+                long = "config",
+                value_name = "CONFIG_FILE",
+                env = "TEST_ENV_VAR1"
+            )]
+            config_file: Option<PathBuf>,
+        }
+
+        // -Cの変数を読み取る
+        let args = vec!["command", "-C", CONFIG_FILE_PATH];
+        let x = Command::parse_from(args.iter());
+        assert_eq!(x.config_file, Some(CONFIG_FILE_PATH.into()));
+
+        // 環境変数の値を読み取る
+        std::env::set_var("TEST_ENV_VAR1", DEFAULT_FILE_PATH);
+        let args = vec!["command"];
+        let x = Command::parse_from(args.iter());
+        assert_eq!(x.config_file, Some(DEFAULT_FILE_PATH.into()));
+
+        // 環境変数を指定していても-Cの変数を優先する
+        std::env::set_var("TEST_ENV_VAR1", DEFAULT_FILE_PATH);
+        let args = vec!["command", "-C", CONFIG_FILE_PATH];
+        let x = Command::parse_from(args.iter());
+        assert_eq!(x.config_file, Some(CONFIG_FILE_PATH.into()));
     }
 }

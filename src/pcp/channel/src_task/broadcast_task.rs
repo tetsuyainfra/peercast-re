@@ -17,12 +17,12 @@ use crate::{
         rtmp_connection::{RtmpConnection, RtmpConnectionEvent},
         stream_manager::{ConnectionMessage, StreamManagerMessage},
     },
-    util::util_mpsc::send,
+    util::util_mpsc::mpsc_send,
     ConnectionId,
 };
 use broker::ChannelBrokerMessage;
 
-use super::{SourceTaskConfig, SourceTaskTrait, TaskStatus};
+use super::{SourceTask, SourceTaskConfig, TaskStatus};
 
 #[derive(Debug, Clone)]
 pub struct BroadcastTaskConfig {
@@ -32,21 +32,12 @@ pub struct BroadcastTaskConfig {
 }
 
 #[derive(Debug)]
-enum WorkerStatus {
-    Init,
-    Idle,
-    Recieving,
-    Finished,
-    Error,
-}
-
-#[derive(Debug)]
 pub struct BroadcastTask {
     broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
-    config: BroadcastTaskConfig,
+    config: Option<BroadcastTaskConfig>,
     //
-    worker_status: watch::Receiver<WorkerStatus>,
-    worker: JoinHandle<Result<(), WorkerError>>,
+    worker_status: Option<watch::Receiver<TaskStatus>>,
+    worker: Option<JoinHandle<Result<(), WorkerError>>>,
 }
 impl From<BroadcastTaskConfig> for SourceTaskConfig {
     fn from(value: BroadcastTaskConfig) -> Self {
@@ -58,61 +49,57 @@ impl BroadcastTask {
     pub(crate) fn new(
         channel_id: GnuId,
         connection_id: ConnectionId,
-        config: BroadcastTaskConfig,
         broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
     ) -> Self {
-        let (tx, rx) = watch::channel(WorkerStatus::Init);
-        let config_clone = config.clone();
-        let rtmp_manager_clone = config.rtmp_manager.clone();
+        let (tx, rx) = watch::channel(TaskStatus::Init);
+        // let config_clone = config.clone();
+        // let rtmp_manager_clone = config.rtmp_manager.clone();
         let broker_sender_clone = broker_sender.clone();
 
-        let mut worker = BroadcastWorker::new(
-            channel_id,
-            connection_id,
-            config_clone,
-            rtmp_manager_clone,
-            broker_sender_clone,
-            tx,
-        );
+        // let mut worker = BroadcastWorker::new(
+        //     channel_id,
+        //     connection_id,
+        //     // config_clone,
+        //     rtmp_manager_clone,
+        //     broker_sender_clone,
+        //     tx,
+        // );
 
-        let worker = tokio::spawn(async {
-            let result = worker.start().await;
-            result
-        });
+        // let worker = tokio::spawn(async {
+        //     let result = worker.start().await;
+        //     result
+        // });
 
         Self {
             broker_sender,
-            config,
-
-            worker_status: rx,
-            worker,
+            config: None,
+            worker_status: None,
+            worker: None,
         }
     }
 }
 
 #[async_trait]
-impl SourceTaskTrait for BroadcastTask {
-    fn connect(&self, config: SourceTaskConfig) {}
-    fn retry(&self) {}
+impl SourceTask for BroadcastTask {
+    fn connect(&mut self, config: SourceTaskConfig) -> bool {
+        true
+    }
+    fn retry(&mut self) -> bool {
+        true
+    }
 
     fn update_info(&self, info: ChannelInfo) {}
     fn update_track(&self, track: TrackInfo) {}
 
     fn status(&self) -> TaskStatus {
-        match *self.worker_status.borrow() {
-            WorkerStatus::Init => TaskStatus::Idle,
-            WorkerStatus::Idle => TaskStatus::Idle,
-            WorkerStatus::Recieving => TaskStatus::Running,
-            WorkerStatus::Finished => TaskStatus::Stopped,
-            WorkerStatus::Error => TaskStatus::Error,
-        }
+        *self.worker_status.as_ref().unwrap().borrow()
     }
 
     async fn status_changed(&mut self) -> Result<(), watch::error::RecvError> {
         todo!()
     }
 
-    async fn stop(&self) {}
+    fn stop(&self) {}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +120,7 @@ struct BroadcastWorker {
     //
     broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
     //
-    status_tx: watch::Sender<WorkerStatus>,
+    status_tx: watch::Sender<TaskStatus>,
 }
 
 impl BroadcastWorker {
@@ -145,7 +132,7 @@ impl BroadcastWorker {
         rtmp_manager: mpsc::UnboundedSender<StreamManagerMessage>,
         //
         broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
-        status_tx: watch::Sender<WorkerStatus>,
+        status_tx: watch::Sender<TaskStatus>,
     ) -> Self {
         Self {
             channel_id,
@@ -162,7 +149,7 @@ impl BroadcastWorker {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
 
-        if !send(
+        if !mpsc_send(
             &mut self.broker_sender,
             ChannelBrokerMessage::NewConnection {
                 connection_id: self.connection_id.clone(),
@@ -174,11 +161,11 @@ impl BroadcastWorker {
                 " BroadcastWorker({}) ChannelBrokerMessage send failed",
                 &self.connection_id
             );
-            self.status_tx.send(WorkerStatus::Error);
+            self.status_tx.send(TaskStatus::Error);
             return Err(WorkerError::Message("cant send ChannelBroker".to_string()));
         };
 
-        self.status_tx.send(WorkerStatus::Idle);
+        self.status_tx.send(TaskStatus::Idle);
 
         let mut conn = RtmpConnection::new(
             self.rtmp_manager.clone(),
@@ -192,7 +179,7 @@ impl BroadcastWorker {
                 " BroadcastWorker({}) RtmpConnection::connect() FAILED",
                 &self.connection_id
             );
-            self.status_tx.send(WorkerStatus::Error);
+            self.status_tx.send(TaskStatus::Error);
             return Err(WorkerError::Message(
                 "cant connect RtmpConnection".to_string(),
             ));
@@ -212,7 +199,7 @@ impl BroadcastWorker {
                 .map_err(|x| WorkerError::Message(format!("error")))?;
             if reaction == BroadcastConnectionReaction::Disconnect {
                 info!("ConnectionReaction::Disconnect");
-                break WorkerStatus::Finished;
+                break TaskStatus::Finish;
             }
 
             tokio::select! {
@@ -224,7 +211,7 @@ impl BroadcastWorker {
                             let result = BroadcastSessionResult::RaisedEvent(msg);
                             results.push(result);
                         },
-                        None => break WorkerStatus::Idle,
+                        None => break TaskStatus::Idle,
                     }
                 }
                 // Channel Brokerからのメッセージ
@@ -279,7 +266,7 @@ impl BroadcastWorker {
         event: RtmpConnectionEvent,
     ) -> Result<BroadcastConnectionReaction, Box<dyn std::error::Error + Sync + Send>> {
         trace!(handle_raised_event=?event);
-        if !send(
+        if !mpsc_send(
             &self.broker_sender,
             ChannelBrokerMessage::BroadcastEvent(event),
         ) {

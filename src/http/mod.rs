@@ -9,7 +9,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use axum::extract::connect_info::Connected;
+use axum::extract::{connect_info::Connected, ConnectInfo};
 use axum_core::response::IntoResponse;
 use bytes::Bytes;
 use http::StatusCode;
@@ -34,17 +34,20 @@ pub use ui::Ui;
 pub(crate) type ShutdownAndNotifySet = (Shutdown, tokio::sync::mpsc::Sender<()>);
 
 #[derive(Debug)]
-pub struct MyIncomingStream<'a> {
+// pub struct MyIncomingStream<'a> {
+pub struct MyIncomingStream {
     pub connection_id: ConnectionId,
-    pub tcp_stream: &'a TokioIo<TcpStream>,
+    // pub tcp_stream: &'a TokioIo<TcpStream>,
     pub remote_addr: SocketAddr,
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }
 
-impl MyIncomingStream<'_> {
+// impl MyIncomingStream<'_> {
+impl MyIncomingStream {
     /// Returns the local address that this stream is bound to.
     pub fn local_addr(&self) -> std::io::Result<SocketAddr> {
-        self.tcp_stream.inner().local_addr()
+        // self.tcp_stream.inner().local_addr()
+        todo!()
     }
 
     /// Returns the remote address that this stream is bound to.
@@ -55,21 +58,30 @@ impl MyIncomingStream<'_> {
 
 #[derive(Clone, Debug)]
 pub struct MyConnectInfo {
-    pub local: SocketAddr,
+    // pub local: SocketAddr,
     pub remote: SocketAddr,
     pub connection_id: ConnectionId,
     // 長い通信があり、シャットダウンを綺麗にしたいならの変数を取得する
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }
 
-impl Connected<MyIncomingStream<'_>> for MyConnectInfo {
-    fn connect_info(mut target: MyIncomingStream<'_>) -> Self {
+/*
+// impl Connected<MyIncomingStream<'_>> for MyConnectInfo {
+//     fn connect_info(mut target: MyIncomingStream<'_>) -> Self {
+impl Connected<MyIncomingStream> for MyConnectInfo {
+    fn connect_info(mut target: MyIncomingStream) -> Self {
         MyConnectInfo {
             local: target.local_addr().unwrap(),
             remote: target.remote_addr(),
             connection_id: target.connection_id,
             shutdown: target.shutdown.clone(),
         }
+    }
+} */
+
+impl Connected<MyConnectInfo> for MyConnectInfo {
+    fn connect_info(target: MyConnectInfo) -> Self {
+        target
     }
 }
 

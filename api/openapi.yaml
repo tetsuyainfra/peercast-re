@@ -84,14 +84,23 @@ components:
           type: string
         album:
           type: string
-        # genre:
-        #   type: string
+        genre:
+          type: string
       required: [title, creator, url, album]
       # required: [title, creator, url, album, genre]
     ChannelStatus:
       type: string
-      enum: [idle, playing, finished, error]
+      enum: [Init, Searching, Receiving, Idle, Finish, Error]
 
+    ReqCreateRelayChannel:
+      type: object
+      required: [id, host]
+      properties:
+        id:
+          $ref: "#/components/schemas/GnuIdString"
+        host:
+          type: string
+          example: "10.0.0.1:7144"
     ReqCreateChannel:
       type: object
       required: [name]
@@ -210,7 +219,9 @@ paths:
                 items:
                   $ref: "#/components/schemas/RespChannel"
     post:
-      description: "create New Channel"
+      summary: create new Channel
+      description: "To broadcast, User creates a Channel."
+      operationId: "createBroadcastChannel"
       tags: [channel]
       requestBody:
         required: true
@@ -218,6 +229,25 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ReqCreateChannel"
+      responses:
+        "201":
+          description: Channel created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespChannel"
+  /channels/relay:
+    post:
+      summary: "create new Relay Channel"
+      description: "To play channel, User create a Rela yChannel"
+      operationId: "createRelayChannel"
+      tags: [channel]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReqCreateRelayChannel"
       responses:
         "201":
           description: Channel created

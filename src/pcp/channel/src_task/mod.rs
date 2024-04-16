@@ -14,34 +14,46 @@ mod relay_task;
 ////////////////////////////////////////////////////////////////////////////////
 /// TaskState
 ///
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TaskStatus {
+    Init,
+    Searching { searched: u32, all: u32 },
+    // Handshake { retry: u8 },
+    Receiving,
     Idle,
-    Running,
-    Stopped,
+    Finish,
     Error,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// SourceTaskConfig
 ///
+#[derive(Debug)]
 pub enum SourceTaskConfig {
     Broadcast(BroadcastTaskConfig),
     Relay(RelayTaskConfig),
 }
 
 #[async_trait]
-pub(crate) trait SourceTaskTrait: Send + Sync + std::fmt::Debug {
-    fn connect(&self, config: SourceTaskConfig);
-    fn retry(&self);
+pub(crate) trait SourceTask: Send + Sync + std::fmt::Debug {
+    // fn new(config: Self::Config) -> Self;
+    // async fn start(self);
 
-    fn update_info(&self, info: ChannelInfo);
-    fn update_track(&self, info: TrackInfo);
+    /// データソースとなるホストに接続する
+    fn connect(&mut self, config: SourceTaskConfig) -> bool;
+
+    /// 同じ設定で再接続する
+    fn retry(&mut self) -> bool;
+
+    /// ChannelInfoを更新する
+    fn update_info(&self, info: ChannelInfo) {}
+    /// TrackInfoを更新する
+    fn update_track(&self, info: TrackInfo) {}
 
     fn status(&self) -> TaskStatus;
     async fn status_changed(&mut self) -> Result<(), watch::error::RecvError>;
 
-    async fn stop(&self);
+    fn stop(&self);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

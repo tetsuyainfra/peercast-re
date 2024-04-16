@@ -1,13 +1,19 @@
+pub mod decode;
+pub mod encode;
+
 use core::fmt;
 use std::{
     fmt::{format, Debug},
     io,
     net::IpAddr,
+    sync::Arc,
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use clap::builder::UnknownArgumentValueParser;
+use num::traits::ToBytes;
 use once_cell::sync::Lazy;
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tracing::{info, trace};
 
 use crate::error::AtomParseError;
@@ -61,10 +67,27 @@ impl Atom {
         }
     }
 
+    // Atomにした時のバイトサイズ
+    pub fn atom_bytes(&self) -> usize {
+        match self {
+            Atom::Parent(p) => p.atom_bytes(),
+            Atom::Child(c) => c.atom_bytes(),
+        }
+    }
+
     pub fn write_bytes(&self, buf: &mut BytesMut) {
         match self {
             Atom::Parent(p) => p.write_bytes(buf),
             Atom::Child(c) => c.write_bytes(buf),
+        }
+    }
+    pub async fn write_stream<T>(&self, stream: T) -> Result<(), std::io::Error>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        match self {
+            Atom::Parent(p) => p.write_stream(stream).await,
+            Atom::Child(c) => c.write_stream(stream).await,
         }
     }
 
@@ -93,17 +116,6 @@ impl fmt::Display for Atom {
             Atom::Child(a) => write!(f, "Atom::Child({:?} [{}])", a.id(), a.len()),
             Atom::Parent(a) => write!(f, "Atom::Parent({:?} [{}])", a.id(), a.len()),
         }
-    }
-}
-
-impl From<ChildAtom> for Atom {
-    fn from(value: ChildAtom) -> Self {
-        Self::Child(value)
-    }
-}
-impl From<ParentAtom> for Atom {
-    fn from(value: ParentAtom) -> Self {
-        Self::Parent(value)
     }
 }
 
@@ -136,6 +148,10 @@ impl ParentAtom {
         (self.id, self.childs)
     }
 
+    pub fn atom_bytes(&self) -> usize {
+        self.childs.iter().fold(8, |sum, a| sum + a.atom_bytes())
+    }
+
     pub fn write_bytes(&self, buf: &mut BytesMut) {
         buf.put_u32(self.id.0);
         buf.put_u32_le(enable_msb_1(self.childs.len() as u32));
@@ -143,11 +159,15 @@ impl ParentAtom {
             atom.write_bytes(buf)
         }
     }
-}
+    pub async fn write_stream<T>(&self, mut stream: T) -> Result<(), std::io::Error>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        // header
+        let mut buf = BytesMut::with_capacity(self.atom_bytes());
+        self.write_bytes(&mut buf);
 
-impl From<(Id4, Vec<Atom>)> for ParentAtom {
-    fn from((id, childs): (Id4, Vec<Atom>)) -> Self {
-        ParentAtom { id, childs }
+        stream.write_all(&buf).await
     }
 }
 
@@ -191,13 +211,9 @@ impl ChildAtom {
         self.head_and_payload.slice(8..)
     }
 
-    // いらないかな？
-    // pub fn map<F, B>(self, mut func: F) -> B
-    // where
-    //     F: FnMut((Id4, Bytes)) -> B,
-    // {
-    //     func(self.raw_parts())
-    // }
+    pub fn atom_bytes(&self) -> usize {
+        self.head_and_payload.len()
+    }
 
     pub fn split_parts(mut self) -> (Id4, Bytes) {
         let id: Id4 = Id4::from(self.head_and_payload.get_u32());
@@ -212,6 +228,13 @@ impl ChildAtom {
     pub fn write_bytes(&self, buf: &mut BytesMut) {
         buf.put(&self.head_and_payload[..]);
     }
+
+    pub async fn write_stream<T>(&self, mut stream: T) -> Result<(), std::io::Error>
+    where
+        T: AsyncWrite + Unpin,
+    {
+        stream.write_all(&self.head_and_payload[..]).await
+    }
 }
 
 impl Debug for ChildAtom {
@@ -220,65 +243,6 @@ impl Debug for ChildAtom {
             // .field("head_and_payload", &self.head_and_payload)
             .field("head_and_payload", &ShortPrintBytes(&self.head_and_payload))
             .finish()
-    }
-}
-
-impl From<(Id4, u8)> for ChildAtom {
-    fn from((id, value): (Id4, u8)) -> Self {
-        let payload = Bytes::copy_from_slice(&value.to_le_bytes()); // LE
-        debug_assert_eq!(payload.len(), 1);
-        Self::new(id, &payload)
-    }
-}
-impl From<(Id4, u16)> for ChildAtom {
-    fn from((id, value): (Id4, u16)) -> Self {
-        let payload = Bytes::copy_from_slice(&value.to_le_bytes()); // LE
-        debug_assert_eq!(payload.len(), 2);
-        Self::new(id, &payload)
-    }
-}
-impl From<(Id4, u32)> for ChildAtom {
-    fn from((id, value): (Id4, u32)) -> Self {
-        let payload = Bytes::copy_from_slice(&value.to_le_bytes()); // LE
-        debug_assert_eq!(payload.len(), 4);
-        Self::new(id, &payload)
-    }
-}
-impl From<(Id4, GnuId)> for ChildAtom {
-    fn from((id, gnu_id): (Id4, GnuId)) -> Self {
-        let value_u128: u128 = gnu_id.0;
-        let payload = Bytes::copy_from_slice(&value_u128.to_be_bytes()); // BigEndianみたいですねぇ
-        debug_assert_eq!(payload.len(), 16);
-        Self::new(id, &payload)
-    }
-}
-
-impl From<(Id4, IpAddr)> for ChildAtom {
-    fn from((id, ip): (Id4, IpAddr)) -> Self {
-        let payload = match ip {
-            IpAddr::V4(ip) => {
-                let bytes = Into::<u32>::into(ip).to_be_bytes();
-                Bytes::copy_from_slice(&bytes)
-            }
-            IpAddr::V6(ip) => {
-                let bytes = Into::<u128>::into(ip).to_be_bytes();
-                Bytes::copy_from_slice(&bytes)
-            }
-        };
-        Self::new(id, &payload)
-    }
-}
-
-impl From<(Id4, String)> for ChildAtom {
-    fn from((id, s): (Id4, String)) -> Self {
-        let payload = Bytes::from(s + "\0");
-        Self::new(id, &payload)
-    }
-}
-
-impl From<(Id4, &Bytes)> for ChildAtom {
-    fn from((id, payload): (Id4, &Bytes)) -> Self {
-        Self::new(id, payload)
     }
 }
 
@@ -337,7 +301,8 @@ impl Debug for ShortPrintBytes<'_> {
 
 #[cfg(test)]
 mod t {
-    use std::collections::VecDeque;
+    use std::{collections::VecDeque, hash::BuildHasher, io::BufWriter};
+    use tokio_test::io::Builder as MockBuilder;
 
     use crate::show_size;
 
@@ -388,8 +353,34 @@ mod t {
         // TODO: write_to_bufferのテスト書く
     }
 
-    #[test]
-    fn test_parent_atoms() {}
+    #[crate::test]
+    async fn test_parent_atoms() {
+        let patom = ParentAtom::from((Id4::PCP_ROOT_UPDATE, vec![]));
+        assert_eq!(8, patom.atom_bytes());
+
+        let mut mock = MockBuilder::new()
+            .write(&Id4::PCP_ROOT_UPDATE.0.to_be_bytes())
+            .write(&enable_msb_1(0).to_le_bytes())
+            .build();
+
+        let _ = patom.write_stream(&mut mock).await;
+    }
+
+    #[crate::test]
+    async fn atom_values() {
+        let atom = ChildAtom::from((
+            Id4::PCP_HELO_REMOTEIP,
+            "192.168.10.1".parse::<IpAddr>().unwrap(),
+        ));
+
+        // - IP 192.168.10.1 -> payload : 0x01_0A_A8_C0 / 01=1, 0A=10, A8=168, C0=192  IPはLEで格納されている
+        let mut mock = MockBuilder::new()
+            .write(&Id4::PCP_HELO_REMOTEIP.0.to_be_bytes())
+            .write(&(4_u32.to_le_bytes()))
+            .write(&(0xC0_A8_0A_01_u32.to_le_bytes()))
+            .build();
+        let _ = atom.write_stream(&mut mock).await;
+    }
 
     #[test]
     fn test_child_atoms() {}
@@ -717,9 +708,12 @@ where
             Err(AtomParseError::NotEnoughRecievedBuffer(_)) => {
                 // 読み込み途中
             }
-            Err(AtomParseError::Unknown) => {
-                return Err(io::Error::from(io::ErrorKind::InvalidData))
-            }
+            Err(
+                AtomParseError::NotFoundValue
+                | AtomParseError::IdError
+                | AtomParseError::Unknown
+                | AtomParseError::ValueError,
+            ) => return Err(io::Error::from(io::ErrorKind::InvalidData)),
         }
 
         let result: Result<usize, std::io::Error> = stream.read_buf(buf).await;

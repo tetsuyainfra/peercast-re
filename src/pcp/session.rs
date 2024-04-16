@@ -69,27 +69,27 @@ impl Session {
                     // Atomの中身見てタイプ分けして処理する
                     // let message_results = ;
                     let message_result = match ClassifyAtom::classify(atom) {
-                        ClassifyAtom::HeadData {
+                        ClassifyAtom::ChanPktHead {
                             atom,
-                            head_data,
+                            payload,
                             pos,
                             info,
                             track,
                         } => SessionResult::RaisedEvent(SessionEvent::ArrivedHeadData {
                             atom,
-                            head_data,
+                            head_data: payload,
                             pos,
                             info,
                             track,
                         }),
-                        ClassifyAtom::Data {
+                        ClassifyAtom::ChanPktData {
                             atom,
-                            data,
+                            payload,
                             pos,
                             continuation,
                         } => SessionResult::RaisedEvent(SessionEvent::ArrivedData {
                             atom,
-                            data,
+                            data: payload,
                             pos,
                             continuation,
                         }),
@@ -197,6 +197,9 @@ impl AtomDeserializer {
             Err(e) => match e {
                 AtomParseError::NotEnoughRecievedBuffer(_) => Ok(None),
                 AtomParseError::Unknown => Err(e),
+                AtomParseError::NotFoundValue => Err(e),
+                AtomParseError::IdError => Err(e),
+                AtomParseError::ValueError => Err(e),
             },
         }
     }

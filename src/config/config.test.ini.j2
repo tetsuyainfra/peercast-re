@@ -1,10 +1,14 @@
 [Server]
+ipv4_check={{ ipv4_check | default('') }}
 server_address={{ server_address | default('') }}
 server_port={{ server_port | default('') }}
 rtmp_port={{ rtmp_port | default('') }}
 local_address={{ local_address| default('') }}
-root_mode={{ root_mode | default('') }}
 
 [Privacy]
 username={{ username | default('') }}
 password={{ password | default('') }}
+
+[Root]
+root_mode={{ root_mode | default('') }}
+root_session_id={{ root_session_id | default('') }}

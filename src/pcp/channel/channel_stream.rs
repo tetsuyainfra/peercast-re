@@ -11,6 +11,8 @@ use crate::pcp::GnuId;
 
 use super::{ChannelMessage, ChannelReciever};
 
+/// Channelに上流から流れてくるPayloadデータを連続で取得するための構造体
+/// future_uti::Streamを参照のこと
 #[derive(Debug)]
 pub struct ChannelStream {
     channel_id: GnuId,
@@ -49,30 +51,26 @@ impl Stream for ChannelStream {
             }
             Poll::Ready(Some(msg)) => {
                 match msg {
-                    ChannelMessage::AtomChanHead {
-                        atom,
-                        pos,
-                        data,
-                        //
-                    } => {
+                    ChannelMessage::RelayChannelHead { pos, payload, .. } => {
                         self.is_sent_header = true;
-                        Poll::Ready(Some(Ok(data)))
+                        Poll::Ready(Some(Ok(payload)))
                     }
-                    ChannelMessage::AtomChanData {
-                        data,
+                    ChannelMessage::RelayChannelData {
+                        atom,
+                        payload,
                         pos,
-                        can_be_dropped,
+                        continuation,
                     } => {
                         if self.is_sent_keyframe {
                             // keyframeを送った後はガンガン送信してよい
-                            Poll::Ready(Some(Ok(data)))
+                            Poll::Ready(Some(Ok(payload)))
                         } else {
                             // keyframe未送信
-                            if can_be_dropped {
+                            if continuation {
                                 Poll::Ready(None)
                             } else {
                                 self.is_sent_keyframe = true;
-                                Poll::Ready(Some(Ok(data)))
+                                Poll::Ready(Some(Ok(payload)))
                             }
                         }
                     }

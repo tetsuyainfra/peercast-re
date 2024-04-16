@@ -1,10 +1,15 @@
-import { PlayIcon } from "@radix-ui/react-icons"
-import { RespChannel } from "../../../gen/ts-fetch/models"
+import { CodeSandboxLogoIcon, PlayIcon } from "@radix-ui/react-icons"
+import {
+  ChannelsBroadcastIdDelete200ResponseFromJSON,
+  RespChannel,
+} from "../../../gen/ts-fetch/models"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { useState } from "react"
-import { play_url } from "@/lib/api"
+import { api_config, play_url } from "@/lib/api"
 import { DialogChannelPlayer } from "./ChannelPlayer"
+import { ChannelApi, ChannelsBroadcastIdDeleteRequest } from "@peercast-client"
+import { string } from "zod"
 
 interface ChannelCardProps {
   channel: RespChannel
@@ -16,6 +21,29 @@ const ChannelCard: React.FC<ChannelCardProps> = ({ channel }) => {
     setPlayDisable(true)
     window.open(play_url(channel.id))
     setPlayDisable(false)
+    evt.preventDefault()
+  }
+
+  const stopButton = (evt: React.MouseEvent<HTMLButtonElement>) => {
+    console.log(evt)
+
+    let api = new ChannelApi(api_config())
+
+    ;(async function () {
+      await api
+        .channelsBroadcastIdDelete({
+          broadcastId: channel.id,
+        })
+        .then(
+          (v) => {
+            window.location.reload()
+          },
+          (err) => {
+            window.location.reload()
+          },
+        )
+    })()
+
     evt.preventDefault()
   }
 
@@ -41,7 +69,7 @@ const ChannelCard: React.FC<ChannelCardProps> = ({ channel }) => {
 
           {/* <!-- 右側 --> */}
           <div className="">
-            <Button variant="secondary" disabled className="mr-4">
+            <Button variant="secondary" className="mr-4" onClick={stopButton}>
               Drop
               {/* <Loader2 className="mr-2 h-4 w-4 animate-spin" /> */}
             </Button>

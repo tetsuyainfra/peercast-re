@@ -4,6 +4,7 @@ use std::{
     io::Write,
     net::IpAddr,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use ipnet::{IpNet, Ipv4Net};
@@ -12,14 +13,19 @@ use pbkdf2::{
     Pbkdf2,
 };
 use rand_core::OsRng;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
+use tracing_subscriber::field::debug;
 
-use crate::error::{AuthError, ConfigError, ParseVariableError};
+use crate::{
+    error::{AuthError, ConfigError, ParseVariableError},
+    pcp::GnuId,
+};
 
 mod loader;
 pub use loader::*;
 
 const SECTION_SERVER: &str = "Server";
+const SECTION_ROOT: &str = "Root";
 const SECTION_PRIVACY: &str = "Privacy";
 
 #[derive(Debug, Clone)]
@@ -30,7 +36,8 @@ pub struct Config {
     pub server_port: u16,
     pub rtmp_port: u16,
     pub local_address: Vec<IpNet>,
-    root_mode: bool,
+    pub root_mode: bool,
+    pub root_session_id: Option<GnuId>,
 
     // Privacy
     pub username: Option<String>,
@@ -48,22 +55,18 @@ impl Config {
             server_port,
             rtmp_port,
             local_address,
-            root_mode,
             // Privacy
             username,
             password,
+            // Root
+            root_mode,
+            root_session_id,
         } = Config::default();
 
-        let (server_address, server_port, rtmp_port, local_address, root_mode) = match conf
+        let (server_address, server_port, rtmp_port, local_address) = match conf
             .section(Some(SECTION_SERVER))
         {
-            None => (
-                server_address,
-                server_port,
-                rtmp_port,
-                local_address,
-                root_mode,
-            ),
+            None => (server_address, server_port, rtmp_port, local_address),
             Some(sec) => {
                 let server_address = match sec.get("server_address") {
                     None | Some("") => server_address,
@@ -86,18 +89,7 @@ impl Config {
                     None | Some("") => local_address,
                     Some(s) => serde_json::from_str(s).map_err(|e| ParseVariableError::from(e))?,
                 };
-                // #[cfg(feature = "root_mode")]
-                let root_mode = match sec.get("root_mode") {
-                    None | Some("") => root_mode,
-                    Some(s) => s.parse::<bool>().map_err(|e| ParseVariableError::from(e))?,
-                };
-                (
-                    server_address,
-                    server_port,
-                    rtmp_port,
-                    local_address,
-                    root_mode,
-                )
+                (server_address, server_port, rtmp_port, local_address)
             }
         };
 
@@ -129,15 +121,35 @@ impl Config {
             }
         };
 
+        let (root_mode, root_session_id) = match conf.section(Some(SECTION_ROOT)) {
+            None => (root_mode, root_session_id),
+            Some(sec) => {
+                //
+                let root_mode = match sec.get("root_mode") {
+                    None | Some("") => root_mode,
+                    Some(s) => s.parse::<bool>().map_err(|e| ParseVariableError::from(e))?,
+                };
+                let root_session_id = match sec.get("root_session_id") {
+                    None | Some("") => root_session_id,
+                    Some(s) => Some(GnuId::from_str(s).map_err(|e| ParseVariableError::from(e))?),
+                };
+
+                (root_mode, root_session_id)
+            }
+        };
+
         Ok(Config {
             config_file_path,
             server_address,
             server_port,
             rtmp_port,
             local_address,
-            root_mode,
+            // Privacy
             username,
             password,
+            // Root
+            root_mode,
+            root_session_id,
         })
     }
 
@@ -151,8 +163,7 @@ impl Config {
             .set(
                 "permit_address",
                 serde_json::to_string(&self.local_address).unwrap(),
-            )
-            .set("root_mode", &self.root_mode.to_string());
+            );
 
         ini.with_section(Some(SECTION_PRIVACY))
             .set(
@@ -165,6 +176,15 @@ impl Config {
                 "password",
                 self.password.as_ref().map_or(String::new(), |pw| pw.into()),
             );
+        ini.with_section(Some(SECTION_ROOT))
+            .set("root_mode", &self.root_mode.to_string())
+            .set(
+                "root_session_id",
+                &self
+                    .root_session_id
+                    .as_ref()
+                    .map_or(String::new(), |id| id.to_string()),
+            );
 
         let mut buf = Vec::new();
         let _r = ini.write_to(&mut buf).unwrap();
@@ -174,7 +194,7 @@ impl Config {
 
 impl ConfigTrait for Config {
     type ErrorType = ConfigError;
-    fn load_file(path: &Path) -> Result<Self, Self::ErrorType> {
+    fn load_file(path: &PathBuf) -> Result<Self, Self::ErrorType> {
         let file_str = fs::read_to_string(path)?;
         let mut config = Self::load_str(&file_str)?;
 
@@ -182,7 +202,7 @@ impl ConfigTrait for Config {
         Ok(config)
     }
 
-    fn save_file(&self, path: &Path) -> Result<(), Self::ErrorType> {
+    fn save_file(&self, path: &PathBuf) -> Result<(), Self::ErrorType> {
         let buf = self.save_str();
         let mut file = File::create(path)?;
         let _r = file.write_all(&buf)?;
@@ -199,6 +219,8 @@ impl Default for Config {
             rtmp_port: 11935,
             local_address: vec!["127.0.0.0/8".parse().unwrap()],
             root_mode: false,
+            root_session_id: None,
+            //
             username: None,
             password: None,
         }
@@ -357,9 +379,9 @@ mod test {
         assert_eq!(conf.server_port, 1);
         assert_eq!(conf.rtmp_port, def_conf.rtmp_port);
         assert_eq!(conf.local_address, def_conf.local_address);
-        assert_eq!(conf.root_mode, def_conf.root_mode);
         assert_eq!(conf.username, def_conf.username);
         assert_eq!(conf.password, def_conf.password);
+        assert_eq!(conf.root_mode, def_conf.root_mode);
 
         let s = render!(include_str!("config.test.ini.j2"),  server_port => 1, password=>"plain_password");
         let conf = Config::load_str(&s).unwrap();
@@ -420,6 +442,16 @@ mod test {
         match Config::load_str(&s) {
             Err(ConfigError::ParseVariable(e)) => match e {
                 ParseVariableError::Bool(_) => assert!(true),
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        };
+
+        // root_session_id
+        let s = render!(include_str!("config.test.ini.j2"),  root_session_id => 1);
+        match Config::load_str(&s) {
+            Err(ConfigError::ParseVariable(e)) => match e {
+                ParseVariableError::GnuId(_) => assert!(true),
                 _ => assert!(false),
             },
             _ => assert!(false),

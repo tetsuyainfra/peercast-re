@@ -3,10 +3,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use axum::{body::HttpBody, extract::ConnectInfo};
+use axum::{body::HttpBody, extract::ConnectInfo, http::HeaderValue};
 use axum_core::{body::Body, extract::Request, response::Response};
 use futures_util::{future::BoxFuture, Future};
-use http::{HeaderValue, StatusCode};
+use hyper::StatusCode;
 use ipnet::IpNet;
 use tower::{Layer, Service};
 
@@ -79,7 +79,7 @@ pub(crate) fn create_error_response() -> Response<Body> {
     #[allow(clippy::declare_interior_mutable_const)]
     const TEXT_PLAIN: HeaderValue = HeaderValue::from_static("text/plain; charset=utf-8");
     res.headers_mut()
-        .insert(http::header::CONTENT_TYPE, TEXT_PLAIN);
+        .insert(hyper::header::CONTENT_TYPE, TEXT_PLAIN);
 
     res
 }

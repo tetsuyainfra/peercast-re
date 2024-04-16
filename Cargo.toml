@@ -5,8 +5,10 @@ edition = "2021"
 repository = "https://github.com/tetsuyainfra/peercast-re"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-default-run = "peercast-re"
+# default-run = "peercast-re"
 # default-run = "rtmp"
+#default-run = "relay"
+default-run = "peercast-root"
 build = "build.rs"
 
 
@@ -49,28 +51,37 @@ tokio-util = { version = "0.7.8" }
 ipnet = { version = "2.8.0", features = ["serde"] }
 
 # http
-http = { version = "*" }
+http = { version = "1.0.0" }
 httparse = { version = "1.8.0" }
 
 # http-server
 
-axum-core = { version = "*", git = "https://github.com/tokio-rs/axum", branch = "main" }
-axum = { version = "*", git = "https://github.com/tokio-rs/axum", branch = "main", features = [
+axum-core = { version = "*" }
+axum = { version = "0.7", features = [
+    "tokio",
     "form",
     "ws",
     "tracing",
 ] }
+# axum = { git = "https://github.com/tokio-rs/axum", branch = "main", features = [
+#     "form",
+#     "ws",
+#     "tracing",
+# ] }
 tower = { version = "0.4.13" }
-tower-http = { version = "0.4", features = ["fs", "trace", "cors"] }
-tower-hyper-http-body-compat = { version = "0.2.0", features = [
-    "http1",
-    "server",
-] }
+tower-http = { version = "0.5.1", features = ["fs", "trace", "cors", "util", "request-id"] }
+# tower-hyper-http-body-compat = { version = "0.2.0", features = [
+# "http1",
+# "server",
+# ] }
 # hyper = { version = "0.14", features = ["full"] }
-hyper = { version = "1.0.0-rc.4", features = ["full"] }
-hyper-util = { git = "https://github.com/hyperium/hyper-util", rev = "f898015", features = [
-    "full",
-] }
+hyper = { version = "1.1.0", features = ["full"] }
+hyper-util = { version = "0.1.2", features = ["full"]}
+# hyper-util = { git = "https://github.com/hyperium/hyper-util", rev = "f898015", features = [
+# "full",
+# ] }
+
+
 
 # HTML Template engine
 askama = { version = "0.12.0", features = ["mime", "mime_guess"] }
@@ -121,6 +132,7 @@ chrono-tz = "0.8.3"
 # GnuId
 uuid = { version = "1.4", features = [
     "v4",                # Lets you generate random UUIDs
+    "v7",                # Version 7 UUIDs using a Unix timestamp.
     "fast-rng",          # Use a faster (but still sufficiently random) RNG
     "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
 ] }
@@ -156,6 +168,8 @@ dirs = "5.0.1"
 indoc = "2.0"
 reqwest = { version = "0.11.19", features = ["stream"] }
 
+# merge member vaiable
+merge = "0.1.0"
 
 # prcess exit code
 exitcode = "1"
@@ -169,6 +183,18 @@ bitflags = "2.4.0"
 # utoipa-redoc = { version = "0.1.0", features = ["axum"] }
 # utoipa-rapidoc = { version = "0.1.0", features = ["axum"] }
 
+#
+#  Use for peercast-port-checkerd
+#
+# axum-client-ip = { version ="0.4.2", optional = true }
+axum-client-ip = { version ="0.4.2" }
+
+#
+#  Use for daemon
+#
+# daemonize ={ version = "*", optional = true }
+# daemonize ={ version = "*" }
+tracing-journald = "0.3.0"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["stable", "async_tokio"] }
@@ -177,6 +203,17 @@ criterion = { version = "0.5.1", features = ["stable", "async_tokio"] }
 npm_rs = { version = "1.0.0" }
 embed-resource = "2.3"
 
+[features]
+# ppc-server = ["dep:axum-client-ip"]
+# daemon = ["dep:daemonize"]
+
+# [[bin]]
+# name = "peercast-port-checkerd"
+# required-features = ["ppc-server"]
+
+# [[bin]]
+# name = "daemon-example"
+# required-features = ["daemon"]
 
 [[bench]]
 name = "bench_main"

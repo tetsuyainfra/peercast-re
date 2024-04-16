@@ -24,6 +24,10 @@ if [ -n "$GEN_DOC" ]; then
         config-help  -g typescript-fetch > gen/config-help.ts-fetch.txt
 fi
 
+################################################################################
+# openapi.yaml
+#
+
 # peercast-rtで使うmodelはこっちから引っ張ってくる
 rm -rf ./gen/rust
 docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" openapitools/openapi-generator-cli generate \
@@ -39,7 +43,7 @@ docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_
     -i /local/api/openapi.yaml \
     -g rust-server \
     -o /local/gen/rust-server \
-    -p packageName=peercast-rt-api-server \
+    -p packageName=peercast-re-api-server \
     -p packageVersion=${PACKAGE_VERSION}
 
 # rm -rf ./gen/js
@@ -56,3 +60,21 @@ docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_
     -o /local/gen/ts-fetch \
     -p packageVersion=${PACKAGE_VERSION} \
 
+################################################################################
+# peercast-port-checkerd.yml
+#
+rm -rf ./gen/ppc
+docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" openapitools/openapi-generator-cli generate \
+    -i /local/api/peercast-port-checkerd.yaml \
+    -g rust \
+    -o /local/gen/ppc \
+    -p packageName=ppc-api \
+    -p packageVersion=${PACKAGE_VERSION}
+
+rm -rf ./gen/ppc-server
+docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" openapitools/openapi-generator-cli generate \
+    -i /local/api/peercast-port-checkerd.yaml \
+    -g rust-server \
+    -o /local/gen/ppc-server \
+    -p packageName=ppc-api \
+    -p packageVersion=${PACKAGE_VERSION}

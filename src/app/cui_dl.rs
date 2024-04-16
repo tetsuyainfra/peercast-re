@@ -19,16 +19,17 @@ impl CuiDL {
         channel_id: GnuId,
         connect_addr: SocketAddr,
     ) {
-        let ch_manager = ChannelManager::new();
+        let session_id = GnuId::new();
+        let ch_manager = ChannelManager::new(&session_id);
 
-        let ch_type = ChannelType::Relay("localhost:7144".parse().unwrap());
+        let ch_type = ChannelType::Relay; //("localhost:7144".parse().unwrap());
         let ch = ch_manager.create_or_get(channel_id, ch_type, None, None);
 
         let task_config = SourceTaskConfig::Relay(RelayTaskConfig {
-            session_id: GnuId::new(),
             addr: connect_addr,
+            self_addr: None,
         });
-        let _r = ch.connect(ConnectionId::new(), GnuId::new(), task_config);
+        let _r = ch.connect(ConnectionId::new(), task_config);
 
         // Connectingになるのを待つ
 

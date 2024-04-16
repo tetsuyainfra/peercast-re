@@ -1,14 +1,31 @@
-mod broker;
+mod broadcast_broker;
+mod relay_broker;
 
+use std::sync::{Arc, RwLock};
+
+use async_trait::async_trait;
 use bytes::Bytes;
-use tokio::sync::mpsc;
+use thiserror::Error;
+use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::{pcp::Atom, ConnectionId, rtmp::rtmp_connection::RtmpConnectionEvent, util::util_mpsc::send};
+use crate::{
+    pcp::{Atom, GnuId},
+    rtmp::rtmp_connection::RtmpConnectionEvent,
+    util::util_mpsc::mpsc_send,
+    ConnectionId,
+};
 
-use super::{ChannelInfo, TrackInfo};
+use self::{broadcast_broker::BroadcastBrokerWoker, relay_broker::RelayBrokerWorker};
 
+use super::{ChannelInfo, ChannelType, TrackInfo};
 
-pub(crate) use broker::ChannelBroker;
+//------------------------------------------------------------------------------
+// ChannelBroker Relation Struct
+//
+
+// BrokerWorkerが起こすエラー
+#[derive(Debug, Error)]
+enum BrokerError {}
 
 /// マネージャへのメッセージ
 #[derive(Debug)]
@@ -22,18 +39,18 @@ pub(crate) enum ChannelBrokerMessage {
         info: ChannelInfo,
         track: TrackInfo,
     },
-    AtomHeadData {
+    ArrivedChannelHead {
         atom: Atom,
         payload: Bytes,
         pos: u32,
         info: Option<ChannelInfo>,
         track: Option<TrackInfo>,
     },
-    AtomData {
+    ArrivedChannelData {
         atom: Atom,
-        data: Bytes,
+        payload: Bytes,
         pos: u32,
-        continuation: Option<bool>,
+        continuation: bool,
     },
     AtomBroadcast {
         direction: AtomDirection,
@@ -45,18 +62,18 @@ pub(crate) enum ChannelBrokerMessage {
 /// 各コネクションへのメッセージ
 #[derive(Debug, Clone)]
 pub enum ChannelMessage {
-    AtomChanHead {
+    RelayChannelHead {
         atom: Atom,
         pos: u32,
-        data: Bytes,
-        // 送る必要ないのではないか
-        // info: Option<ChannelInfo>,
-        // track: Option<TrackInfo>,
+        payload: Bytes,
+        info: Option<ChannelInfo>,
+        track: Option<TrackInfo>,
     },
-    AtomChanData {
+    RelayChannelData {
+        atom: Atom,
         pos: u32,
-        data: Bytes,
-        can_be_dropped: bool,
+        payload: Bytes,
+        continuation: bool,
     },
     // AtomTrackerUpdate {
     //     info: Option<ChannelInfo>,
@@ -85,6 +102,89 @@ pub enum AtomDirection {
 }
 
 //------------------------------------------------------------------------------
+// ChannelBroker
+//
+#[derive(Debug)]
+pub(crate) struct ChannelBroker {
+    manager_tx: mpsc::UnboundedSender<ChannelBrokerMessage>,
+    task: JoinHandle<Result<(), BrokerError>>,
+    task_shutdown_tx: mpsc::UnboundedSender<()>,
+}
+
+impl ChannelBroker {
+    pub fn new(
+        channel_type: ChannelType,
+        channel_id: GnuId,
+        channel_info: Arc<RwLock<Option<ChannelInfo>>>,
+        track_info: Arc<RwLock<Option<TrackInfo>>>,
+    ) -> Self {
+        let (manager_tx, manager_rx) = mpsc::unbounded_channel();
+        let (task_shutdown_tx, task_shutdown_rx) = mpsc::unbounded_channel();
+
+        let task = match &channel_type {
+            ChannelType::Broadcast => {
+                //
+                // let broker: BroadcastBrokerWoker = ChannelBrokerWorker::new(
+                //     channel_id,
+                //     channel_info,
+                //     track_info,
+                //     task_shutdown_rx,
+                // );
+                // tokio::spawn(broker.start(manager_rx))
+                let broker: BroadcastBrokerWoker = ChannelBrokerWorker::new(
+                    channel_id,
+                    channel_info,
+                    track_info,
+                    task_shutdown_rx,
+                );
+                tokio::spawn(broker.start(manager_rx))
+            }
+            ChannelType::Relay => {
+                let broker: RelayBrokerWorker = ChannelBrokerWorker::new(
+                    channel_id,
+                    channel_info,
+                    track_info,
+                    task_shutdown_rx,
+                );
+                tokio::spawn(broker.start(manager_rx))
+            }
+        };
+
+        Self {
+            manager_tx,
+            task,
+            task_shutdown_tx,
+        }
+    }
+
+    pub fn sender(&self) -> mpsc::UnboundedSender<ChannelBrokerMessage> {
+        self.manager_tx.clone()
+    }
+
+    pub fn channel_reciever(&self, connection_id: ConnectionId) -> ChannelReciever {
+        ChannelReciever::create(self.sender(), connection_id)
+    }
+}
+
+//------------------------------------------------------------------------------
+// ChannelBrokerWorker
+//
+#[async_trait]
+trait ChannelBrokerWorker {
+    fn new(
+        channel_id: GnuId,
+        channel_info: Arc<RwLock<Option<ChannelInfo>>>,
+        track_info: Arc<RwLock<Option<TrackInfo>>>,
+        shutdown_rx: mpsc::UnboundedReceiver<()>,
+    ) -> Self;
+
+    async fn start(
+        mut self,
+        manager_receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
+    ) -> Result<(), BrokerError>;
+}
+
+//------------------------------------------------------------------------------
 // ChannelBrokerReciever
 //
 #[derive(Debug)]
@@ -105,7 +205,7 @@ impl ChannelReciever {
             sender: reciever_tx,
             disconnection: disconnection,
         };
-        send(&mut broker_sender, message);
+        mpsc_send(&mut broker_sender, message);
 
         Self {
             broker_sender,

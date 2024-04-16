@@ -9,6 +9,7 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use async_trait::async_trait;
 use axum::routing::head;
 use byteorder::WriteBytesExt;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -35,51 +36,37 @@ use crate::{
         Atom, ChildAtom, GnuId, Id4, ParentAtom,
     },
     rtmp::rtmp_connection::RtmpConnectionEvent,
-    util::util_mpsc::send,
+    util::util_mpsc::mpsc_send,
     ConnectionId,
 };
 
-use super::{ChannelInfo, TrackInfo, ChannelBrokerMessage, ChannelReciever, ChannelMessage};
+use super::{
+    BrokerError, ChannelBrokerMessage, ChannelBrokerWorker, ChannelInfo, ChannelMessage,
+    ChannelReciever, TrackInfo,
+};
 
-
-
-
-/// Channelで扱いやすくするためのクラス
-#[derive(Debug)]
-pub(crate) struct ChannelBroker {
-    manager_tx: mpsc::UnboundedSender<ChannelBrokerMessage>,
-    task: JoinHandle<()>,
-    task_shutdown_tx: mpsc::UnboundedSender<()>,
-}
-
-impl ChannelBroker {
-    pub fn new(
+#[async_trait]
+impl ChannelBrokerWorker for BroadcastBrokerWoker {
+    fn new(
         channel_id: GnuId,
         channel_info: Arc<RwLock<Option<ChannelInfo>>>,
         track_info: Arc<RwLock<Option<TrackInfo>>>,
+        //
+        shutdown_rx: mpsc::UnboundedReceiver<()>,
     ) -> Self {
-        let (manager_tx, manager_rx) = mpsc::unbounded_channel();
-        let (task_shutdown_tx, task_shutdown_rx) = mpsc::unbounded_channel();
-        let broker =
-            ChannelBrokerWoker::new(channel_id, channel_info, track_info, task_shutdown_rx);
-
-        let task = tokio::spawn(broker.start(manager_rx));
-
-        Self {
-            manager_tx,
-            task,
-            task_shutdown_tx,
-        }
+        BroadcastBrokerWoker::new(channel_id, channel_info, track_info, shutdown_rx)
     }
 
-    pub fn sender(&self) -> UnboundedSender<ChannelBrokerMessage> {
-        self.manager_tx.clone()
-    }
-
-    pub fn channel_reciever(&self, connection_id: ConnectionId) -> ChannelReciever {
-        ChannelReciever::create(self.sender(), connection_id)
+    async fn start(
+        mut self,
+        manager_receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
+    ) -> Result<(), BrokerError> {
+        self.start(manager_receiver).await
     }
 }
+
+/// Channelで扱いやすくするためのクラス
+#[derive(Debug)]
 
 pub struct HeadAtom {
     atom: Atom,
@@ -90,7 +77,7 @@ pub struct HeadAtom {
 }
 
 /// ChannelBrokerの実処理が行われるWoker
-struct ChannelBrokerWoker {
+pub(super) struct BroadcastBrokerWoker {
     channel_id: GnuId,
     shutdown_rx: UnboundedReceiver<()>,
     //
@@ -111,8 +98,8 @@ struct ChannelBrokerWoker {
 }
 
 // Broker分けた方がシンプルになると思う
-impl ChannelBrokerWoker {
-    fn new(
+impl BroadcastBrokerWoker {
+    pub(super) fn new(
         channel_id: GnuId,
         channel_info: Arc<RwLock<Option<ChannelInfo>>>,
         track_info: Arc<RwLock<Option<TrackInfo>>>,
@@ -154,7 +141,10 @@ impl ChannelBrokerWoker {
         // }
     }
 
-    async fn start(mut self, receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>) {
+    pub(super) async fn start(
+        mut self,
+        receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
+    ) -> Result<(), BrokerError> {
         debug!("CID:{} ChannelBrokerWorker START", self.channel_id);
         async fn new_receiver_future(
             mut receiver: UnboundedReceiver<ChannelBrokerMessage>,
@@ -199,6 +189,8 @@ impl ChannelBrokerWoker {
 
         // Shutdown(終了処理)
         debug!("CID:{} ChannelBrokerWorker FINISH", self.channel_id);
+
+        Ok(())
     }
 
     fn handle_message(&mut self, message: ChannelBrokerMessage) {
@@ -215,7 +207,7 @@ impl ChannelBrokerWoker {
                 *lock_info = Some(info);
                 *lock_track = Some(track);
             }
-            ChannelBrokerMessage::AtomHeadData {
+            ChannelBrokerMessage::ArrivedChannelHead {
                 atom,
                 payload,
                 pos,
@@ -224,13 +216,13 @@ impl ChannelBrokerWoker {
             } => {
                 self.handle_head_data(atom, payload, pos, info, track);
             }
-            ChannelBrokerMessage::AtomData {
+            ChannelBrokerMessage::ArrivedChannelData {
                 atom,
-                data,
+                payload,
                 pos,
                 continuation,
             } => {
-                self.handle_data(atom, data, pos, continuation);
+                self.handle_data(atom, payload, pos, continuation);
             }
             ChannelBrokerMessage::AtomBroadcast { direction, atom } => todo!(),
             ChannelBrokerMessage::BroadcastEvent(event) => {
@@ -254,12 +246,14 @@ impl ChannelBrokerWoker {
                 magic_with_data,
                 data,
             } = self.head_atom.as_ref().unwrap();
-            send(
+            mpsc_send(
                 &mut sender,
-                ChannelMessage::AtomChanHead {
+                ChannelMessage::RelayChannelHead {
                     atom: atom.clone(),
                     pos: *pos,
-                    data: magic_with_data.clone(),
+                    payload: magic_with_data.clone(),
+                    info: None,
+                    track: None,
                 },
             );
         }
@@ -317,23 +311,22 @@ impl ChannelBrokerWoker {
             magic_with_data,
             data,
         } = self.head_atom.as_ref().unwrap();
-        self.send_listener(ChannelMessage::AtomChanHead {
+        self.send_listener(ChannelMessage::RelayChannelHead {
             atom: atom.clone(),
             pos: pos.clone(),
-            data: data.clone(),
+            payload: data.clone(),
+            info: None,
+            track: None,
         })
     }
 
-    fn handle_data(&self, atom: Atom, data: Bytes, pos: u32, continuation: Option<bool>) {
+    fn handle_data(&self, atom: Atom, data: Bytes, pos: u32, continuation: bool) {
         // TODO: continuationの扱いをどうするか
-        let can_be_dropped = match continuation {
-            Some(cont) => cont,
-            None => false,
-        };
-        let msg = ChannelMessage::AtomChanData {
-            data,
+        let msg = ChannelMessage::RelayChannelData {
+            atom,
+            payload: data,
             pos,
-            can_be_dropped,
+            continuation,
         };
         self.send_listener(msg)
     }
@@ -437,14 +430,15 @@ impl ChannelBrokerWoker {
                     None,
                     &tagged_data,
                 );
-                self.handle_data(atom, tagged_data, self.flv_position, Some(can_be_dropped))
+                // Some(continuation);
+                self.handle_data(atom, tagged_data, self.flv_position, !can_be_dropped)
             }
         }
     }
 
     fn send_listener(&self, message: ChannelMessage) {
         for (id, sender) in &self.sender_by_connection_id {
-            send(sender, message.clone());
+            mpsc_send(sender, message.clone());
         }
     }
 
@@ -789,7 +783,6 @@ impl RtmpFlvnizer {
     }
 }
 
-
 #[cfg(test)]
 mod t {
     use std::time::Duration;
@@ -797,7 +790,7 @@ mod t {
 
     use super::*;
     use crate::{
-        pcp::{ChildAtom, Id4},
+        pcp::{channel::broker::ChannelBroker, ChannelType, ChildAtom, Id4},
         test_helper::*,
     };
 
@@ -808,7 +801,7 @@ mod t {
         let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
         let (broker_sender, broker_receiver) = mpsc::unbounded_channel();
 
-        let worker = ChannelBrokerWoker::new(
+        let worker = BroadcastBrokerWoker::new(
             GnuId::new(),
             Default::default(),
             Default::default(),
@@ -827,20 +820,30 @@ mod t {
     async fn test_broker() {
         init_logger("trace");
 
-        let broker = ChannelBroker::new(GnuId::new(), Default::default(), Default::default());
+        let broker = ChannelBroker::new(
+            ChannelType::Broadcast,
+            //  { app: "".into(),
+            //     pass: "".into(),
+            // },
+            GnuId::new(),
+            Default::default(),
+            Default::default(),
+        );
 
         let mut reciever = broker.channel_reciever(ConnectionId::new());
         let handle = tokio::spawn(async move { reciever.recv().await });
 
         let atom: Atom = Atom::Child(ChildAtom::from((Id4::PCP_HELO, 1_u8)));
         let payload = Bytes::new();
-        broker.sender().send(ChannelBrokerMessage::AtomHeadData {
-            atom,
-            payload,
-            pos: 0,
-            info: Some(ChannelInfo::new()),
-            track: Some(TrackInfo::new()),
-        });
+        broker
+            .sender()
+            .send(ChannelBrokerMessage::ArrivedChannelHead {
+                atom,
+                payload,
+                pos: 0,
+                info: Some(ChannelInfo::new()),
+                track: Some(TrackInfo::new()),
+            });
 
         let r = handle.await.unwrap();
         assert!(r.is_some());

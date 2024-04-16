@@ -2,6 +2,8 @@ use std::{net::AddrParseError, num::ParseIntError, str::ParseBoolError};
 
 use thiserror::Error;
 
+use crate::pcp::{GnuId, GnuIdParseError};
+
 // 主に通信について
 #[derive(Debug, Error)]
 pub enum ConnectionError {
@@ -21,6 +23,9 @@ pub enum HandshakeError {
     #[error("Could not find a server to connect")]
     ServerNotFound,
 
+    #[error("Timeout")]
+    Timeout,
+
     #[error("Parsing error {0}")]
     Parse(#[from] AtomParseError),
 
@@ -37,6 +42,16 @@ pub enum AtomParseError {
     // 少なくとも処理を進めるために必要なバイト数(このバイト数があればパースできるとは限らない)
     #[error("at least, recieve {0} bytes. but not enough for the atom.")]
     NotEnoughRecievedBuffer(usize),
+
+    // 少なくとも処理を進めるために必要なバイト数(このバイト数があればパースできるとは限らない)
+    #[error("Not found need value")]
+    NotFoundValue,
+
+    #[error("invalid atom id")]
+    IdError,
+
+    #[error("invalid atom value")]
+    ValueError,
 
     #[error("unknown parse error")]
     Unknown,
@@ -68,6 +83,9 @@ pub enum ParseVariableError {
 
     #[error("parse vaiable error. error occured: {0}")]
     Serde(#[from] serde_json::Error),
+
+    #[error("parse vaiable error. error occured: {0}")]
+    GnuId(#[from] GnuIdParseError),
 }
 
 #[derive(Error, Debug)]

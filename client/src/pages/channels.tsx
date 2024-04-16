@@ -2,22 +2,55 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BrodcastChannelButton from "@/components/forms/BrodcastChannelForm"
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { api_config } from "@/lib/api"
 import { ChannelApi } from "../../../gen/ts-fetch/apis"
 import { RespChannel } from "../../../gen/ts-fetch/models"
 import ChannelCard from "@/components/ChannelCard"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { env } from "process"
 
 export default function Channels() {
+  const urlInputId = React.useId()
   let [channels, channelsSet] = useState<RespChannel[]>([])
   useEffect(() => {
     ;(async () => {
       let api = new ChannelApi(api_config())
-      let channels = await api.channelsGet()
-      // console.log("channelsGet", channels)
-      channelsSet(channels)
+      await api.channelsGet().then(
+        (channels) => {
+          channelsSet(channels)
+        },
+        (err) => {
+          console.info("channelsGet failed", err)
+        },
+      )
     })()
   }, [])
+
+  const addChannel = (evt: React.FormEvent<HTMLFormElement>) => {
+    evt.preventDefault()
+    // const form = evt.target as HTMLFormElement
+    // const formData = new FormData(form)
+    // console.log("evt: ", evt, formData.entries())
+    let urlInput = (document.getElementById(urlInputId) as HTMLInputElement).value
+    let url = new URL(urlInput)
+    let id = url.pathname.split("/").at(-1) || ""
+    let host = url.searchParams.get("tip") || ""
+
+    let api = new ChannelApi(api_config())
+    api
+      .createRelayChannel({
+        reqCreateRelayChannel: {
+          id: id,
+          host: host,
+        },
+      })
+      .then((channel) => {
+        console.log("createRelayChannel", channel)
+        window.location.reload()
+      })
+  }
   return (
     <>
       <Tabs defaultValue="all" className="h-full space-y-6">
@@ -36,6 +69,17 @@ export default function Channels() {
               Idle
             </TabsTrigger>
           </TabsList>
+          <div className="flex w-full max-w-sm">
+            <form className="flex w-full max-w-sm items-center space-x-2" onSubmit={addChannel}>
+              <Input
+                type="url"
+                id={urlInputId}
+                name="source_url"
+                defaultValue={import.meta.env.VITE_DEBUG_URL}
+              />
+              <Button type="submit">Play</Button>
+            </form>
+          </div>
           <div className="ml-auto mr-4">
             <BrodcastChannelButton />
           </div>

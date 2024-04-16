@@ -15,23 +15,24 @@ use crate::{
     pcp::{
         builder::OlehInfo,
         channel::{node_pool::HostCandidate, ChannelBrokerMessage},
-        procedure::{BothHandshake, HandshakeReturn},
+        procedure::{HandshakeReturn, PcpHandshake},
         session::{Session, SessionConfig, SessionEvent, SessionResult},
         Atom, ChannelInfo, GnuId, TrackInfo,
     },
-    util::util_mpsc::send,
+    util::util_mpsc::mpsc_send,
     ConnectionId,
 };
 
-use super::{SourceTaskConfig, SourceTaskTrait, TaskStatus};
+use super::{SourceTask, SourceTaskConfig, TaskStatus};
 
 ////////////////////////////////////////////////////////////////////////////////
 //  Relation Struct
 //
 
+#[derive(Debug, Clone)]
 pub struct RelayTaskConfig {
-    pub session_id: GnuId,
     pub addr: SocketAddr,
+    pub self_addr: Option<SocketAddr>,
 }
 impl From<RelayTaskConfig> for SourceTaskConfig {
     fn from(value: RelayTaskConfig) -> Self {
@@ -45,60 +46,39 @@ impl From<RelayTaskConfig> for SourceTaskConfig {
 
 #[derive(Debug)]
 pub struct RelayTask {
-    worker_status: watch::Receiver<TaskState>,
+    session_id: GnuId,
+    broadcast_id: GnuId,
+    broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
+    config: Option<RelayTaskConfig>,
+    //
+    worker_status: Option<watch::Receiver<TaskStatus>>,
     worker_handle: Option<JoinHandle<Result<(), ConnectionError>>>,
-    // worker_shutdown: Shutdown,
 }
 
 impl RelayTask {
     pub(crate) fn new(
+        session_id: GnuId,
         broadcast_id: GnuId,
-        connection_id: ConnectionId,
-        config: RelayTaskConfig,
         broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
     ) -> Self {
-        let RelayTaskConfig { session_id, addr } = config;
-        let (status_tx, status_rx) = watch::channel(TaskState::Init);
-
-        let worker = ChannelTaskWoker::new(
-            broadcast_id,
-            connection_id,
-            session_id,
-            addr,
-            //
-            broker_sender,
-            //
-            status_tx,
-            // worker_shutdown.reciever(),
-        );
-        let worker_handle = tokio::spawn(async {
-            // let connection_id = worker.connection_id.clone();
-            let result = worker.start().await;
-            // info!("{:?}: worker finished {:?}", connection_id, &result);
-            result
-        });
-
         RelayTask {
-            worker_status: status_rx,
-            worker_handle: Some(worker_handle),
-            // worker_shutdown,
+            session_id,
+            broadcast_id,
+            broker_sender,
+            config: None,
+            worker_status: None,
+            worker_handle: None,
         }
     }
 
     pub async fn status_changed(&mut self) -> Result<TaskStatus, watch::error::RecvError> {
-        self.worker_status.changed().await?;
+        self.worker_status.as_mut().unwrap().changed().await?;
         Ok(self.status())
     }
 
     //
     pub async fn wait(&mut self) {
         self.worker_handle.take().unwrap().await;
-    }
-
-    pub async fn stop(mut self) {
-        debug!("stop");
-        // self.worker_shutdown.shutdown().await;
-        debug!("stop end");
     }
 
     pub fn blocking_shutdown(mut self) {
@@ -110,49 +90,44 @@ impl RelayTask {
 }
 
 #[async_trait::async_trait]
-impl SourceTaskTrait for RelayTask {
-    fn connect(&self, config: SourceTaskConfig) {
-        todo!()
+impl SourceTask for RelayTask {
+    fn connect(&mut self, config: SourceTaskConfig) -> bool {
+        let (status_tx, status_rx) = watch::channel(TaskStatus::Init);
+
+        match config {
+            SourceTaskConfig::Broadcast(_) => panic!("invalid config {:?}", config),
+            SourceTaskConfig::Relay(c) => self.config = Some(c),
+        };
+
+        let worker = ChannelTaskWoker::new(
+            self.broadcast_id,
+            ConnectionId::new(),
+            self.session_id,
+            self.config.as_ref().unwrap().self_addr.clone(),
+            self.config.as_ref().unwrap().addr.clone(),
+            self.broker_sender.clone(),
+            status_tx,
+        );
+        let worker_handle = tokio::spawn(async { worker.start().await });
+        true
     }
 
-    fn retry(&self) {
-        todo!()
-    }
-
-    fn update_info(&self, info: ChannelInfo) {
-        todo!()
-    }
-
-    fn update_track(&self, info: TrackInfo) {
-        todo!()
+    fn retry(&mut self) -> bool {
+        let c = self.config.take().unwrap();
+        self.connect(c.into())
     }
 
     fn status(&self) -> TaskStatus {
-        match *self.worker_status.borrow() {
-            TaskState::Init => TaskStatus::Idle,
-            TaskState::Handshake => TaskStatus::Running,
-            TaskState::Recieving => TaskStatus::Running,
-            TaskState::Finish => TaskStatus::Stopped,
-            TaskState::Error => TaskStatus::Error,
-        }
+        *self.worker_status.as_ref().unwrap().borrow()
     }
 
     async fn status_changed(&mut self) -> Result<(), watch::error::RecvError> {
-        self.worker_status.changed().await
+        self.worker_status.as_mut().unwrap().changed().await
     }
 
-    async fn stop(&self) {
+    fn stop(&self) {
         todo!()
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum TaskState {
-    Init,
-    Handshake,
-    Recieving,
-    Finish,
-    Error,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -164,6 +139,7 @@ struct ChannelTaskWoker {
     connection_id: ConnectionId,
     //
     session_id: GnuId,
+    self_addr: Option<SocketAddr>,
     //
     root_addr: SocketAddr, // rootって言うのが正しいのかなぁ・・・
     target_hosts: VecDeque<HostCandidate>,
@@ -171,7 +147,7 @@ struct ChannelTaskWoker {
     //
     broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
     //
-    status_tx: watch::Sender<TaskState>,
+    status_tx: watch::Sender<TaskStatus>,
     // shutdown: ShutdownRecvier,
     //
     session: Session,
@@ -185,11 +161,12 @@ impl ChannelTaskWoker {
         connection_id: ConnectionId,
         //
         session_id: GnuId,
+        self_addr: Option<SocketAddr>,
         addr: SocketAddr,
         //
         broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
         //
-        status_tx: watch::Sender<TaskState>,
+        status_tx: watch::Sender<TaskStatus>,
         // shutdown: ShutdownRecvier,
     ) -> Self {
         Self {
@@ -197,6 +174,8 @@ impl ChannelTaskWoker {
             connection_id,
             //
             session_id,
+            self_addr,
+            //
             root_addr: addr,
             target_hosts: VecDeque::from([HostCandidate::server(GnuId::from(0), addr)]),
             failed_hosts: VecDeque::new(),
@@ -210,10 +189,11 @@ impl ChannelTaskWoker {
     }
 
     async fn start(mut self) -> Result<(), ConnectionError> {
-        self.status_tx.send(TaskState::Handshake);
-
         // Peerに接続する
-        let (stream, read_buf, oleh) = self.connect_to_peer().await?;
+        // let (stream, read_buf, oleh) = self.connect_to_peer().await?;
+        let (stream, read_buf, oleh) = self.connect_to_peer_only_root().await?;
+
+        info!("connected success CID:{}", self.connection_id);
 
         let (stream_reader, stream_writer) = tokio::io::split(stream);
 
@@ -231,7 +211,7 @@ impl ChannelTaskWoker {
             sender: broker_sender,
             disconnection: disconnection_reader,
         };
-        if !send(&self.broker_sender, message) {
+        if !mpsc_send(&self.broker_sender, message) {
             return Ok(());
         }
 
@@ -244,7 +224,7 @@ impl ChannelTaskWoker {
 
         results.extend(remaining_results);
 
-        self.status_tx.send(TaskState::Recieving);
+        let _ = self.status_tx.send(TaskStatus::Receiving);
 
         loop {
             // リモートにデータを送る
@@ -290,9 +270,44 @@ impl ChannelTaskWoker {
         }
 
         drop(disconnection_sender);
-        self.status_tx.send(TaskState::Finish);
+        self.status_tx.send(TaskStatus::Finish);
         info!("BID {:.7}: ChannelTaskWorker shutdown", self.broadcast_id);
         Ok(())
+    }
+
+    async fn connect_to_peer_only_root(
+        &mut self,
+    ) -> Result<(TcpStream, BytesMut, OlehInfo), HandshakeError> {
+        let stream_result =
+            tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(self.root_addr))
+                .await
+                .map_err(|_elapsed_err| HandshakeError::Failed)?;
+        let stream = stream_result?;
+
+        let handshake_result = PcpHandshake::new(
+            self.connection_id,
+            stream,
+            self.self_addr,
+            self.root_addr,
+            BytesMut::with_capacity(4096),
+            self.session_id,
+        )
+        .outgoing(self.broadcast_id)
+        .await?;
+
+        match handshake_result {
+            HandshakeReturn::Success {
+                stream,
+                read_buf,
+                oleh,
+            } => {
+                //
+                debug!(?oleh);
+                Ok((stream, read_buf, oleh))
+            }
+            HandshakeReturn::NextHost { oleh, hosts, quit } => todo!(),
+            HandshakeReturn::ChannelNotFound => todo!(),
+        }
     }
 
     async fn connect_to_peer(&mut self) -> Result<(TcpStream, BytesMut, OlehInfo), HandshakeError> {
@@ -321,7 +336,10 @@ impl ChannelTaskWoker {
             let Some(mut target) = select_host(&mut self.target_hosts) else {
                 return Err(HandshakeError::ServerNotFound);
             };
+            info!("connect_to_peer target: {:?}", &target);
 
+            // let stream = TcpStream::connect(target.addr()).await?;
+            // info!(connection_id = ?self.connection_id, "TcpStream::connect({:?})", target);
             let Ok(stream_result): Result<
                 Result<TcpStream, std::io::Error>,
                 tokio::time::error::Elapsed,
@@ -331,16 +349,17 @@ impl ChannelTaskWoker {
                 push_buck_or_failed(target, &mut self.target_hosts, &mut self.failed_hosts);
                 continue;
             };
-            let stream = TcpStream::connect(target.addr()).await?;
-            info!(connection_id = ?self.connection_id, "TcpStream::connect({:?})", target);
+            let stream = stream_result?;
 
-            let Ok(handshake_result) = BothHandshake::new(
+            let Ok(handshake_result) = PcpHandshake::new(
                 self.connection_id,
                 stream,
+                self.self_addr,
+                target.addr(),
+                BytesMut::with_capacity(4096),
                 self.session_id,
-                self.broadcast_id,
             )
-            .outgoing()
+            .outgoing(self.broadcast_id)
             .await
             else {
                 error!(connection_id = ?self.connection_id, "timeout TcpStream::connect({:?})", target.addr());
@@ -348,6 +367,7 @@ impl ChannelTaskWoker {
                 continue;
             };
 
+            info!("target: {:?}, result: {:?}", &target, &handshake_result);
             match handshake_result {
                 // 接続先が満杯だった
                 HandshakeReturn::NextHost { oleh, hosts, quit } => {
@@ -393,6 +413,7 @@ impl ChannelTaskWoker {
                     read_buf,
                     oleh,
                 } => {
+                    info!("Connect Success, target={:?}", &target);
                     target.set_session_id(oleh.session_id);
                     target.reset_retry();
                     // エラー起きたら再接続するけど、一番最初にいると延々とハンドシェイク→エラーが起きかねないのでこうする。
@@ -452,14 +473,14 @@ impl ChannelTaskWoker {
                 pos,
             } => {
                 //
-                let messages = ChannelBrokerMessage::AtomHeadData {
+                let messages = ChannelBrokerMessage::ArrivedChannelHead {
                     atom,
                     payload: head_data,
                     pos,
                     info,
                     track,
                 };
-                send(&self.broker_sender, messages);
+                mpsc_send(&self.broker_sender, messages);
                 Ok(ConnectionReaction::None)
             }
             //
@@ -470,13 +491,13 @@ impl ChannelTaskWoker {
                 continuation,
             } => {
                 //
-                let messages = ChannelBrokerMessage::AtomData {
+                let messages = ChannelBrokerMessage::ArrivedChannelData {
                     atom,
-                    data,
+                    payload: data,
                     pos,
-                    continuation,
+                    continuation: continuation.map_or(false, |v| v),
                 };
-                send(&self.broker_sender, messages);
+                mpsc_send(&self.broker_sender, messages);
                 Ok(ConnectionReaction::None)
             }
         }
@@ -505,7 +526,7 @@ async fn connection_reader(
         }
 
         let bytes = buffer.split_off(bytes_read);
-        if !send(&manager, buffer.freeze()) {
+        if !mpsc_send(&manager, buffer.freeze()) {
             break;
         }
 
@@ -569,7 +590,10 @@ async fn connection_writer(
 
 #[cfg(test)]
 mod t {
+    use std::{net::ToSocketAddrs, str::FromStr};
+
     use crate::pcp::channel::broker::ChannelBroker;
+    use crate::pcp::ChannelType;
 
     use super::super::SourceTaskConfig;
     use super::*;
@@ -577,19 +601,29 @@ mod t {
     #[ignore = "Not yet implement"]
     #[crate::test]
     async fn test() {
-        let session_id = GnuId::new();
-        let broadcast_id = GnuId::new();
-        let addr = "127.0.0.1:3000".parse().unwrap();
-        let broker_task = ChannelBroker::new(broadcast_id, Default::default(), Default::default());
-        let config = RelayTaskConfig {
-            session_id: session_id,
-            addr: addr,
+        let url = match std::env::var("PEERCAST_RE_DEBUG_URL") {
+            Ok(s) => url::Url::parse(&s).unwrap(),
+            Err(_) => todo!(),
         };
-        let task = RelayTask::new(
-            broadcast_id,
-            ConnectionId::new(),
-            config,
-            broker_task.sender(),
+        let id = GnuId::from_str(url.path().split("/").last().unwrap()).unwrap();
+        let (key, val) = url.query_pairs().find(|(k, v)| k == "tip").unwrap();
+        let addr = val.parse::<SocketAddr>().unwrap();
+
+        let session_id = GnuId::new();
+        let broker_task = ChannelBroker::new(
+            ChannelType::Relay,
+            id,
+            Default::default(),
+            Default::default(),
+        );
+        let mut task = RelayTask::new(session_id, id, broker_task.sender());
+
+        task.connect(
+            RelayTaskConfig {
+                addr,
+                self_addr: None,
+            }
+            .into(),
         );
 
         loop {

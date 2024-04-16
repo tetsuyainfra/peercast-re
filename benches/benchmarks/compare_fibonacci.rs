@@ -24,12 +24,15 @@ fn fibonacci_fast(n: u64) -> u64 {
     }
 }
 
+#[allow(dead_code)]
 fn compare_fibonaccis(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci");
 
     group.bench_with_input("Recursive", &20, |b, i| b.iter(|| fibonacci_slow(*i)));
     group.bench_with_input("Iterative", &20, |b, i| b.iter(|| fibonacci_fast(*i)));
 }
+
+#[allow(dead_code)]
 fn compare_fibonaccis_group(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fibonacci3");
     for i in 20..=21 {

@@ -1,0 +1,28 @@
+{
+  "version": "0.2",
+  "ignorePaths": [],
+  "dictionaryDefinitions": [],
+  "dictionaries": [],
+  "words": [
+    "BCID",
+    "BCST",
+    "childs",
+    "chrono",
+    "Helo",
+    "ipaddr",
+    "numc",
+    "oleh",
+    "Oleh",
+    "OLEH",
+    "peercast",
+    "REMOTEIP",
+    "rhost",
+    "rtmp",
+    "serv",
+    "SESSIONID",
+    "UPDINT",
+    "urlencode"
+  ],
+  "ignoreWords": [],
+  "import": []
+}

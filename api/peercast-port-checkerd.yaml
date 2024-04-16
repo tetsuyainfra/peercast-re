@@ -1,0 +1,114 @@
+openapi: "3.0.3"
+
+info:
+  title: PeerCast-Port-Checkerd
+  description: PeerCast-RE is written by Rust, PeerCast-Port-Checkerd is portchecker for PeerCast
+  license:
+    name: Unknown
+    # identifier: Unknown
+  contact:
+    url: https://github.com/tetsuyainfra/peercast-re
+  version: "0.1.0"
+
+servers:
+  - url: "http://localhost:7145/ppc"
+    description: Local development API Server
+    variables:
+      api_version:
+        default: "v1"
+        enum:
+          - "v1"
+  - url: "http://ppc-v4.tetsuyainfra.dev:7145/ppc"
+    description: Open API Server
+    variables:
+      api_version:
+        default: "v1"
+        enum:
+          - "v1"
+
+components:
+  schemas:
+    RespIp:
+      type: object
+      properties:
+        ip:
+          type: string
+      required: [ip]
+      example:
+        ip: 10.0.0.1
+    RespPortCheck:
+      type: object
+      properties:
+        ip:
+          type: string
+        port:
+          type: integer
+        result:
+          type: boolean
+      required: [ip, port, result]
+      example:
+        ip: 10.0.0.1
+        port: 7144
+        result: true
+    ErrPortCheck:
+      type: object
+      properties:
+        error:
+          type: string
+        result:
+          type: boolean
+      required: [error, result]
+      example:
+        error: Query Param is invalid
+        result: false
+
+tags:
+  - name: default
+    description: Default Api
+
+paths:
+  /ip:
+    get:
+      description: "get global IP"
+      tags: [default]
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespIp"
+  /portcheck:
+    get:
+      description: "check Connect to Peercast to yourself ip"
+      tags: [default]
+      parameters:
+        - name: port
+          schema: { type: integer }
+          in: query
+          description: Id of an existing channle id.
+          required: true
+          example: 7144
+      responses:
+        "200":
+          description: "success"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RespPortCheck"
+        "406":
+          description: "failed because invalid query"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrPortCheck"
+        "500":
+          description: failed because something occur
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrPortCheck"
+              example:
+                error: Could not connect in time
+                result: false
+
