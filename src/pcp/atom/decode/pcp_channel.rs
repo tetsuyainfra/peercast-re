@@ -1,18 +1,38 @@
+use std::sync::Arc;
+
+use bytes::BufMut;
 use tracing::{error, warn};
 
 use crate::{
     error::AtomParseError,
-    pcp::{atom::decode::decode_string, Atom, GnuId, Id4, TrackInfo},
+    pcp::{atom::decode::decode_string, Atom, ChildAtom, GnuId, Id4, ParentAtom, TrackInfo},
 };
 
-use super::{decode_gnuid, PcpChannelInfo, PcpTrackInfo};
+use super::{
+    decode_gnuid,
+    pcp_channel_info::{self},
+    PcpChannelInfo, PcpTrackInfo,
+};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PcpChannel {
+    atom: Arc<Atom>,
     pub channel_id: Option<GnuId>,
     pub broadcast_id: Option<GnuId>,
     pub channel_info: Option<PcpChannelInfo>,
     pub track_info: Option<PcpTrackInfo>,
+}
+
+impl Default for PcpChannel {
+    fn default() -> Self {
+        Self {
+            atom: Arc::new(Atom::Parent(ParentAtom::new(Id4::PCP_CHAN, vec![]))),
+            channel_id: Default::default(),
+            broadcast_id: Default::default(),
+            channel_info: Default::default(),
+            track_info: Default::default(),
+        }
+    }
 }
 
 impl PcpChannel {
@@ -51,3 +71,46 @@ impl PcpChannel {
         Ok(c)
     }
 }
+
+/*
+#[derive(Debug)]
+pub struct PcpChannelWith {
+    pub channel_id: Option<GnuId>,
+    pub broadcast_id: Option<GnuId>,
+    pub channel_info: Option<PcpChannelInfoWith>,
+    // pub track_info: Option<PcpTrackInfoWith>,
+}
+
+pub(crate) struct PcpChannelMerger<'a> {
+    atom: &'a mut Atom,
+    channel_info: PcpChannelInfoWith,
+    // track_info:  PcpTrackInfoWith,
+}
+
+impl<'a> PcpChannelMerger<'a> {
+    pub fn update_with(&mut self, other: &mut PcpChannelWith) {
+        for a in self.atom.as_parent_mut().childs_mut() {
+            match a.id() {
+                Id4::PCP_CHAN_ID => {}
+                Id4::PCP_CHAN_BCID => {}
+                Id4::PCP_CHAN_INFO => {
+                    let mut merger = PcpChannelInfoMerger { atom: a };
+                    // merger.update_with(&mut self.info);
+                }
+                Id4::PCP_CHAN_TRACK => {}
+                _ => {}
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod t {
+    use super::PcpChannel;
+
+    #[test]
+    fn test() {
+        let pcp = PcpChannel::default();
+    }
+}
+ */

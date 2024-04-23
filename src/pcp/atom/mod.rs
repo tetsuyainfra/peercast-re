@@ -10,8 +10,6 @@ use std::{
 };
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use clap::builder::UnknownArgumentValueParser;
-use num::traits::ToBytes;
 use once_cell::sync::Lazy;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tracing::{info, trace};
@@ -29,12 +27,26 @@ pub enum Atom {
 }
 
 impl Atom {
+    pub fn new_child(id: Id4, payload: impl Into<Bytes>) -> Self {
+        Atom::Child((id, payload.into()).into())
+    }
+    pub fn new_parent(id: Id4, childs: Vec<Atom>) -> Self {
+        Atom::Parent((id, childs).into())
+    }
+
     pub fn id(&self) -> Id4 {
         match self {
             Atom::Parent(p) => p.id(),
             Atom::Child(c) => c.id(),
         }
     }
+    // pub fn set_id(&mut self, id: Id4) {
+    //     match self {
+    //         Atom::Parent(p) => p.set_id(id),
+    //         Atom::Child(c) => c.set_id(id),
+    //     }
+    // }
+
     pub fn len(&self) -> u32 {
         match self {
             Atom::Parent(p) => p.len(),
@@ -60,10 +72,33 @@ impl Atom {
             Atom::Child(_) => panic!("this atom is not parent"),
         }
     }
+    pub fn as_parent_mut(&mut self) -> &mut ParentAtom {
+        match self {
+            Atom::Parent(p) => p,
+            Atom::Child(_) => panic!("this atom is not parent"),
+        }
+    }
+
     pub fn as_child(&self) -> &ChildAtom {
         match self {
             Atom::Parent(_) => panic!("this atom is not child"),
             Atom::Child(c) => c,
+        }
+    }
+    pub fn as_child_mut(&mut self) -> &mut ChildAtom {
+        match self {
+            Atom::Parent(_) => panic!("this atom is not child"),
+            Atom::Child(c) => c,
+        }
+    }
+
+    pub fn update_by<F>(&mut self, f: F)
+    where
+        F: Fn(Atom) -> (),
+    {
+        match self {
+            Atom::Parent(p) => todo!(),
+            Atom::Child(c) => todo!(),
         }
     }
 
@@ -137,11 +172,25 @@ impl ParentAtom {
     pub fn id(&self) -> Id4 {
         self.id
     }
+    // pub fn set_id(&mut self, id: Id4) {
+    //     self.id = id
+    // }
+
     pub fn len(&self) -> u32 {
         self.childs.len() as u32
     }
     pub fn childs(&self) -> &Vec<Atom> {
         self.childs.as_ref()
+    }
+    pub fn childs_mut(&mut self) -> std::slice::IterMut<'_, Atom> {
+        self.childs.iter_mut()
+    }
+
+    pub fn push_child(&mut self, other: Atom) {
+        self.childs.push(other)
+    }
+    pub fn append_child(&mut self, other: &mut Vec<Atom>) {
+        self.childs.append(other)
     }
 
     pub fn raw_parts(self) -> (Id4, Vec<Atom>) {
@@ -204,11 +253,20 @@ impl ChildAtom {
         let x: &[u8; 4] = &self.head_and_payload[0..4].try_into().unwrap();
         Id4::from(*x)
     }
+    // pub fn set_id(&mut self, id: Id4) {
+    //     // MEMO: 重い？
+    //     *self = Self::new(id, &self.payload())
+    // }
+
     pub fn len(&self) -> u32 {
         (self.head_and_payload.len() - 8) as u32
     }
     pub fn payload(&self) -> Bytes {
         self.head_and_payload.slice(8..)
+    }
+
+    pub fn set_payload(&mut self, payload: &Bytes) {
+        *self = Self::new(self.id(), payload)
     }
 
     pub fn atom_bytes(&self) -> usize {

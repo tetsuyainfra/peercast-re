@@ -99,6 +99,11 @@ impl From<(Id4, String)> for ChildAtom {
     }
 }
 
+impl From<(Id4, Bytes)> for ChildAtom {
+    fn from((id, payload): (Id4, Bytes)) -> Self {
+        Self::new(id, &payload)
+    }
+}
 impl From<(Id4, &Bytes)> for ChildAtom {
     fn from((id, payload): (Id4, &Bytes)) -> Self {
         Self::new(id, payload)

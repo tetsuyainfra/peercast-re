@@ -1,3 +1,6 @@
+use std::ops::Deref;
+
+use bytes::Bytes;
 use merge::Merge;
 use serde::Serialize;
 use tracing::warn;
@@ -7,7 +10,7 @@ use crate::{
     pcp::{
         atom::decode::{self, decode_i32, decode_string},
         decode::macros::merge_ref,
-        Atom, Channel, ChannelInfo, Id4,
+        Atom, Channel, ChannelInfo, ChildAtom, Id4,
     },
 };
 
@@ -91,4 +94,41 @@ impl PcpChannelInfo {
     getter!(&self, bitrate, i32, 0);
 }
 
-// fn merge_ref()
+/*
+#[derive(Debug, Clone, Default, Merge)]
+pub struct PcpChannelInfoWith {
+    pub typ: Option<String>,
+    pub name: Option<String>,
+    // pub genre: Option<String>,
+    // pub desc: Option<String>,
+    // pub comment: Option<String>,
+    // pub url: Option<String>,
+    // //
+    // pub stream_type: Option<String>,
+    // // .で始まる拡張子
+    // pub stream_ext: Option<String>,
+    // pub bitrate: Option<i32>,
+}
+
+pub(crate) struct PcpChannelInfoMerger<'a> {
+    pub atom: &'a mut Atom,
+}
+
+impl<'a> PcpChannelInfoMerger<'a> {
+    pub fn update_with(&mut self, other: &mut PcpChannelInfoWith) {
+        let PcpChannelInfoWith { typ, name } = other;
+    }
+
+    pub fn update_by(mut self, id: Id4) {
+        match self
+            .atom
+            .as_parent_mut()
+            .childs_mut()
+            .find(|t| t.id() == id)
+        {
+            Some(_) => todo!(),
+            None => todo!(),
+        }
+    }
+}
+*/
