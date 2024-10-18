@@ -6,6 +6,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use clap::builder::Str;
+use futures_util::future::select_all;
 use peercast_re::{
     pcp::{
         decode::{PcpBroadcast, PcpChannelInfo, PcpTrackInfo},
@@ -14,7 +15,7 @@ use peercast_re::{
     ConnectionId,
 };
 use serde::de;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tracing::{debug, info};
 
 use crate::{
@@ -25,7 +26,7 @@ use crate::{
 //------------------------------------------------------------------------------
 // ChannelTrait
 //
-pub trait ChannelTrait: Clone {
+pub trait ChannelTrait: Clone + Send + Sync {
     type Config;
     fn new(
         root_session_id: Arc<GnuId>,
@@ -41,32 +42,26 @@ pub trait ChannelTrait: Clone {
 //------------------------------------------------------------------------------
 // ChannelManager
 //
-
 #[derive(Debug)]
 pub struct ChannelStore<C: ChannelTrait> {
     // Root(つまり自分のId)
     root_session_id: Arc<GnuId>,
     root_broadcast_id: Arc<GnuId>,
     channels: Arc<RwLock<HashMap<GnuId, C>>>,
-}
-impl<C: ChannelTrait> Clone for ChannelStore<C> {
-    fn clone(&self) -> Self {
-        Self {
-            root_session_id: Arc::clone(&self.root_session_id),
-            root_broadcast_id: Arc::clone(&self.root_broadcast_id),
-            channels: Arc::clone(&self.channels),
-        }
-    }
+    // channel_keeper: ChannelStoreKeeper<C>,
 }
 
 impl<C: ChannelTrait> ChannelStore<C> {
     pub fn new(self_session_id: Option<GnuId>, self_broadcast_id: Option<GnuId>) -> Self {
         let root_session_id = Arc::new(self_session_id.unwrap_or_else(|| GnuId::new()));
         let root_broadcast_id = Arc::new(self_broadcast_id.unwrap_or_else(|| GnuId::new()));
+        // let channels = Default::default();
         Self {
             root_session_id,
             root_broadcast_id,
             channels: Default::default(),
+            // channels: channels.clone(),
+            // channel_keeper: ,
         }
     }
 
@@ -113,9 +108,8 @@ impl<C: ChannelTrait> ChannelStore<C> {
 }
 
 //------------------------------------------------------------------------------
-// TrackerChannel : Channelを扱うための構造体
-//
-
+/// TrackerChannelを作成する際に指定する構造物
+///
 #[derive(Debug, Clone)]
 pub struct TrackerChannelConfig {
     pub tracker_session_id: Arc<GnuId>,
@@ -123,6 +117,9 @@ pub struct TrackerChannelConfig {
     pub first_broadcast: Arc<PcpBroadcast>,
 }
 
+//------------------------------------------------------------------------------
+/// Channelを扱うための構造体
+///
 #[derive(Debug, Clone)]
 pub struct TrackerChannel {
     root_session_id: Arc<GnuId>,
@@ -137,6 +134,9 @@ pub struct TrackerChannel {
     // _called_before_remove: bool,
 }
 
+//------------------------------------------------------------------------------
+// TrackerChannel : Channelを扱うための構造体
+//
 impl TrackerChannel {
     pub fn tracker_connection(
         &self,

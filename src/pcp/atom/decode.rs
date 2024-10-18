@@ -5,6 +5,7 @@ mod pcp_broadcast;
 mod pcp_channel;
 mod pcp_channel_info;
 mod pcp_host;
+mod pcp_quit;
 mod pcp_track_info;
 
 use std::net::{IpAddr, Ipv4Addr};
@@ -19,6 +20,7 @@ pub use pcp_broadcast::{BroadcastGroup, PcpBroadcast};
 pub use pcp_channel::PcpChannel;
 pub use pcp_channel_info::PcpChannelInfo;
 pub use pcp_host::PcpHost;
+pub use pcp_quit::PcpQuit;
 pub use pcp_track_info::PcpTrackInfo;
 
 #[inline]

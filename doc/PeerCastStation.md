@@ -146,3 +146,11 @@ ctx.Upgrade(async opaqueEnv => {
   - これは結局Rootへ送っているってことか
 
 1. OutStream.OnBroadcast ->
+
+
+# ChannelID
+- PeCaStではチャンネル情報からGnuIDを作っている？(未確認)
+  - 同じ値で配信するとチャンネルIDが被る
+  - だから何か有ってPeCaStクラッシュした後、YPに乗らない問題が起きるのかな？
+- どうなっているのがいいのか。。。
+-

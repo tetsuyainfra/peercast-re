@@ -3,6 +3,7 @@ use tracing::{error, warn};
 
 use crate::pcp::{builder::quit, error_code::QuitCode, Atom, Id4};
 
+#[derive(Debug)]
 pub enum QuitReason {
     Any,
     SendTimeoutError,
@@ -39,7 +40,7 @@ impl QuitBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct QuitInfo {
     quit_code: u32,
 }

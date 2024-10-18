@@ -1,0 +1,80 @@
+name: CI-release
+
+# Controls when the workflow will run
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  # Allows you to run this workflow manually from the Actions tab
+  # workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    uses: tetsuyainfra/peercast-re/.github/workflows/build.yml@main
+    # with:
+    #   config-path: .github/labeler.yml
+    # secrets: inherit
+
+  release_job:
+    name: release from artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      git_hash: ${{ needs.build.outputs.git_hash }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build hash is
+        run: echo ${{ env.git_hash }}
+
+      - name: Get Version from tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Release Version is
+        run: echo ${{ env.TAG_NAME }}
+
+      - name: Download math result for job 1
+        uses: actions/download-artifact@v4
+        with:
+            path: dest
+
+      - name: Display structure of downloaded files
+        run: ls -R
+
+      - name: Upload artifact with renaming
+        shell: bash
+        run: |
+          files=$(find ./dest -type f)
+          for file in $files;
+          do
+            new_file=$(echo $file | sed -e "s/${{env.git_hash}}\(\(\.[a-z]\+\)\+\)/${{ env.TAG_NAME }}\1/" )
+            mv $file $new_file
+          done
+
+      #  -exec rename s/${{ env.git_hash }}/${{ env.TAG_NAME }}/ {} \;
+      - name: Display structure of downloaded files (2)
+        run: ls -R
+
+      - name: Upload Release File
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
+        run: |
+          echo repo: $GITHUB_REPOSITORY
+          echo tag: $tag
+          gh release create "$tag" \
+              --repo="$GITHUB_REPOSITORY" \
+              --title="Release Version ${tag#v}" \
+              --generate-notes
+
+          files=$(find ./dest -type f)
+          for file in $files;
+          do
+            gh release upload $tag ${file}
+          done

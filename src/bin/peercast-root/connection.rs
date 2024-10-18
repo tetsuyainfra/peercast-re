@@ -3,16 +3,22 @@
 
 use std::sync::Arc;
 
+use merge::vec;
 use peercast_re::{
     pcp::{
-        decode::PcpBroadcast, Atom, GnuId, Id4, PcpConnection, PcpConnectionReadHalf,
-        PcpConnectionWriteHalf,
+        decode::{PcpBroadcast, PcpQuit},
+        Atom, GnuId, Id4, PcpConnection, PcpConnectionReadHalf, PcpConnectionWriteHalf,
     },
     util::util_mpsc::mpsc_send,
     ConnectionId,
 };
-use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use tokio::sync::{
+    broadcast,
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
+};
+use tower_http::trace;
 use tracing::{debug, info, trace, warn};
+use uuid::fmt::Braced;
 
 use crate::{
     channel::TrackerChannelConfig,
@@ -86,6 +92,8 @@ impl TrackerConnection {
         mut self,
         connection: PcpConnection,
     ) -> Result<(), RootError> {
+        info!(cid = ?connection.connection_id(), "START ConnectionManager");
+
         let remote_broadcast_id = self.remote_broadcast_id.clone();
         let remote_session_id = connection.remote_session_id.clone();
         let connection_id = connection.connection_id();
@@ -135,7 +143,7 @@ impl TrackerConnection {
             tokio::select! {
                 // read_routineで受信したAtomはここで処理される
                 atom = reader_rx.recv() => {
-                    info!("atom: {:#?}",&atom);
+                    trace!(cid=?connection_id, atom=?atom, "CONNECTION ATOM COME");
                     match atom {
                         None => break,
                         Some(a) => { results = self.handle_arrived_atom(a)?; }
@@ -143,7 +151,7 @@ impl TrackerConnection {
                 },
                 // Managerからメッセージが来たら処理
                 manager_message = message_receiver.recv() => {
-                    info!("action: {:#?}",&action);
+                    trace!(cid=?connection_id, action=?action, "CONNECTION MANAGER_MSG COME");
                     match manager_message {
                         None => break,
                         Some(message) => {
@@ -157,6 +165,7 @@ impl TrackerConnection {
                 }
             };
         };
+        info!(cid = ?connection_id, "STOP ConnectionManager");
 
         Ok(())
     }
@@ -174,8 +183,10 @@ impl TrackerConnection {
         for result in results.drain(..) {
             match result {
                 SessionResult::RaisedEvent(event) => {
-                    //
-                    todo!();
+                    let action = self.handle_raised_event(event, &mut new_results)?;
+                    if action == ConnectionAction::Disconnect {
+                        return Ok(ConnectionAction::Disconnect);
+                    }
                 }
             }
         }
@@ -185,11 +196,49 @@ impl TrackerConnection {
         Ok(ConnectionAction::None)
     }
 
+    fn handle_raised_event(
+        &mut self,
+        event: ServerSessionEvent,
+        new_results: &mut Vec<SessionResult>,
+    ) -> Result<ConnectionAction, RootError> {
+        match event {
+            ServerSessionEvent::PublishChannelRequested { atom, broadcast } => todo!(
+                "今のところ、start_connect_managerの冒頭で処理しているので処理しないで良さそう"
+            ),
+            ServerSessionEvent::PublishChannelFinished {} => todo!("Finish処理"),
+            ServerSessionEvent::UpdateChannel { atom } => {
+                trace!(cid = ?self.connection_id,atom=?atom, "UpdateChannel");
+                let broadcast = PcpBroadcast::parse(&atom)?;
+                let message = RootManagerMessage::UpdateChannel {
+                    connection_id: self.connection_id,
+                    broadcast: Arc::new(broadcast),
+                };
+                if !mpsc_send(&self.manager_sender, message) {
+                    return Err(RootError::InitFailed); // TODO: Change
+                }
+                Ok(ConnectionAction::None)
+            }
+            ServerSessionEvent::FinishChannel { quit_atom } => {
+                trace!(cid = ?self.connection_id, quit_atom=?quit_atom, "FinishChannel");
+
+                let quit = PcpQuit::parse(&quit_atom)?;
+                let message = RootManagerMessage::FinishChannel {
+                    connection_id: self.connection_id,
+                    quit: Arc::new(quit),
+                };
+                if !mpsc_send(&self.manager_sender, message) {
+                    return Err(RootError::InitFailed); // TODO: Change
+                }
+                Ok(ConnectionAction::Disconnect)
+            }
+        }
+    }
+
     /// 通信相手から到着したAtomを処理する
     fn handle_arrived_atom(&self, atom: Atom) -> Result<Vec<SessionResult>, RootError> {
         match atom.id() {
             Id4::PCP_BCST => {
-                info!("{} ARRIVED_BCST {:?}", self.connection_id, atom);
+                trace!("{} ARRIVED_BCST {:?}", self.connection_id, atom);
                 Ok(vec![SessionResult::RaisedEvent(
                     ServerSessionEvent::UpdateChannel {
                         atom: Arc::new(atom),
@@ -197,13 +246,12 @@ impl TrackerConnection {
                 )])
             }
             Id4::PCP_QUIT => {
-                info!("{} ARRIVED_QUIT {:?}", self.connection_id, atom);
-                // Ok(vec![SessionResult::RaisedEvent(
-                //     ServerSessionEvent::UpdateChannel {
-                //         atom: Arc::new(atom),
-                //     },
-                // )])
-                Ok(vec![])
+                trace!("{} ARRIVED_QUIT {:?}", self.connection_id, atom);
+                Ok(vec![SessionResult::RaisedEvent(
+                    ServerSessionEvent::FinishChannel {
+                        quit_atom: Arc::new(atom),
+                    },
+                )])
             }
             _ => {
                 warn!("{} UNKNOWN ATOM: {:#?}", self.connection_id, atom);
@@ -221,6 +269,7 @@ impl TrackerConnection {
             ConnectionMessage::ConnectAccepted {} => todo!(),
             ConnectionMessage::ConnectRefused {} => todo!(),
             ConnectionMessage::Ok {} => todo!(),
+            ConnectionMessage::FinishChannel {} => Ok((vec![], ConnectionAction::Disconnect)),
         }
     }
 }
@@ -232,7 +281,7 @@ async fn read_routine(
     mut read_half: PcpConnectionReadHalf,
 ) -> Result<(), std::io::Error> {
     let conn_id = read_half.connection_id();
-    info!("{conn_id} START READ HALF");
+    trace!(cid = ?conn_id, "START READ HALF");
     loop {
         let Ok(atom) = read_half.read_atom().await else {
             break;
@@ -240,7 +289,7 @@ async fn read_routine(
         // debug!("{conn_id} ARRIVED_ATOM {:?}", atom);
         mpsc_send(&mut tx, atom);
     }
-    info!("{conn_id} STOP READ HALF");
+    trace!(cid = ?conn_id, "STOP READ HALF");
     Ok(())
 }
 async fn write_routine(
@@ -248,7 +297,7 @@ async fn write_routine(
     mut write_half: PcpConnectionWriteHalf,
 ) -> Result<(), std::io::Error> {
     let conn_id = write_half.connection_id();
-    info!("{conn_id} START WRITE HALF");
+    trace!(cid = ?conn_id, "START WRITE HALF");
     loop {
         let atom = rx.recv().await;
         match atom {
@@ -259,7 +308,7 @@ async fn write_routine(
             }
         };
     }
-    info!("{conn_id} STOP WRITE HALF");
+    trace!(cid = ?conn_id, "STOP WRITE HALF");
     Ok(())
 }
 

@@ -6,7 +6,10 @@ use futures_util::{
 };
 use minijinja::filters::first;
 use peercast_re::{
-    pcp::{decode::PcpBroadcast, GnuId},
+    pcp::{
+        decode::{PcpBroadcast, PcpQuit},
+        GnuId,
+    },
     ConnectionId,
 };
 use peercast_re_api::models::channel_info;
@@ -68,7 +71,7 @@ impl RootManager {
     }
 
     fn cleanup_connection(&mut self, connection_id: ConnectionId) {
-        println!("REMOVE: RootManager is removing {}", connection_id);
+        trace!(cid=?connection_id, "REMOVE Connection from RootManager");
 
         self.sender_by_connection_id.remove(&connection_id);
         //     if let Some(key) = self.key_by_connection_id.remove(&connection_id) {
@@ -85,7 +88,7 @@ impl RootManager {
     }
 
     async fn main(mut self, receiver: UnboundedReceiver<RootManagerMessage>) {
-        info!("START: RootManager {:?}", &self.channel_id);
+        info!(channel_id = ?&self.channel_id,"START RootManager");
 
         async fn new_receiver_future(
             mut receiver: UnboundedReceiver<RootManagerMessage>,
@@ -99,14 +102,25 @@ impl RootManager {
 
         let mut futures = select_all(vec![new_receiver_future(receiver).boxed()]);
 
+        // MEMO: 終了の合図(ATOM)が来た時どう処理するか問題
         'manager: loop {
             let (result, _index, remaining_futures) = futures.await;
             let mut new_futures = Vec::from(remaining_futures);
 
             match result {
-                FutureResult::MessageReceived { receiver, message } => {
+                FutureResult::MessageReceived {
+                    mut receiver,
+                    message,
+                } => {
+                    // trace!(receiver=?receiver, "Reciever");
                     match message {
-                        Some(message) => self.handle_message(message),
+                        Some(message) => {
+                            //
+                            match self.handle_message(message) {
+                                HandleAction::None => (),
+                                HandleAction::FinishChannel => break 'manager,
+                            }
+                        }
                         None => {
                             debug!("RootManagerMessage sender is all gone.");
                             break 'manager;
@@ -129,8 +143,8 @@ impl RootManager {
         info!("FINISH: RootManager {:?}", &self.channel_id);
     }
 
-    fn handle_message(&mut self, message: RootManagerMessage) {
-        debug!("RootManager::handle_message() {:?}", message);
+    fn handle_message(&mut self, message: RootManagerMessage) -> HandleAction {
+        debug!(message=?message, "RootManager::handle_message(message)");
         match message {
             RootManagerMessage::NewConnection {
                 connection_id,
@@ -154,6 +168,13 @@ impl RootManager {
                 connection_id,
                 broadcast,
             } => self.handle_update_channel(connection_id, broadcast),
+            RootManagerMessage::FinishChannel {
+                connection_id,
+                quit,
+            } => {
+                info!(cid=?connection_id, quit_reason=?quit.quit().reason(), "FinishChannel");
+                self.handle_finish_channel()
+            }
         }
     }
 
@@ -163,10 +184,11 @@ impl RootManager {
         connection_id: ConnectionId,
         sender: UnboundedSender<ConnectionMessage>,
         disconnection: UnboundedReceiver<()>,
-    ) {
+    ) -> HandleAction {
         self.sender_by_connection_id.insert(connection_id, sender);
         self.new_disconnect_futures
             .push(wait_for_client_disconnection(connection_id, disconnection).boxed());
+        HandleAction::None
     }
 
     // チャンネルの配信開始
@@ -177,11 +199,11 @@ impl RootManager {
         session_id: Arc<GnuId>,
         broadcast_id: Arc<GnuId>,
         first_broadcast: Arc<PcpBroadcast>,
-    ) {
+    ) -> HandleAction {
         let sender = match self.sender_by_connection_id.get(&connection_id) {
             None => {
                 info!("Publish request received by connection {} but that connection hasn't registered", connection_id);
-                return;
+                return HandleAction::None;
             }
             Some(x) => x,
         };
@@ -203,34 +225,48 @@ impl RootManager {
             if !send(&sender, ConnectionMessage::ConnectRefused {}) {
                 self.cleanup_connection(connection_id);
             }
-            return;
+            return HandleAction::None;
         }
 
         // 配信を開始
         if let Some(old_tracker_conn_id) = self.tracker_connection_id {
-            // TODO: 既に接続されているコネクションに切断するよう通知
-            //
+            // TODO: 既に接続されているコネクションに切断するよう通知する
+            // MEMO: 現状は無視するだけになっている
             warn!(
-                "Connection {} will be connected as Tracker, Connection {} will be refused.",
+                "{} will be connected as Tracker, {} will be refused.",
                 connection_id, old_tracker_conn_id
             );
         }
         self.tracker_connection_id = Some(connection_id);
 
-        self.handle_update_channel(connection_id, first_broadcast);
+        self.handle_update_channel(connection_id, first_broadcast)
     }
 
     // PcpBroadcastを元にチャンネル情報を更新する
-    fn handle_update_channel(&mut self, connection_id: ConnectionId, broadcast: Arc<PcpBroadcast>) {
+    fn handle_update_channel(
+        &mut self,
+        connection_id: ConnectionId,
+        broadcast: Arc<PcpBroadcast>,
+    ) -> HandleAction {
+        info!(cid = ?connection_id, "UPDATE CHANNEL INFOMATION");
+        trace!(cid = ?connection_id, broadcast = ?broadcast);
         let Some(group) = &broadcast.broadcast_group else {
-            return;
+            return HandleAction::None;
         };
         match group.has_root() {
             true => (),
-            false => return,
+            false => return HandleAction::None,
         };
-        info!("UPDATE_CHANNEL: {:#?}", broadcast);
-        self.detail_send(broadcast)
+        self.detail_send(broadcast);
+        return HandleAction::None;
+    }
+
+    fn handle_finish_channel(&mut self) -> HandleAction {
+        for (k, v) in self.sender_by_connection_id.iter() {
+            let send_result = v.send(ConnectionMessage::FinishChannel {});
+            trace!(?send_result);
+        }
+        return HandleAction::FinishChannel;
     }
 
     fn detail_send(&mut self, broadcast: Arc<PcpBroadcast>) {
@@ -299,6 +335,11 @@ pub enum RootManagerMessage {
         connection_id: ConnectionId,
         broadcast: Arc<PcpBroadcast>,
     },
+
+    FinishChannel {
+        connection_id: ConnectionId,
+        quit: Arc<PcpQuit>,
+    },
 }
 
 /// RootManager -> Connection メッセージ
@@ -308,7 +349,16 @@ pub enum ConnectionMessage {
     ConnectAccepted {},
     // 接続を拒否する場合
     ConnectRefused {},
+
+    // Channelが終了したとき
+    FinishChannel {},
+
     Ok {},
+}
+
+enum HandleAction {
+    FinishChannel,
+    None,
 }
 
 /// Sends a message over an unbounded receiver and returns true if the message was sent

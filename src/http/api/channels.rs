@@ -20,7 +20,7 @@ use peercast_re_api::models::{
     channel_type::{self, Typ as ChannelTypeEnum},
     ChannelInfo as RespChannelInfo, ChannelStatus, ChannelTrack as RespChannelTrack,
     ChannelType as RespChannelType, ReqCreateChannel, ReqCreateRelayChannel, ReqPatchChannel,
-    ReqPatchChannelInfo, ReqPatchChannelStatus, RespChannel,
+    RespChannel,
 };
 
 use super::AppState;
@@ -106,6 +106,7 @@ impl ChannelsSvc {
         State(AppState {
             channel_manager, ..
         }): State<AppState>,
+        // extract::Json(req_ch): extract::Json<ReqPatchChannel>,
         extract::Json(req_ch): extract::Json<ReqPatchChannel>,
     ) -> impl IntoResponse {
         let Ok(channel_id) = GnuId::from_str(&channel_id) else {
@@ -119,14 +120,14 @@ impl ChannelsSvc {
             _ => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
         }
 
-        // 操作
-        if req_ch.info.is_some() {
-            let info = req_ch.info.unwrap();
-            if (info.url.is_some()) {}
-        }
-        if req_ch.status.is_some() {
-            //
-        }
+        // // 操作
+        // if req_ch.info.is_some() {
+        //     let info = req_ch.info.unwrap();
+        //     if (info.url.is_some()) {}
+        // }
+        // if req_ch.status.is_some() {
+        //     //
+        // }
 
         (
             StatusCode::OK,

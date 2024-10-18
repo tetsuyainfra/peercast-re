@@ -110,7 +110,7 @@ impl HeloInfo {
         let mut ping = None;
         let mut broadcast_id = None;
         for a in atom.as_parent().childs() {
-            trace!(atom = ?a);
+            // trace!(atom = ?a);
             if a.is_parent() {
                 return Err(AtomParseError::ValueError);
             }

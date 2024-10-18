@@ -28,6 +28,10 @@ pub mod error;
 pub mod util {
     mod identify;
     mod shutdown;
+    mod sync;
+    pub use sync::mutex_poisoned;
+    pub use sync::rwlock_read_poisoned;
+    pub use sync::rwlock_write_poisoned;
     pub mod util_mpsc;
     pub use identify::identify_protocol;
     pub use identify::{ConnectionProtocol, IdentifierError};

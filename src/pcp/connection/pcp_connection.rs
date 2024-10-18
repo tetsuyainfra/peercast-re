@@ -16,7 +16,7 @@ use tokio::{
     },
     time::Instant,
 };
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 use crate::{
     error::HandshakeError,
@@ -204,13 +204,13 @@ impl PcpHandshake {
         let read_n = self.inner.peek(&mut head).await?;
         assert!(read_n == 4);
         if Self::PCP_MAGIC_HEAD != &head {
-            info!("NOT COMMING PCP");
+            trace!(cid = ?self.inner.connection_id(), "NOT COMMING PCP");
             return Err(HandshakeError::Failed);
         }
-        info!("COMMING PCP");
+        trace!(cid = ?self.inner.connection_id(), "COMMING PCP");
 
         let atom = self.inner.read_atom().await?;
-        info!("ARRIVED_ATOM: {:?}", &atom);
+        // trace!("ARRIVED_ATOM: {:?}", &atom);
         if !(atom.id() == Id4::PCP_CONNECT && atom.is_child() && atom.len() == 4) {
             return Err(HandshakeError::Failed);
         }
@@ -220,7 +220,7 @@ impl PcpHandshake {
 
         // PCP_HELO
         let atom = self.inner.read_atom().await?;
-        info!("ARRIVED_ATOM: {:?}", &atom);
+        // trace!("ARRIVED_ATOM: {:?}", &atom);
         if atom.len() == 1 {
             // PingはPCP_HELOが親でchildにSESSION_IDしかないハズ。。。
             // PCP_HELO(PING)
@@ -234,7 +234,7 @@ impl PcpHandshake {
         } else {
             // PCP_HELO(normal)を主体とする接続のハズ
             let helo_info = HeloInfo::parse(&atom)?;
-            info!("ARRIVED_HELO: {:#?}", &helo_info);
+            // trace!("ARRIVED_HELO: {:#?}", &helo_info);
             // Send Oleh, Root, Ok
             let remote_port = self._incoming_pcp_root(&helo_info).await?;
             Ok(PcpConnection::new(

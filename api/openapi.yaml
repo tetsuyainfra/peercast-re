@@ -122,17 +122,6 @@ components:
           example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
 
     ReqPatchChannel:
-      oneOf:
-        - type: object
-          properties:
-            info:
-              $ref: "#/components/schemas/ReqPatchChannelInfo"
-        - type: object
-          properties:
-            status:
-              $ref: "#/components/schemas/ReqPatchChannelStatus"
-
-    ReqPatchChannelInfo:
       type: object
       properties:
         genre:
@@ -147,9 +136,41 @@ components:
         url:
           type: string
           example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
-    ReqPatchChannelStatus:
-      type: string
-      enum: [pause, stop]
+        status:
+          type: string
+          enum: [pause, stop]
+          example: "pause"
+    # ReqPatchChannel:
+    #   oneOf:
+    #     - type: object
+    #       properties:
+    #         info:
+    #           $ref: "#/components/schemas/ReqPatchChannelInfo"
+    #     - type: object
+    #       properties:
+    #         status:
+    #           $ref: "#/components/schemas/ReqPatchChannelStatus"
+    # ReqPatchChannelInfo:
+    #   type: object
+    #   properties:
+    #     genre:
+    #       type: string
+    #       example: "sp?@@@プログラミング"
+    #     desc:
+    #       type: string
+    #       example: "PeerCast-RTのテスト"
+    #     comment:
+    #       type: string
+    #       example: "コメント欄"
+    #     url:
+    #       type: string
+    #       example: "http://bbs.jpnkn.com/test/read.cgi/tetsuyainfra/1694271646/l50"
+    # ReqPatchChannelStatus:
+    #   type: object
+    #   properties:
+    #     status:
+    #       type: string
+    #       enum: [pause, stop]
 
     RespChannel:
       type: object
@@ -239,7 +260,7 @@ paths:
   /channels/relay:
     post:
       summary: "create new Relay Channel"
-      description: "To play channel, User create a Rela yChannel"
+      description: "To play channel, User create a Relay Channel"
       operationId: "createRelayChannel"
       tags: [channel]
       requestBody:
@@ -282,15 +303,19 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/ReqPatchChannel"
-            examples:
-              change_info:
-                value:
-                  info:
-                    comment: 終わりました。
-                    url: http://google.co.jp/
-              change_status:
-                value:
-                  status: idle
+            # schema:
+            #   oneOf:
+            #     - $ref: "#/components/schemas/ReqPatchChannelInfo"
+            #     - $ref: "#/components/schemas/ReqPatchChannelStatus"
+            # examples:
+            #   change_info:
+            #     value:
+            #       info:
+            #         comment: 終わりました。
+            #         url: http://google.co.jp/
+            #   change_status:
+            #     value:
+            #       status: idle
       responses:
         "200":
           description: "success"
@@ -373,7 +398,7 @@ paths:
             text/plain:
               schema:
                 type: string
-                example: Describe why error occured.
+                example: Describe why error occurred.
 
   #
   # Test
