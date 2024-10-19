@@ -1,0 +1,24 @@
+#!/bin/sh
+
+config_service() {
+    TARGET_SERVICE=$1
+    ## This will only remove masks created by d-s-h on package removal.
+    deb-systemd-helper unmask ${TARGET_SERVICE}.service > /dev/null || true
+
+    # was-enabled defaults to true, so new installations run enable.
+    if deb-systemd-helper --quiet was-enabled ${TARGET_SERVICE}.service
+    then
+        # Enables the unit on first installation, creates new
+        # symlinks on upgrades if the unit file has changed.
+        deb-systemd-helper enable ${TARGET_SERVICE}.service > /dev/null || true
+        deb-systemd-invoke start ${TARGET_SERVICE}
+    else
+        # Update the statefile to add new symlinks (if any), which need to be
+        # cleaned up on purge. Also remove old symlinks.
+        deb-systemd-helper update-state ${TARGET_SERVICE}.service > /dev/null || true
+    fi
+}
+
+
+config_service peercast-root
+config_service peercast-port-checkerd

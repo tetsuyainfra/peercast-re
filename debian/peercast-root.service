@@ -1,0 +1,22 @@
+[Unit]
+Description=PeerCast Root server daemon
+After=syslog.target network.target
+AssertPathExists=/usr/bin/peercast-root
+
+
+
+[Service]
+# Peer Cast Port Checker is Foreground Daemon
+Type=simple
+# If we implement the sd_notify(), we can enable the following lines
+# Type=notify
+
+EnvironmentFile=-/etc/default/peercast-root
+ExecStart=/usr/local/bin/peercast-root $OPTIONS
+# ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+# WantedBy=default.target

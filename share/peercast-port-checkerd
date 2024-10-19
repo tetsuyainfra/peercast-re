@@ -1,2 +1,0 @@
-# Put this file on /etc/default/peercast-port-checkerd (Ubuntu)
-RUST_LOG=info

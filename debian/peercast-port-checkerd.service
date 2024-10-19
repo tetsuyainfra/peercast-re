@@ -9,7 +9,7 @@ Type=simple
 # If we implement the sd_notify(), we can enable the following lines
 # Type=notify
 
-EnvironmentFile=/etc/default/peercast-port-checkerd
+EnvironmentFile=-/etc/default/peercast-port-checkerd
 ExecStart=/opt/local/bin/peercast-port-checkerd $OPTIONS
 # ExecReload=/bin/kill -HUP $MAINPID
 

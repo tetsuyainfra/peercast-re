@@ -3,6 +3,8 @@ name = "peercast-re"
 version = "0.1.0"
 edition = "2021"
 repository = "https://github.com/tetsuyainfra/peercast-re"
+authors = ["tetsuyainfra <tetsuyainfra@gmail.com>"]
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 # default-run = "peercast-re"
@@ -222,3 +224,26 @@ embed-resource = "2.3"
 [[bench]]
 name = "bench_main"
 harness = false
+
+
+#
+# Debian Package
+#
+[package.metadata.deb]
+depends = "$auto, systemd"
+extended-description = "simple hello world test"
+section = "admin"
+priority = "optional"
+assets = [
+    ["target/release/peercast-root", "usr/local/bin/peercast-root", "755"],
+    ["debian/peercast-root.service", "/lib/systemd/system/peercast-root.service", "644"],
+    ["debian/default/peercast-root", "/etc/default/peercast-root", "644"],
+
+    ["target/release/peercast-port-checkerd", "usr/local/bin/peercast-port-checkerd", "755"],
+    ["debian/peercast-port-checkerd.service", "/lib/systemd/system/peercast-port-checkerd.service", "644"],
+    ["debian/default/peercast-port-checkerd", "/etc/default/peercast-port-checkerd", "644"],
+]
+
+# こっちのオプションは*.service unitファイル/install scriptを自分で追加するときに指定する
+maintainer-scripts = "debian/scripts"
+

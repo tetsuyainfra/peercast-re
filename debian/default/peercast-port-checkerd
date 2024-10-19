@@ -1,0 +1,5 @@
+# Put this file on /etc/default/peercast-port-checkerd (Ubuntu)
+# This file is only used for init.d based systems!
+# but if you use EnvironmentFile option in *.service of Systemd,
+# this file will be used.
+RUST_LOG=info
