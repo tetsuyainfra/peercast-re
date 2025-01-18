@@ -228,7 +228,7 @@ mod test_spec {
     use super::*;
     use rml_rtmp::sessions::StreamMetadata;
 
-    const SAMPLE: &[u8] = include_bytes!("../../../tmp/output.mp4");
+    // const SAMPLE: &[u8] = include_bytes!("../../../temp/output.mp4");
 
     #[test]
     fn test_bitshift() {
@@ -249,7 +249,7 @@ mod test_spec {
 
     #[crate::test]
     async fn test_writer() {
-        let writer = tokio::fs::File::create("./tmp/test.flv").await.unwrap();
+        let writer = tokio::fs::File::create("./temp/test.flv").await.unwrap();
         let mut flv = FlvWriter::new(writer);
         // let meta = StreamMetadata {
         //     video_width: todo!(),

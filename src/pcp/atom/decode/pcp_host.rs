@@ -1,6 +1,6 @@
 use std::net::{IpAddr, SocketAddr};
 
-use axum::extract::Host;
+use axum_extra::extract::Host;
 use bytes::Bytes;
 use tracing::warn;
 

@@ -6,13 +6,14 @@ use std::{
 use askama::filters::format;
 use axum::{
     body::{self, Body},
-    extract::{connect_info::Connected, ConnectInfo, Host, Path, Query, Request, State},
+    extract::{connect_info::Connected, ConnectInfo, Path, Query, Request, State},
     http::HeaderValue,
     response::{Html, IntoResponse, Redirect, Response},
     routing::{self, get},
     Router,
 };
 use axum_core::BoxError;
+use axum_extra::extract::Host;
 use bytes::Bytes;
 use futures_util::{future::Pending, task::SpawnExt, Stream};
 use hyper::{rt::Write, upgrade::Upgraded, StatusCode, Uri};

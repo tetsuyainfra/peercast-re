@@ -8,7 +8,6 @@ use std::{
     time::Duration,
 };
 
-use async_trait::async_trait;
 use bytes::BytesMut;
 use thiserror::Error;
 use tokio::{

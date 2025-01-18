@@ -4,6 +4,7 @@
     "rust-lang.rust-analyzer",
     "tamasfe.even-better-toml",
     "editorconfig.editorconfig",
-    "fill-labs.dependi"
+    "fill-labs.dependi",
+    "vadimcn.vscode-lldb"
   ]
 }

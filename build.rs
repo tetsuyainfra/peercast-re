@@ -3,10 +3,31 @@
 use npm_rs::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let build = vergen::BuildBuilder::all_build()?;
+    let cargo = vergen::CargoBuilder::all_cargo()?;
+    let rustc = vergen::RustcBuilder::all_rustc()?;
+    let git2 = vergen_git2::Git2Builder::default()
+        .sha(false)
+        .branch(true)
+        .commit_timestamp(true)
+        .commit_count(true)
+        .dirty(true)
+        .build()?;
+
+    // let si = vergen::SysinfoBuilder::all_sysinfo()?;
+
+    vergen::Emitter::default()
+        .add_instructions(&build)?
+        .add_instructions(&cargo)?
+        .add_instructions(&rustc)?
+        .add_instructions(&git2)?
+        // .add_instructions(&si)?
+        .emit()?;
+
     let target = std::env::var("TARGET").unwrap();
     if target.contains("windows") {
         // println!("cargo:rerun-if-changed=icon.rc");
-        embed_resource::compile("icon.rc", embed_resource::NONE);
+        let _compilation_result = embed_resource::compile("icon.rc", embed_resource::NONE);
     }
 
     // cargo check(rust-analyzer)でこのbuild.rsが毎回実行されて遅くてつらい
@@ -34,5 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .exec()?;
         assert!(exit_status.success());
     }
+
     Ok(())
 }

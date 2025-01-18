@@ -9,7 +9,7 @@ if !(type "jq" > /dev/null 2>&1); then
     exit -1
 fi
 
-OPENAPI_IMAGE=openapitools/openapi-generator-cli:v7.9.0
+OPENAPI_IMAGE=openapitools/openapi-generator-cli:v7.10.0
 
 PACKAGE_VERSION=$(cargo metadata --no-deps --format-version=1 | jq --raw-output .packages[0].version)
 
@@ -21,7 +21,7 @@ if [ -n "$GEN_DOC" ]; then
     docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" ${OPENAPI_IMAGE} \
         config-help  -g rust > gen/config-help.rust.txt
     docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" ${OPENAPI_IMAGE} \
-        config-help  -g rust-server > gen/config-help.rust.txt
+        config-help  -g rust-server > gen/config-help.rust-server.txt
     docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_ID} -v "${PWD}:/local" ${OPENAPI_IMAGE} \
         config-help  -g typescript-fetch > gen/config-help.ts-fetch.txt
 fi
@@ -37,7 +37,8 @@ docker run --rm --user ${PEERCAST_RT_DOCKER_USER_ID}:${PEERCAST_RT_DOCKER_GROUP_
     -g rust \
     -o /local/gen/rust \
     -p packageVersion=${PACKAGE_VERSION} \
-    -p packageName=peercast-re-api
+    -p packageName=peercast-re-api \
+    -c /local/api/rust-config.yaml
 
 # mockを作るときはこっち
 rm -rf ./gen/rust-server

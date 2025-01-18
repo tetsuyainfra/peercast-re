@@ -1,17 +1,6 @@
-use std::{
-    collections::HashMap,
-    marker::PhantomData,
-    sync::{Arc, Mutex, RwLock},
-};
 
-use peercast_re::{
-    pcp::GnuId,
-    util::{rwlock_read_poisoned, rwlock_write_poisoned},
-};
-use tokio::{
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    task::JoinHandle,
-};
+use peercast_re::pcp::GnuId;
+use tokio::sync::mpsc::{self};
 use tracing::info;
 
 pub use self::store::ChannelStore;

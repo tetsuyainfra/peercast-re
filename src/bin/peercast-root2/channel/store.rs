@@ -9,8 +9,7 @@ use peercast_re::{
     util::{mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
 };
 use tokio::{
-    signal,
-    sync::mpsc::{self, UnboundedSender},
+    sync::mpsc::{self},
     task::JoinHandle,
 };
 use tracing::{info, trace};
@@ -259,10 +258,10 @@ where
 
 #[cfg(test)]
 mod t {
-    use std::time::Duration;
+    
 
     use peercast_re::pcp::GnuId;
-    use tracing::info;
+    
 
     use crate::channel::{
         tracker_channel::{TrackerChannel, TrackerChannelConfig},
@@ -274,7 +273,7 @@ mod t {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn channel_control() {
-        let mut store: ChannelStore<TrackerChannel> = ChannelStore::new(None, None);
+        let store: ChannelStore<TrackerChannel> = ChannelStore::new(None, None);
         let id = GnuId::new();
         let config = TrackerChannelConfig {};
         let ch1 = store.get_or_create(&id, config);

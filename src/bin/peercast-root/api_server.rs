@@ -3,7 +3,6 @@ use std::{
     sync::{mpsc::channel, Arc},
 };
 
-use async_trait::async_trait;
 use axum::{
     extract::{MatchedPath, Path, State},
     http::{HeaderMap, Request},
@@ -269,7 +268,6 @@ async fn users_create(
 /// Example implementation of `UserRepo`.
 struct ExampleUserRepo;
 
-#[async_trait]
 impl UserRepo for ExampleUserRepo {
     async fn find(&self, _user_id: Uuid) -> Result<User, UserRepoError> {
         unimplemented!()
@@ -284,7 +282,6 @@ impl UserRepo for ExampleUserRepo {
 type DynUserRepo = Arc<dyn UserRepo + Send + Sync>;
 
 /// A trait that defines things a user repo might support.
-#[async_trait]
 trait UserRepo {
     /// Loop up a user by their id.
     async fn find(&self, user_id: Uuid) -> Result<User, UserRepoError>;

@@ -1,5 +1,4 @@
 use peercast_re::pcp::GnuId;
-use peercast_re_api::models::ChannelStatus;
 use tokio::sync::{mpsc, watch};
 use tracing::info;
 
@@ -33,9 +32,9 @@ impl RootManager {
     }
 
     // async fn main(mut self, receiver: mpsc::UnboundedReceiver<RootManagerMessage>) {
-    async fn main(mut self, receiver: mpsc::UnboundedReceiver<()>) {
+    async fn main(self, receiver: mpsc::UnboundedReceiver<()>) {
         info!(id=?self.channel_id, "START CHANNEL MANAGER");
-        let (mut status_sender, status_reciever) = mpsc::unbounded_channel::<ChannelControl>();
+        let (status_sender, status_reciever) = mpsc::unbounded_channel::<ChannelControl>();
         // info!(channel_id = ?&self.channel_id,"START RootManager");
 
         loop {

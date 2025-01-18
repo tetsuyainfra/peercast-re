@@ -1,4 +1,4 @@
-use chrono::{Date, DateTime, Utc};
+use chrono::{DateTime, Utc};
 use peercast_re::pcp::GnuId;
 use tokio::sync::watch;
 
