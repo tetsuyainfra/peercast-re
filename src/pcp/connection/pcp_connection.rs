@@ -22,10 +22,8 @@ use crate::{
     error::HandshakeError,
     pcp::{
         atom,
-        builder::{
-            HelloBuilder, HeloInfo, OkBuilder, OlehBuilder, PingBuilder, PingInfo, PongBuilder,
-            PongInfo, RootBuilder,
-        },
+        builder::{HelloBuilder, OkBuilder, OlehBuilder, PingBuilder, PongBuilder, RootBuilder},
+        decode::{PcpHelo, PcpPing, PcpPong},
         GnuId, Id4,
     },
     ConnectionId,
@@ -163,6 +161,7 @@ impl InnerWriteHalf {
 //--------------------------------------------------------------------------------
 // PcpHandshake
 //
+#[derive(Debug)]
 pub struct PcpHandshake {
     inner: Inner,
     factory: PcpConnectionFactory,
@@ -182,7 +181,7 @@ impl PcpHandshake {
         // start pcp negotiation
         // recieve HeloAtom
         let helo_atom = self._read_atom().await?;
-        let helo = HeloInfo::parse(&helo_atom)?;
+        let helo = PcpHelo::parse(&helo_atom)?;
 
         // check is port opened?
         let open_port_no: Option<u16> = check_port(
@@ -224,7 +223,7 @@ impl PcpHandshake {
         if atom.len() == 1 {
             // PingはPCP_HELOが親でchildにSESSION_IDしかないハズ。。。
             // PCP_HELO(PING)
-            let ping_info = PingInfo::parse(&atom)?;
+            let ping_info = PcpPing::parse(&atom)?;
             Ok(PcpConnection::new(
                 self.inner,
                 ping_info.session_id,
@@ -233,7 +232,7 @@ impl PcpHandshake {
             ))
         } else {
             // PCP_HELO(normal)を主体とする接続のハズ
-            let helo_info = HeloInfo::parse(&atom)?;
+            let helo_info = PcpHelo::parse(&atom)?;
             // trace!("ARRIVED_HELO: {:#?}", &helo_info);
             // Send Oleh, Root, Ok
             let remote_port = self._incoming_pcp_root(&helo_info).await?;
@@ -246,13 +245,13 @@ impl PcpHandshake {
         }
     }
 
-    async fn _incoming_pcp_ping(&mut self, helo: &HeloInfo) -> Result<(), HandshakeError> {
+    async fn _incoming_pcp_ping(&mut self, helo: &PcpHelo) -> Result<(), HandshakeError> {
         todo!()
     }
 
     /// pcp_rootだった場合の処理
     /// return : Remoteのポートが解放していればSome(port:u16), 解放されていなければNone
-    async fn _incoming_pcp_root(&mut self, helo: &HeloInfo) -> Result<Option<u16>, HandshakeError> {
+    async fn _incoming_pcp_root(&mut self, helo: &PcpHelo) -> Result<Option<u16>, HandshakeError> {
         // Is port opened ?
         let open_port_no: Option<u16> = check_port(
             &self.factory,
@@ -265,8 +264,8 @@ impl PcpHandshake {
         // return oleh
         let oleh_atom = OlehBuilder::new(
             self.inner.self_session_id,
-            Some(self.inner.remote.ip()),
-            open_port_no,
+            self.inner.remote.ip(),
+            open_port_no.unwrap_or(0),
         )
         .build();
         self._write_atom(oleh_atom).await?;
@@ -300,13 +299,13 @@ impl PcpHandshake {
     }
 
     // TODO: この関数、check_port()内に結合してもいいとおもう
-    async fn outgoing_ping(&mut self) -> Result<PongInfo, HandshakeError> {
+    async fn outgoing_ping(&mut self) -> Result<PcpPong, HandshakeError> {
         let ping_atom = PingBuilder::new(self.inner.self_session_id).build();
         for a in ping_atom {
             let _ = self._write_atom(a).await;
         }
         let atom = self._read_atom().await?;
-        let pong_info = PongInfo::parse(&atom)?;
+        let pong_info = PcpPong::parse(&atom)?;
         let quit_atom = self._read_atom().await?;
         Ok(pong_info)
     }
@@ -349,8 +348,8 @@ async fn check_port(
 #[derive(Debug)]
 pub enum PcpConnectType {
     Outgoing,
-    IncomingPing(PingInfo),
-    IncomingBroadcast(HeloInfo),
+    IncomingPing(PcpPing),
+    IncomingBroadcast(PcpHelo),
 }
 
 #[derive(Debug)]

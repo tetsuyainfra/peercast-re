@@ -1,8 +1,9 @@
 # Added by myself
 .env
-/temp
 Cross.toml
 
+/temp/*
+!/temp/.keep_dir
 
 # gen directory
 /gen/**/

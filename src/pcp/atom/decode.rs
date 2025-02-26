@@ -4,7 +4,9 @@ mod macros;
 mod pcp_broadcast;
 mod pcp_channel;
 mod pcp_channel_info;
+mod pcp_helo;
 mod pcp_host;
+mod pcp_ping_pong;
 mod pcp_quit;
 mod pcp_track_info;
 
@@ -19,7 +21,9 @@ use super::ChildAtom;
 pub use pcp_broadcast::{BroadcastGroup, PcpBroadcast};
 pub use pcp_channel::PcpChannel;
 pub use pcp_channel_info::PcpChannelInfo;
+pub use pcp_helo::PcpHelo;
 pub use pcp_host::PcpHost;
+pub use pcp_ping_pong::{PcpPing, PcpPong};
 pub use pcp_quit::PcpQuit;
 pub use pcp_track_info::PcpTrackInfo;
 

@@ -45,3 +45,26 @@ pub enum Commands {
         json: bool,
     },
 }
+
+pub fn version_print(output_as_json: bool) -> anyhow::Result<()> {
+    use std::collections::BTreeMap;
+
+    if output_as_json {
+        let build_envs = vergen_pretty::vergen_pretty_env!()
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect::<BTreeMap<_, _>>();
+        let s = serde_json::to_string_pretty(&build_envs)?;
+        println!("{}", s);
+    } else {
+        let stdout = std::io::stdout();
+        let mut stdout = stdout.lock();
+
+        let _pp = vergen_pretty::PrettyBuilder::default()
+            .env(vergen_pretty::vergen_pretty_env!())
+            .build()?
+            .display(&mut stdout)?;
+    }
+
+    Ok(())
+}

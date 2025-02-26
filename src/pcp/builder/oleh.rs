@@ -11,17 +11,17 @@ use crate::pcp::{Atom, GnuId, Id4};
 pub struct OlehBuilder {
     // agent: String,
     session_id: GnuId,
-    remote_ip: Option<IpAddr>,
-    remote_port: Option<u16>,
+    remote_ip: IpAddr,
+    remote_port: u16,
 }
 
 #[allow(dead_code)]
 impl OlehBuilder {
     //! Olehパケットを作成する
     //! session_id : このマシンを同定する唯一のID
-    //! remote_ip : 返信先マシンのポート番号
-    //! remote_port : 返信先マシンのポート番号、ポート開放チェックに失敗したらNone
-    pub fn new(session_id: GnuId, remote_ip: Option<IpAddr>, remote_port: Option<u16>) -> Self {
+    //! remote_ip : 返信先マシンのポート番号(Heloを送ってきたアドレス)
+    //! remote_port : 返信先マシンのポート番号、ポート開放チェックに失敗したらNone(Heloで送られてきたPINGポート)
+    pub fn new(session_id: GnuId, remote_ip: IpAddr, remote_port: u16) -> Self {
         Self {
             session_id,
             remote_ip,
@@ -36,15 +36,8 @@ impl OlehBuilder {
             (Id4::PCP_HELO_SESSIONID, self.session_id).into(),
         ));
         vec.push(Atom::VERSION.clone());
-        if self.remote_ip.is_some() {
-            vec.push(Atom::Child(
-                (Id4::PCP_HELO_REMOTEIP, self.remote_ip.unwrap()).into(),
-            ));
-        }
-        vec.push(Atom::Child(
-            // remote_portがNoneなら0を返す
-            (Id4::PCP_HELO_PORT, self.remote_port.unwrap_or(0)).into(),
-        ));
+        vec.push(Atom::Child((Id4::PCP_HELO_REMOTEIP, self.remote_ip).into()));
+        vec.push(Atom::Child((Id4::PCP_HELO_PORT, self.remote_port).into()));
 
         Atom::Parent((Id4::PCP_OLEH, vec).into())
     }
@@ -136,7 +129,7 @@ mod t {
         let sid = GnuId::new();
         let remote_ip: IpAddr = Ipv4Addr::new(127, 0, 0, 1).into();
         let remote_port = 7144;
-        let oleh = OlehBuilder::new(sid, Some(remote_ip), Some(remote_port)).build();
+        let oleh = OlehBuilder::new(sid, remote_ip, remote_port).build();
         let info = OlehInfo::parse(&oleh);
         assert_eq!(info.session_id, sid);
         assert_eq!(info.remote_ip, Some(remote_ip));
@@ -145,7 +138,7 @@ mod t {
         let sid = GnuId::new();
         let remote_ip: IpAddr = Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x2ff).into();
         let remote_port = 7144;
-        let oleh = OlehBuilder::new(sid, Some(remote_ip), Some(remote_port)).build();
+        let oleh = OlehBuilder::new(sid, remote_ip, remote_port).build();
         let info = OlehInfo::parse(&oleh);
         assert_eq!(info.session_id, sid);
         assert_eq!(info.remote_ip, Some(remote_ip));

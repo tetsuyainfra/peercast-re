@@ -15,5 +15,5 @@ async fn get_config(State(state): State<AppState>) -> impl IntoResponse {
     state.config.to_string()
 }
 async fn put_config(State(state): State<AppState>) -> impl IntoResponse {
-    todo!()
+    ()
 }

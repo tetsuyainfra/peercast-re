@@ -14,9 +14,10 @@ use crate::{
     pcp::{
         atom::{self, read_atom},
         builder::{
-            HelloBuilder, HostInfo, OlehBuilder, OlehInfo, PingBuilder, PingInfo, PongBuilder,
-            PongInfo, QuitBuilder, QuitInfo, QuitReason,
+            HelloBuilder, HostInfo, OlehBuilder, OlehInfo, PingBuilder, PongBuilder, QuitBuilder,
+            QuitInfo, QuitReason,
         },
+        decode::{PcpPing, PcpPong},
         Atom, ChannelManager, GnuId, Id4,
     },
     ConnectionId,
@@ -153,7 +154,7 @@ impl PcpHandshake {
 
         // Receive oleh Atom
         let oleh_atom = self.read_atom().await?;
-        let pong_info = PongInfo::parse(&oleh_atom)?;
+        let pong_info = PcpPong::parse(&oleh_atom)?;
 
         // Send Quit
         let quit_atom = QuitBuilder::new(QuitReason::ConnectionError).build();
@@ -184,7 +185,7 @@ impl PcpHandshake {
 
         let ping_atom = self.read_atom().await?;
         trace!("ping_atom: {:#?}", &ping_atom);
-        let r = PingInfo::parse(&ping_atom)?;
+        let r = PcpPing::parse(&ping_atom)?;
         trace!("PingInfo: {:#?}", &r);
 
         // send pong
@@ -220,7 +221,8 @@ impl PcpHandshake {
         let mut payload = BytesMut::new();
 
         // HELOを送信
-        let mut builder = HelloBuilder::new(self.self_session_id, broadcast_id);
+        // FIX: ROOTへの送信か確認せねば・・・
+        let mut builder = HelloBuilder::new(self.self_session_id, broadcast_id.into());
         if (self.self_addr.is_some()) {
             let port = self.self_addr.as_ref().unwrap().port();
             builder = builder.port(port).ping(port);

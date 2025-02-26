@@ -258,10 +258,8 @@ where
 
 #[cfg(test)]
 mod t {
-    
 
     use peercast_re::pcp::GnuId;
-    
 
     use crate::channel::{
         tracker_channel::{TrackerChannel, TrackerChannelConfig},

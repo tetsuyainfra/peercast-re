@@ -1,414 +1,472 @@
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in library 'peercast_re'",
-      "cargo": {
-        "args": ["test", "--no-run", "--lib", "--package=peercast-re"],
-        "filter": {
-          "name": "peercast_re",
-          "kind": "lib"
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'peercast_re'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast_re",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'parse_atom'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=parse_atom",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "parse_atom",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'parse_atom'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=parse_atom",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "parse_atom",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'peercast-port-checkerd'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=peercast-port-checkerd",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-port-checkerd",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'peercast-port-checkerd'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=peercast-port-checkerd",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-port-checkerd",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'peercast-re'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=peercast-re",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-re",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'peercast-re'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=peercast-re",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-re",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'peercast-root'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=peercast-root",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'peercast-root'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=peercast-root",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'peercast-root2'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=peercast-root2",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root2",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'peercast-root2'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=peercast-root2",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root2",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'peercast-root3'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=peercast-root3",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root3",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'peercast-root3'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=peercast-root3",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "peercast-root3",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'relay'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=relay",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "relay",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'relay'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=relay",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "relay",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'rtmp'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=rtmp",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "rtmp",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'rtmp'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=rtmp",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "rtmp",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'test-serve'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=test-serve",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "test-serve",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'test-serve'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=test-serve",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "test-serve",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'version_check'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=version_check",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "version_check",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'version_check'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=version_check",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "version_check",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'simple-daemon'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=simple-daemon",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "simple-daemon",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in example 'simple-daemon'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--example=simple-daemon",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "simple-daemon",
+                    "kind": "example"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug integration test 'integration_test'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--test=integration_test",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "integration_test",
+                    "kind": "test"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug benchmark 'bench_main'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bench=bench_main",
+                    "--package=peercast-re"
+                ],
+                "filter": {
+                    "name": "bench_main",
+                    "kind": "bench"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'parse_atom'",
-      "cargo": {
-        "args": ["build", "--bin=parse_atom", "--package=peercast-re"],
-        "filter": {
-          "name": "parse_atom",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'parse_atom'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=parse_atom",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "parse_atom",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'peercast-port-checkerd'",
-      "cargo": {
-        "args": [
-          "build",
-          "--bin=peercast-port-checkerd",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "peercast-port-checkerd",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'peercast-port-checkerd'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=peercast-port-checkerd",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "peercast-port-checkerd",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'peercast-re'",
-      "cargo": {
-        "args": ["build", "--bin=peercast-re", "--package=peercast-re"],
-        "filter": {
-          "name": "peercast-re",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'peercast-re'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=peercast-re",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "peercast-re",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'peercast-root'",
-      "cargo": {
-        "args": ["build", "--bin=peercast-root", "--package=peercast-re"],
-        "filter": {
-          "name": "peercast-root",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'peercast-root'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=peercast-root",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "peercast-root",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'peercast-root2'",
-      "cargo": {
-        "args": ["build", "--bin=peercast-root2", "--package=peercast-re"],
-        "filter": {
-          "name": "peercast-root2",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'peercast-root2'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=peercast-root2",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "peercast-root2",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'relay'",
-      "cargo": {
-        "args": ["build", "--bin=relay", "--package=peercast-re"],
-        "filter": {
-          "name": "relay",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'relay'",
-      "cargo": {
-        "args": ["test", "--no-run", "--bin=relay", "--package=peercast-re"],
-        "filter": {
-          "name": "relay",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'rtmp'",
-      "cargo": {
-        "args": ["build", "--bin=rtmp", "--package=peercast-re"],
-        "filter": {
-          "name": "rtmp",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'rtmp'",
-      "cargo": {
-        "args": ["test", "--no-run", "--bin=rtmp", "--package=peercast-re"],
-        "filter": {
-          "name": "rtmp",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'test-serve'",
-      "cargo": {
-        "args": ["build", "--bin=test-serve", "--package=peercast-re"],
-        "filter": {
-          "name": "test-serve",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'test-serve'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=test-serve",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "test-serve",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug executable 'version_check'",
-      "cargo": {
-        "args": ["build", "--bin=version_check", "--package=peercast-re"],
-        "filter": {
-          "name": "version_check",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'version_check'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=version_check",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "version_check",
-          "kind": "bin"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug example 'example-daemon'",
-      "cargo": {
-        "args": ["build", "--example=example-daemon", "--package=peercast-re"],
-        "filter": {
-          "name": "example-daemon",
-          "kind": "example"
-        }
-      },
-      "args": ["-L./temp/debug-access.log"],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in example 'example-daemon'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--example=example-daemon",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "example-daemon",
-          "kind": "example"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug example 'simple'",
-      "cargo": {
-        "args": ["build", "--example=simple", "--package=peercast-re"],
-        "filter": {
-          "name": "simple",
-          "kind": "example"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in example 'simple'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--example=simple",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "simple",
-          "kind": "example"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug integration test 'integration_test'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--test=integration_test",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "integration_test",
-          "kind": "test"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug benchmark 'bench_main'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bench=bench_main",
-          "--package=peercast-re"
-        ],
-        "filter": {
-          "name": "bench_main",
-          "kind": "bench"
-        }
-      },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    }
-  ]
+    ]
 }

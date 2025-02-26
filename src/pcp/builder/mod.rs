@@ -12,11 +12,11 @@ mod track_info;
 
 pub use broadcast::BroadcastBuilder;
 pub use channel_info::ChannelInfoBuilder;
-pub use hello::{HelloBuilder, HeloInfo};
+pub use hello::HelloBuilder;
 pub use host::{HostBuilder, HostInfo};
 pub use ok::OkBuilder;
 pub use oleh::{OlehBuilder, OlehInfo};
-pub use ping_pong::{PingBuilder, PingInfo, PongBuilder, PongInfo};
+pub use ping_pong::{PingBuilder, PongBuilder};
 pub use quit::{QuitBuilder, QuitInfo, QuitReason};
 pub use root::RootBuilder;
 pub use track_info::TrackInfoBuilder;

@@ -103,7 +103,7 @@ def_id4! {
   PCP_HELO_REMOTEIP  = b"rip\0",
   PCP_HELO_VERSION   = b"ver\0",
   PCP_HELO_BCID      = b"bcid",
-  PCP_HELO_DISABLE   = b"dis\0",
+  PCP_HELO_DISABLE   = b"dis\0", // BANされている時に通知する
 
   PCP_OLEH           = b"oleh",
 

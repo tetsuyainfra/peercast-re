@@ -7,6 +7,7 @@ macro_rules! show_size {
     };
 }
 
+pub fn is_sized<T: Sized>() {}
 pub fn is_sync<T: Sync>() {}
 pub fn is_send<T: Send>() {}
 pub fn is_copy<T: Copy>() {}

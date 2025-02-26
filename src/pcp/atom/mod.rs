@@ -140,8 +140,9 @@ impl Atom {
 }
 
 impl Atom {
-    pub const AGENT: Lazy<Atom> =
-        Lazy::new(|| Atom::Child((Id4::PCP_HELO_AGENT, crate::PKG_AGENT.clone() + "\0").into()));
+    pub const AGENT: Lazy<Atom> = Lazy::new(|| {
+        Atom::Child((Id4::PCP_HELO_AGENT, crate::PKG_AGENT.to_string() + "\0").into())
+    });
     pub const VERSION: Lazy<Atom> =
         Lazy::new(|| Atom::Child((Id4::PCP_HELO_VERSION, 1218_u32).into()));
 }

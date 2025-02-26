@@ -6,6 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let build = vergen::BuildBuilder::all_build()?;
     let cargo = vergen::CargoBuilder::all_cargo()?;
     let rustc = vergen::RustcBuilder::all_rustc()?;
+    // let si = SysinfoBuilder::all_sysinfo()?;
     let git2 = vergen_git2::Git2Builder::default()
         .sha(false)
         .branch(true)
@@ -20,8 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_instructions(&build)?
         .add_instructions(&cargo)?
         .add_instructions(&rustc)?
-        .add_instructions(&git2)?
         // .add_instructions(&si)?
+        .add_instructions(&git2)?
         .emit()?;
 
     let target = std::env::var("TARGET").unwrap();
@@ -35,7 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // npm run buildでproduction版が常にbuildされる
     // npm run dev で development版がホストされる -> Httpでアクセスして取ってくる
-    let is_rebuild = match std::env::var("PEERCAST_RT_BUILD_NPM_REBUILD")
+    let mut will_build = match std::env::var("PEERCAST_RT_BUILD_NPM_REBUILD")
         .unwrap_or_else(|_| "false".into())
         .as_str()
     {
@@ -43,7 +44,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => false,
     };
 
-    if is_rebuild {
+    if false == std::fs::exists("client/dist").unwrap_or(false) {
+        will_build = true;
+    }
+
+    if will_build {
         println!("RE-BUILD NPM");
         let exit_status = NpmEnv::default()
             .set_path("client")

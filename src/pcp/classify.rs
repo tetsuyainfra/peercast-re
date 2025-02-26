@@ -187,7 +187,7 @@ mod t {
     fn test_utils() {
         let sid = GnuId::new();
         let bid = GnuId::new();
-        let a = HelloBuilder::new(sid.clone(), bid).build();
+        let a = HelloBuilder::new(sid.clone(), bid.into()).build();
 
         let r = get_by_id(Id4::PCP_SESSIONID, a.as_parent().childs());
         assert!(r.is_some());
