@@ -11,7 +11,6 @@ use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
 use futures_util::{future::BoxFuture, FutureExt, SinkExt, StreamExt};
-use ipnet::IpAdd;
 use itertools::concat;
 use peercast_re::{
     config,
@@ -28,9 +27,8 @@ use peercast_re::{
     },
     ConnectionId,
 };
-use peercast_re_api::models::channel_info;
+// use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
-use rml_rtmp::handshake::Handshake;
 use serde::Serialize;
 use tokio::{
     fs::read,
