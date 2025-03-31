@@ -11,7 +11,7 @@ build = "build.rs"
 
 
 [dependencies]
-peercast-re-api = { path = "./gen/rust" }
+peercast-re-api = { path = "../libpeercast-re-apis/gen/rust" }
 
 aquamarine = { version = "0.6.0" }
 
