@@ -37,7 +37,7 @@ use tracing::{debug, error, info, trace, Span};
 use crate::{
     codec::FlvWriter,
     config::Config,
-    http::{middleware::RestrictIpLayer, Ui},
+    http::{middleware::RestrictIpLayer },
     pcp::{
         ChannelInfo, ChannelManager, ChannelMessage, ChannelType, GnuId, RelayTaskConfig,
         SourceTaskConfig, TaskStatus,
@@ -111,8 +111,8 @@ impl HttpSvc {
             .route("/pls/:id", get(Self::playlist))
             .route("/stream/:id", get(Self::stream))
             // .route("/demo/throttle", get(Demo::throttle))
-            .route("/ui", get(|| async { Redirect::permanent("/ui/") }))
-            .nest("/ui/", Ui::new())
+            // .route("/ui", get(|| async { Redirect::permanent("/ui/") }))
+            // .nest("/ui/", Ui::new())
             .nest("/api", Api::new())
             .fallback(Self::not_found)
             .layer(TraceLayer::new_for_http().on_body_chunk(

@@ -5,6 +5,7 @@ members = [
   "libpeercast-re", "peercast-re",
   "peercast-root",
   "peercast-utils",
+  "libpeercast-re-apis/gen/rust"
 ]
 default-members = ["libpeercast-re", "peercast-root", "peercast-utils"]
 

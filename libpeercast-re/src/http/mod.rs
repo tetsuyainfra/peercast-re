@@ -1,7 +1,6 @@
 mod api;
 mod http_svc;
 mod middleware;
-mod ui;
 
 use std::{
     net::{IpAddr, SocketAddr},
@@ -29,7 +28,6 @@ use crate::{
 };
 
 pub use api::Api;
-pub use ui::Ui;
 
 pub(crate) type ShutdownAndNotifySet = (Shutdown, tokio::sync::mpsc::Sender<()>);
 
