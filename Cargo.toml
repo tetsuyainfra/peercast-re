@@ -2,8 +2,10 @@
 
 members = [
   "check-specifications",
-  "libpeercast-re", "peercast-root",
+  "libpeercast-re",
+  "peercast-root",
+  "peercast-utils",
 ]
-default-members = ["libpeercast-re"]
+default-members = ["libpeercast-re", "peercast-root", "peercast-utils"]
 
 resolver = "2"
