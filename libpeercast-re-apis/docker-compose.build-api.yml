@@ -1,0 +1,124 @@
+#PACKAGE_VERSION=$(cargo metadata --no-deps --format-version=1 | jq --raw-output .packages[0].version)
+
+services:
+  base:
+    profiles: ["no_run"]
+    image: openapitools/openapi-generator-cli:v7.10.0
+    user: "${PEERCAST_RT_DOCKER_USER_ID-1000}:${PEERCAST_RT_DOCKER_GROUP_ID-1000}"
+    volumes:
+      #- ./api:/api # Swagger Directory
+      - ./:/local
+    environment:
+      SWAGGER_FILE: /api/openapi.yaml
+      ENTRYPOINT: "/usr/local/bin/docker-entrypoint.sh"
+      PACKAGE_VERSION: "0.1.0"
+    restart: no
+
+  test:
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        ls /local/api
+      "
+
+  gen-doc:
+    extends:
+      service: base
+    volumes: []
+    entrypoint: >
+      /usr/bin/bash -c "
+        $${ENTRYPOINT} help generate > /local/gen/help.generate.txt
+        $${ENTRYPOINT} config-help -g rust             > /local/gen/config-help.rust.txt
+        $${ENTRYPOINT} config-help -g rust-server      > /local/gen/config-help.rust-server.txt
+        $${ENTRYPOINT} config-help -g typescript-fetch > /local/gen/config-help.typescript-fetch.txt
+      "
+
+  build-rust:
+    profiles: ["api"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/rust ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/openapi.yaml \\
+        -g rust \\
+        -o /local/gen/rust \\
+        -p packageVersion=$${PACKAGE_VERSION} \\
+        -p packageName=peercast-re-api \\
+        -c /local/api/rust-config.yaml
+      "
+
+  build-rust-server:
+    profiles: ["api"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/rust-server ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/openapi.yaml \\
+        -g rust-server \\
+        -o /local/gen/rust-server \\
+        -p packageVersion=$${PACKAGE_VERSION} \\
+        -p packageName=peercast-re-api-server
+      "
+
+  build-js:
+    profiles: ["api"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/js ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/openapi.yaml \\
+        -g javascript \\
+        -o /local/gen/js \\
+        -p packageVersion=$${PACKAGE_VERSION}
+      "
+
+  build-ts-fetch:
+    profiles: ["api"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/ts-fetch ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/openapi.yaml \\
+        -g typescript-fetch \\
+        -o /local/gen/ts-fetch \\
+        -p packageVersion=$${PACKAGE_VERSION}
+      "
+
+  build-ppc:
+    profiles: ["api", "ppc"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/ppc ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/peercast-port-checkerd.yaml \\
+        -g rust \\
+        -o /local/gen/ppc \\
+        -p packageName=ppc-api \\
+        -p packageVersion=$${PACKAGE_VERSION}
+      "
+
+  build-ppc-server:
+    profiles: ["api", "ppc"]
+    extends:
+      service: base
+    entrypoint: >
+      /usr/bin/bash -c "
+        rm -rf /local/gen/ppc-server ;
+        $${ENTRYPOINT} generate \\
+        -i /local/api/peercast-port-checkerd.yaml \\
+        -g rust-server \\
+        -o /local/gen/ppc-server \\
+        -p packageName=ppc-api \\
+        -p packageVersion=$${PACKAGE_VERSION}
+      "

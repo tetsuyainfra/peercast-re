@@ -1,0 +1,71 @@
+[package]
+name = "peercast-root"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libpeercast-re = { version = "*", path = "../libpeercast-re" }
+
+anyhow = { version = "1.0.95" }
+
+# tracing logging
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = [
+    "env-filter",
+    "json",
+    "fmt",
+    "local-time",
+] }
+
+# Async
+futures-util = { version = "0.3.31", default-features = false, features = [
+    "alloc",
+] }
+tokio = { version = "1.43.0", features = ["full", "tracing"] }
+tokio-stream = { version = "0.1.17" }
+tokio-test = { version = "0.4.4" }
+tokio-util = { version = "0.7.13", features = ["rt"] }
+console-subscriber = { version = "0.4.1" }
+
+# Axum
+axum-core = { version = "*" }
+axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
+tower = { version = "0.5.2" }
+tower-http = { version = "0.6.2", features = [
+    "fs",
+    "trace",
+    "cors",
+    "util",
+    "request-id",
+    "timeout",
+    "add-extension",
+] }
+hyper-util = { version = "0.1.10", features = ["full"] }
+
+# Serialize/Deserialize
+serde = { version = "1.0.217", features = ["derive"] }
+# serde_derive = { version = "1.0" } # serde features = ["derive"]しているので必要ない
+serde_json = "1.0.138"
+
+# url
+url = { version = "2.5.4" }
+html-escape = { version = "0.2.13" }
+
+
+# バイナリ操作
+bytes = { version = "1.10.0", features = ["serde"] }
+byteorder = "1"
+nom = { version = "8.0.0" }
+
+# iterator操作
+itertools = "0.14.0"
+
+# Timezoneなどを取り扱い
+chrono = { version = "0.4.40", features = ["serde"] }
+chrono-tz = "0.10.3"
+
+# Commandline
+clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
+clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
