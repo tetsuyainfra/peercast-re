@@ -7,7 +7,7 @@
 use std::time::Duration;
 
 use clap::Parser;
-use peercast_re::pcp::{GnuId, PcpConnectionFactory};
+use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_BIN_NAME"))]

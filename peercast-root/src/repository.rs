@@ -5,7 +5,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use peercast_re::{
+use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo},
     util::mutex_poisoned,
 };
@@ -216,7 +216,7 @@ mod t {
     };
 
     use chrono::{DateTime, Utc};
-    use peercast_re::{
+    use libpeercast_re::{
         pcp::{ChannelInfo, GnuId},
         util::mutex_poisoned,
     };
@@ -244,10 +244,10 @@ mod t {
     impl Channel for TestChannel {
         type Config = ();
         fn new(
-            session_id: peercast_re::pcp::GnuId,
-            id: peercast_re::pcp::GnuId,
-            channel_info: Option<peercast_re::pcp::ChannelInfo>,
-            track_info: Option<peercast_re::pcp::TrackInfo>,
+            session_id: libpeercast_re::pcp::GnuId,
+            id: libpeercast_re::pcp::GnuId,
+            channel_info: Option<libpeercast_re::pcp::ChannelInfo>,
+            track_info: Option<libpeercast_re::pcp::TrackInfo>,
             option: Option<()>,
         ) -> Self {
             let last_update = Mutex::new(Utc::now()).into();

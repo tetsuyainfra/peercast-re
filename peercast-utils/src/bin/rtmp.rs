@@ -1,4 +1,4 @@
-use peercast_re::{
+use libpeercast_re::{
     rtmp::{
         self, connection,
         rtmp_connection::{RtmpConnection, RtmpConnectionEvent},

@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use peercast_re::pcp::read_atom;
+use libpeercast_re::pcp::read_atom;
 use tokio::fs::File;
 
 #[tokio::main]

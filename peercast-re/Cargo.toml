@@ -1,12 +1,11 @@
 [package]
-name = "peercast-utils"
+name = "peercast-re"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
-thiserror = { version = "2.0.11" }
 anyhow = { version = "1.0.95" }
 
 # tracing logging
@@ -17,13 +16,6 @@ tracing-subscriber = { version = "0.3.19", features = [
     "fmt",
     "local-time",
 ] }
-tracing-futures = "0.2"
-tracing-attributes = "0.1"
-tracing-appender = "0.2"
-tracing-test = "0.2.5"
-tracing-log = { version = "0.2.0" }
-tracing-journald = "0.3.1"
-
 
 # Async
 futures-util = { version = "0.3.31", default-features = false, features = [
@@ -36,12 +28,10 @@ tokio-util = { version = "0.7.13", features = ["rt"] }
 console-subscriber = { version = "0.4.1" }
 
 # Axum
-axum-core = { version = "0.5.2" }
-axum = { version = "0.8.3", features = ["tokio", "form", "ws", "tracing"] }
+axum-core = { version = "*" }
+axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
 axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
-
-# Tower
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",
@@ -52,15 +42,12 @@ tower-http = { version = "0.6.2", features = [
     "timeout",
     "add-extension",
 ] }
-
-# Hyper
-hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 
 # Serialize/Deserialize
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
+serde = { version = "1.0.217", features = ["derive"] }
 # serde_derive = { version = "1.0" } # serde features = ["derive"]しているので必要ない
+serde_json = "1.0.138"
 
 # url
 url = { version = "2.5.4" }
@@ -82,3 +69,10 @@ chrono-tz = "0.10.3"
 # Commandline
 clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
 clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
+
+# Home direcotry
+dirs = "6.0.0"
+
+# prcess exit code
+exitcode = "1"
+bitflags = "2.9.0"

@@ -12,7 +12,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
 use futures_util::{future::BoxFuture, FutureExt, SinkExt, StreamExt};
 use itertools::concat;
-use peercast_re::{
+use libpeercast_re::{
     config,
     pcp::{
         builder::{QuitBuilder, QuitReason, RootBuilder},
@@ -272,7 +272,7 @@ async fn serve_root(
     graceful_shutdown: CancellationToken,
     force_shutdown: CancellationToken,
 ) {
-    use peercast_re::pcp::connection::HandshakeType;
+    use libpeercast_re::pcp::connection::HandshakeType;
     let read_buf = BytesMut::new();
 
     // HandshakeFutureにすればよさそう
@@ -365,8 +365,8 @@ async fn serve_root(
 pub struct RootChannel {
     cid: GnuId,
     tracker_addr: Arc<RwLock<Option<SocketAddr>>>,
-    channel_info: Arc<RwLock<peercast_re::pcp::ChannelInfo>>,
-    track_info: Arc<RwLock<peercast_re::pcp::TrackInfo>>,
+    channel_info: Arc<RwLock<libpeercast_re::pcp::ChannelInfo>>,
+    track_info: Arc<RwLock<libpeercast_re::pcp::TrackInfo>>,
     last_update: Arc<Mutex<DateTime<Utc>>>,
     created_at: Arc<DateTime<Utc>>,
 }
@@ -380,8 +380,8 @@ impl Channel for RootChannel {
     fn new(
         self_session_id: GnuId,
         cid: GnuId,
-        channel_info: Option<peercast_re::pcp::ChannelInfo>,
-        track_info: Option<peercast_re::pcp::TrackInfo>,
+        channel_info: Option<libpeercast_re::pcp::ChannelInfo>,
+        track_info: Option<libpeercast_re::pcp::TrackInfo>,
         config: Option<RootConfig>,
     ) -> Self {
         let tracker_addr = config.and_then(|c| c.tracker_host);

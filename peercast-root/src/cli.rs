@@ -91,7 +91,7 @@ pub enum Commands {
 pub fn version_print(args: &Args) -> anyhow::Result<()> {
     match args.command {
         Some(Commands::Version { json }) => {
-            peercast_re::util::version_print_with(json, |envs| {
+            libpeercast_re::util::version_print_with(json, |envs| {
                 envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
                 envs.insert("VERGEN_BIN_VERSION", Some(env!("CARGO_PKG_VERSION")));
             })?;

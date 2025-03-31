@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-peercast-re = { version = "*", path = "../libpeercast-re" }
+libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
 anyhow = { version = "1.0.95" }
 

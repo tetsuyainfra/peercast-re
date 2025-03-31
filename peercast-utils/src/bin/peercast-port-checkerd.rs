@@ -20,7 +20,7 @@ use axum_core::{extract::Request, response::IntoResponse};
 use bytes::BytesMut;
 use clap::Parser;
 use hyper::StatusCode;
-use peercast_re::{
+use libpeercast_re::{
     pcp::{procedure::PcpHandshake, GnuId},
     ConnectionId,
 };

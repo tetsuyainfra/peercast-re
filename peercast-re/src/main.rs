@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 use tracing::debug;
 
-use peercast_re::{
+use libpeercast_re::{
     app::cui::{self, CuiError},
     config::{Config, ConfigLoader},
     error::ConfigError,
@@ -47,7 +47,7 @@ struct Cli {
 impl Cli {
     /// merge Config and Cli instance.
     fn merge_with(self, config: &Config) -> Config {
-        use peercast_re::config::ConfigAddress;
+        use libpeercast_re::config::ConfigAddress;
 
         let mut config = config.clone();
 
