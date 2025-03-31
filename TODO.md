@@ -1,4 +1,6 @@
 # リファクタリング
+- コードのお引越し
+  - uiはとりあえず無理やり動かしたけどー
 - src/pcp/decode, src/pcp/builderの統合
   - atomの作成、変更を統合して操作できるようにしたい
   - XXXInfoからAtomの作成
