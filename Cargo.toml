@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+  "libpeercast-re",
+]
+resolver = "2"
