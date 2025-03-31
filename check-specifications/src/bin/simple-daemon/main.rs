@@ -20,7 +20,7 @@
 *    - https://github.com/tokio-rs/axum/tree/main/examples/tls-graceful-shutdown
 */
 
-use std::{env, net::SocketAddr, process::exit, time::Duration};
+use std::{ net::SocketAddr, process::exit, time::Duration};
 
 use axum::{
     extract::{MatchedPath, Request},

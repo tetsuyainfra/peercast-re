@@ -1,6 +1,6 @@
 [workspace]
 
-members = [
+members = [ "check-specifications",
   "libpeercast-re",
 ]
 resolver = "2"
