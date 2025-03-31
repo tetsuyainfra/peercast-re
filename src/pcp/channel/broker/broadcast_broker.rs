@@ -852,7 +852,7 @@ mod t {
 
     #[crate::test]
     async fn test_channel_reciever() {
-        is_send::<ChannelReciever>();
-        is_sync::<ChannelReciever>();
+        assert_send::<ChannelReciever>();
+        assert_sync::<ChannelReciever>();
     }
 }

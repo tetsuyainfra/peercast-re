@@ -7,11 +7,14 @@ macro_rules! show_size {
     };
 }
 
-pub fn is_sized<T: Sized>() {}
-pub fn is_sync<T: Sync>() {}
-pub fn is_send<T: Send>() {}
-pub fn is_copy<T: Copy>() {}
-pub fn is_clone<T: Clone>() {}
+/* usage:
+   assert_sync::<TargetStruct>();
+*/
+pub fn assert_sized<T: Sized>() {}
+pub fn assert_sync<T: Sync>() {}
+pub fn assert_send<T: Send>() {}
+pub fn assert_copy<T: Copy>() {}
+pub fn assert_clone<T: Clone>() {}
 
 pub fn init_logger(env_format: &str) {
     use std::sync::OnceLock;
@@ -31,4 +34,16 @@ pub fn init_logger(env_format: &str) {
             .init();
         true
     });
+}
+
+#[cfg(test)]
+mod t {
+    use crate::test_helper::assert_clone;
+
+    #[test]
+    fn test_helpers() {
+        #[derive(Clone)]
+        struct C {}
+        assert_clone::<C>();
+    }
 }

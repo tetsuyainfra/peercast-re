@@ -22,6 +22,8 @@ impl ChannelInfo {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn merge_pcp(&mut self, new_val: &PcpChannelInfo) {}
 }
 
 impl From<&PcpChannelInfo> for ChannelInfo {

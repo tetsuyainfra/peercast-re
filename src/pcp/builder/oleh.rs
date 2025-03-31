@@ -45,11 +45,11 @@ impl OlehBuilder {
 
 #[derive(Debug)]
 pub struct OlehInfo {
-    pub remote_ip: Option<IpAddr>,
-    pub agent: String,
     pub session_id: GnuId,
-    pub port: u16,
-    pub version: u32,
+    pub remote_ip: Option<IpAddr>,
+    pub agent: Option<String>,
+    pub port: Option<u16>,
+    pub version: Option<u32>,
 }
 
 impl OlehInfo {
@@ -111,11 +111,11 @@ impl OlehInfo {
             }
         }
         OlehInfo {
-            remote_ip, // これは送られてこない場合がある
-            agent: agent.unwrap(),
             session_id: session_id.unwrap(),
-            port: port.unwrap(),
-            version: version.unwrap(),
+            remote_ip, // これは送られてこない場合がある
+            agent: agent,
+            port: port,
+            version: version,
         }
     }
 }
@@ -133,7 +133,7 @@ mod t {
         let info = OlehInfo::parse(&oleh);
         assert_eq!(info.session_id, sid);
         assert_eq!(info.remote_ip, Some(remote_ip));
-        assert_eq!(info.port, remote_port);
+        assert_eq!(info.port, Some(remote_port));
 
         let sid = GnuId::new();
         let remote_ip: IpAddr = Ipv6Addr::new(0, 0, 0, 0, 0, 0xffff, 0xc00a, 0x2ff).into();
@@ -142,7 +142,7 @@ mod t {
         let info = OlehInfo::parse(&oleh);
         assert_eq!(info.session_id, sid);
         assert_eq!(info.remote_ip, Some(remote_ip));
-        assert_eq!(info.port, remote_port);
+        assert_eq!(info.port, Some(remote_port));
     }
 }
 

@@ -17,7 +17,7 @@ build = "build.rs"
 [dependencies]
 peercast-re-api = { path = "./gen/rust" }
 
-aquamarine = {version  ="0.6.0" }
+aquamarine = { version = "0.6.0" }
 
 # Error handling
 thiserror = { version = "2.0.11" }
@@ -25,14 +25,19 @@ anyhow = { version = "1.0.95" }
 
 # tracing logging
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json","fmt", "local-time"] }
+tracing-subscriber = { version = "0.3.19", features = [
+    "env-filter",
+    "json",
+    "fmt",
+    "local-time",
+] }
 tracing-futures = "0.2"
 tracing-attributes = "0.1"
 tracing-appender = "0.2"
 tracing-test = "0.2.5"
-tracing-log = { version = "0.2.0"}
+tracing-log = { version = "0.2.0" }
 
-time = {version = "*", features = ["formatting"]}
+time = { version = "*", features = ["formatting"] }
 
 # log = "0.4"
 
@@ -46,6 +51,9 @@ flavors = { git = "https://github.com/rust-av/flavors", rev = "833508af656d298c2
 # 数値操作(cast等)
 num = "0.4.3"
 
+#
+itertools = "0.14.0"
+
 # 非同期処理
 futures-util = { version = "0.3.31", default-features = false, features = [
     "alloc",
@@ -53,27 +61,28 @@ futures-util = { version = "0.3.31", default-features = false, features = [
 tokio = { version = "1.43.0", features = ["full", "tracing"] }
 tokio-stream = { version = "0.1.17" }
 tokio-test = { version = "0.4.4" }
-tokio-util = { version = "0.7.13", features = ["rt"]}
+tokio-util = { version = "0.7.13", features = ["rt"] }
 console-subscriber = { version = "0.4.1" }
-tokio-graceful-shutdown = {version = "0.16.0", features = ["tracing"]}
+tokio-graceful-shutdown = { version = "0.16.0", features = ["tracing"] }
 
 # ip adrees range
 ipnet = { version = "2.11.0", features = ["serde"] }
 
 # http
-http = { version = "1.2.0" }
-httparse = { version = "1.10.0" }
+http = { version = "1.3.1" }
+httparse = { version = "1.10.1" }
 
 # http-server
 
 axum-core = { version = "*" }
 axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0" }
+axum-extra = { version = "0.10.0", features = ["typed-header"] }
 # axum = { git = "https://github.com/tokio-rs/axum", branch = "main", features = [
 #     "form",
 #     "ws",
 #     "tracing",
 # ] }
+axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",
@@ -82,6 +91,7 @@ tower-http = { version = "0.6.2", features = [
     "util",
     "request-id",
     "timeout",
+    "add-extension",
 ] }
 # tower-hyper-http-body-compat = { version = "0.2.0", features = [
 # "http1",
@@ -128,9 +138,11 @@ daemonize = "0.5.0"
 
 # url
 url = { version = "2.5.4" }
+urlencoding = {version = "2.1.3"}
 
 # http/get
 # ureq = { version = "2.5" }
+html-escape = { version = "0.2.13" }
 
 # embed file
 rust-embed = { version = "8.5.0", features = [
@@ -155,7 +167,7 @@ uuid = { version = "1.11.0", features = [
 
 # password
 pbkdf2 = { version = "0.12", features = ["simple"] }
-rand_core = { version = "0.6.4", features = ["std"]}
+rand_core = { version = "0.6.4", features = ["std"] }
 
 # ini
 rust-ini = { version = "0.21.1", features = ["inline-comment"] }
@@ -257,15 +269,38 @@ extended-description = "simple hello world test"
 section = "admin"
 priority = "optional"
 assets = [
-    ["target/release/peercast-root", "usr/local/bin/peercast-root", "755"],
-    ["debian/peercast-root.service", "/lib/systemd/system/peercast-root.service", "644"],
-    ["debian/default/peercast-root", "/etc/default/peercast-root", "644"],
+    [
+        "target/release/peercast-root",
+        "usr/local/bin/peercast-root",
+        "755",
+    ],
+    [
+        "debian/peercast-root.service",
+        "/lib/systemd/system/peercast-root.service",
+        "644",
+    ],
+    [
+        "debian/default/peercast-root",
+        "/etc/default/peercast-root",
+        "644",
+    ],
 
-    ["target/release/peercast-port-checkerd", "usr/local/bin/peercast-port-checkerd", "755"],
-    ["debian/peercast-port-checkerd.service", "/lib/systemd/system/peercast-port-checkerd.service", "644"],
-    ["debian/default/peercast-port-checkerd", "/etc/default/peercast-port-checkerd", "644"],
+    [
+        "target/release/peercast-port-checkerd",
+        "usr/local/bin/peercast-port-checkerd",
+        "755",
+    ],
+    [
+        "debian/peercast-port-checkerd.service",
+        "/lib/systemd/system/peercast-port-checkerd.service",
+        "644",
+    ],
+    [
+        "debian/default/peercast-port-checkerd",
+        "/etc/default/peercast-port-checkerd",
+        "644",
+    ],
 ]
 
 # こっちのオプションは*.service unitファイル/install scriptを自分で追加するときに指定する
 maintainer-scripts = "debian/scripts"
-

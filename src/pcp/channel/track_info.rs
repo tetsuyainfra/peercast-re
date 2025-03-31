@@ -17,6 +17,8 @@ impl TrackInfo {
     pub fn new() -> Self {
         Default::default()
     }
+
+    pub fn merge_pcp(&mut self, new_val: &PcpTrackInfo) {}
 }
 
 impl From<&PcpTrackInfo> for TrackInfo {

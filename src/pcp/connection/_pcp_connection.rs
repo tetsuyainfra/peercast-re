@@ -7,6 +7,7 @@ use std::{
 
 use atom::Atom;
 use bytes::{Buf, BytesMut};
+use futures_util::future::IntoFuture;
 use hyper::rt::Read;
 use tokio::{
     io::{AsyncWriteExt, ReadHalf, WriteHalf},
@@ -29,7 +30,7 @@ use crate::{
     ConnectionId,
 };
 
-use super::PcpConnectionFactory;
+use super::factory::PcpConnectionFactory;
 
 //--------------------------------------------------------------------------------
 //

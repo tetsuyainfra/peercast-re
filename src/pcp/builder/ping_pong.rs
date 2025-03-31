@@ -1,3 +1,5 @@
+use std::collections::{vec_deque, VecDeque};
+
 use bytes::Buf;
 
 use crate::{
@@ -8,24 +10,52 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////
 //  Ping
 //
-
+/// Pingする時に使うAtomを生成する(最初のPCP_CONNECTを含む)
 #[derive(Debug)]
 pub struct PingBuilder {
     self_session_id: GnuId,
+    port: Option<u16>,
+    port_check: Option<u16>,
 }
 
 impl PingBuilder {
     pub fn new(self_session_id: GnuId) -> Self {
-        Self { self_session_id }
+        Self {
+            self_session_id,
+            port: None,
+            port_check: None,
+        }
     }
 
-    pub fn build(self) -> Vec<Atom> {
+    pub fn port(mut self, port: Option<u16>) -> Self {
+        self.port = port;
+        self
+    }
+
+    pub fn port_check(mut self, port_check: Option<u16>) -> Self {
+        self.port_check = port_check;
+        self
+    }
+
+    pub fn build(self) -> VecDeque<Atom> {
         let magic_atom = Atom::Child((Id4::PCP_CONNECT, 1_u32).into());
 
         let session_atom = Atom::Child((Id4::PCP_HELO_SESSIONID, self.self_session_id).into());
-        let ping_atom = Atom::Parent((Id4::PCP_HELO, vec![session_atom]).into());
+        let mut atoms = Vec::with_capacity(3);
+        atoms.push(session_atom);
 
-        vec![magic_atom, ping_atom]
+        if let Some(port) = self.port {
+            let atom = Atom::Child((Id4::PCP_HELO_PORT, port).into());
+            atoms.push(atom)
+        }
+        if let Some(check_port) = self.port_check {
+            let atom = Atom::Child((Id4::PCP_HELO_PING, check_port).into());
+            atoms.push(atom)
+        }
+
+        let ping_atom = Atom::Parent((Id4::PCP_HELO, atoms).into());
+
+        VecDeque::from([magic_atom, ping_atom])
     }
 }
 

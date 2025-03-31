@@ -1,5 +1,7 @@
 use std::{any, io::Write, time::Duration};
 
+use chrono_tz::Asia::Kabul;
+use futures_util::{future::BoxFuture, FutureExt};
 use hyper_util::server::graceful;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -26,11 +28,7 @@ static MAX_COUNT: usize = 2;
 
 /// システム外部からのシャットダウン操作をキャプチャするスレッドを作成する
 /// 内部で使用されるCancellationTokenが最上位にあたる
-pub(crate) fn create_task() -> (
-    impl std::future::Future<Output = ()>,
-    CancellationToken,
-    CancellationToken,
-) {
+pub(crate) fn create_task() -> (BoxFuture<'static, ()>, CancellationToken, CancellationToken) {
     let graceful_shutdown = tokio_util::sync::CancellationToken::new();
     let force_shutdown = tokio_util::sync::CancellationToken::new();
 
@@ -55,6 +53,39 @@ pub(crate) fn create_task_anyhow() -> (
     (new_handler, graceful, force)
 }
 
+fn _create(
+    graceful_shutdown: CancellationToken,
+    force_shutdown: CancellationToken,
+) -> BoxFuture<'static, ()> {
+    use tokio::signal::ctrl_c;
+
+    fn terminate() -> BoxFuture<'static, ()> {
+        #[cfg(unix)]
+        let terminate = async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("failed to install signal handler")
+                .recv()
+                .await;
+        };
+
+        #[cfg(not(unix))]
+        let terminate = std::future::pending::<()>();
+
+        terminate.boxed()
+    }
+
+    async move {
+        tokio::select! {
+            _ = ctrl_c() => {}
+            _ = terminate() => {}
+        }
+        graceful_shutdown.cancel();
+        info!("GRACEFUL SHUTDOWN START");
+    }
+    .boxed()
+}
+
+/*
 // create_handle()内では必ずgraceful_shutdownが呼ばれてからforce_shutdownが呼ばれることを保障する
 // TODO: Signaleキャプチャした時どうする？
 async fn _create(graceful_shutdown: CancellationToken, force_shutdown: CancellationToken) -> () {
@@ -121,3 +152,4 @@ async fn _create(graceful_shutdown: CancellationToken, force_shutdown: Cancellat
 
     info!("SHUTDOWN")
 }
+ */

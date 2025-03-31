@@ -26,19 +26,6 @@ pub use conn::ConnectionId;
 
 pub mod error;
 
-pub mod util {
-    mod identify;
-    mod shutdown;
-    mod sync;
-    pub use sync::mutex_poisoned;
-    pub use sync::rwlock_read_poisoned;
-    pub use sync::rwlock_write_poisoned;
-    pub mod util_mpsc;
-    pub use identify::identify_protocol;
-    pub use identify::{ConnectionProtocol, IdentifierError};
-    pub(crate) use shutdown::Shutdown;
-}
-
 pub mod codec;
 
 /// Peercast Protocol
@@ -51,11 +38,11 @@ pub mod rtmp;
 pub mod app {
     pub mod cui;
     mod cui_dl;
-    mod root_server;
 
     pub use cui_dl::CuiDL;
-    pub use root_server::RootApp;
 }
+
+pub mod util;
 
 #[cfg(test)]
 mod test_helper;

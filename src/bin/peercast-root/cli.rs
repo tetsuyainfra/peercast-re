@@ -3,7 +3,7 @@ use std::process::exit;
 use clap::{Parser, Subcommand};
 
 /// Simple Daemon Program
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(name = env!("CARGO_BIN_NAME"))]
 #[command(version, about, long_about = None)]
 pub struct Args {
@@ -29,6 +29,9 @@ pub struct Args {
     #[arg(long, default_value_t = 7143)]
     pub api_port: u16,
 
+    // TODO: TIMEZONEの実装
+    // #[arg(long, default_value_t = 7143)]
+    // pub timezone: u16,
     /// Enable daemon-mode
     #[arg(short = 'D', long, default_value_t = false)]
     pub daemon: bool,
@@ -67,6 +70,9 @@ pub struct Args {
     )]
     pub access_log: std::path::PathBuf,
 
+    #[arg(long, value_name="FOOTER_FILE.yml", default_value = None)]
+    pub index_txt_footer: Option<std::path::PathBuf>,
+
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
@@ -74,7 +80,7 @@ pub struct Args {
     pub command: Option<Commands>,
 }
 
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, Clone)]
 pub enum Commands {
     Version {
         #[arg(long, default_value_t = false)]
@@ -85,53 +91,13 @@ pub enum Commands {
 pub fn version_print(args: &Args) -> anyhow::Result<()> {
     match args.command {
         Some(Commands::Version { json }) => {
-            _version_print(json)?;
+            peercast_re::util::version_print_with(json, |envs| {
+                envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
+                envs.insert("VERGEN_BIN_VERSION", Some(env!("CARGO_PKG_VERSION")));
+            })?;
             exit(0)
         }
         _ => {}
-    }
-
-    Ok(())
-}
-
-fn _version_print(output_as_json: bool) -> anyhow::Result<()> {
-    use std::collections::BTreeMap;
-
-    if output_as_json {
-        let build_envs = vergen_pretty::vergen_pretty_env!()
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|v| (k, v)))
-            .collect::<BTreeMap<_, _>>();
-        let s = serde_json::to_string_pretty(&build_envs)?;
-        println!("{}", s);
-    } else {
-        let stdout = std::io::stdout();
-        let mut stdout = stdout.lock();
-
-        let mut build_envs = vergen_pretty::vergen_pretty_env!();
-        build_envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
-        build_envs.insert("VERGEN_BIN_VERSION", Some(peercast_re::PKG_VERSION));
-        build_envs.insert("VERGEN_PKG_VERSION", Some(peercast_re::PKG_VERSION));
-        build_envs.insert(
-            "VERGEN_PKG_VERSION_MAJOR",
-            Some(peercast_re::PKG_VERSION_MAJOR),
-        );
-        build_envs.insert(
-            "VERGEN_PKG_VERSION_MINOR",
-            Some(peercast_re::PKG_VERSION_MINOR),
-        );
-        build_envs.insert(
-            "VERGEN_PKG_VERSION_PATCH",
-            Some(peercast_re::PKG_VERSION_PATCH),
-        );
-        build_envs.insert("VERGEN_PKG_AGENT", Some(peercast_re::PKG_AGENT));
-        // pub const PKG_AGENT: Lazy<String> =
-        //     Lazy::new(|| format!("PeerCast/0.1218 (REv{PKG_VERSION})"));
-
-        let _pp = vergen_pretty::PrettyBuilder::default()
-            .env(build_envs)
-            .build()?
-            .display(&mut stdout)?;
     }
 
     Ok(())
