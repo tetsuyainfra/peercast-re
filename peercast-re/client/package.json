@@ -1,7 +1,7 @@
 {
   "name": "client",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,7 +23,6 @@
     "clsx": "^2.1.1",
     "flv.js": "^1.6.2",
     "localforage": "^1.10.0",
-    "peercast-re-api": "file:../gen/ts-fetch",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-hook-form": "^7.54.2",

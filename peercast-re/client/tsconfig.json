@@ -25,7 +25,7 @@
     /* myconfif for shadcn */
     "baseUrl": ".",
     "paths": {
-      "@peercast-client": ["../gen/ts-fetch"],
+      "@peercast-api": ["../../libpeercast-re-apis/gen/ts-fetch"],
       "@/*": ["./src/*"]
     }
   },

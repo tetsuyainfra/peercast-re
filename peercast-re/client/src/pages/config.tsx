@@ -1,4 +1,4 @@
-import {  Configuration, ConfigApi } from "@peercast-client"
+import {  Configuration, ConfigApi } from "@peercast-api"
 import React, { useEffect } from "react"
 
 export default function Config() {
