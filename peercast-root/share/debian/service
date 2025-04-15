@@ -1,8 +1,6 @@
 [Unit]
 Description=PeerCast Root server daemon
 After=syslog.target network.target
-AssertPathExists=/usr/bin/peercast-root
-
 
 
 [Service]
@@ -12,7 +10,7 @@ Type=simple
 # Type=notify
 
 EnvironmentFile=-/etc/default/peercast-root
-ExecStart=/usr/local/bin/peercast-root $OPTIONS
+ExecStart=/usr/bin/peercast-root $OPTIONS
 # ExecReload=/bin/kill -HUP $MAINPID
 
 Restart=always

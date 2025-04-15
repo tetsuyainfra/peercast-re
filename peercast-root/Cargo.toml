@@ -69,3 +69,15 @@ chrono-tz = "0.10.3"
 # Commandline
 clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
 clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
+
+[package.metadata.deb]
+maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"
+copyright = "2025, tetsuyainfra"
+license-file = ["LICENSE"]
+# changelog = "changelog"
+assets = [
+    ["target/release/peercast-root", "usr/bin/", "755"],
+    ["share/debian/default/peercast-root", "etc/default/", "644"],
+]
+maintainer-scripts = "share/debian/"
+systemd-units = { enable = false }
