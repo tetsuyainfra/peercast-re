@@ -41,6 +41,9 @@ services:
       service: base
     entrypoint: >
       /usr/bin/bash -c "
+        id
+        ls -l /local
+        ls -l /local/gen
         rm -rf /local/gen/rust ;
         $${ENTRYPOINT} generate \\
         -i /local/api/openapi.yaml \\
@@ -51,75 +54,75 @@ services:
         -c /local/api/rust-config.yaml
       "
 
-  build-rust-server:
-    profiles: ["api"]
-    extends:
-      service: base
-    entrypoint: >
-      /usr/bin/bash -c "
-        rm -rf /local/gen/rust-server ;
-        $${ENTRYPOINT} generate \\
-        -i /local/api/openapi.yaml \\
-        -g rust-server \\
-        -o /local/gen/rust-server \\
-        -p packageVersion=$${PACKAGE_VERSION} \\
-        -p packageName=peercast-re-api-server
-      "
+  # build-rust-server:
+  #   profiles: ["api"]
+  #   extends:
+  #     service: base
+  #   entrypoint: >
+  #     /usr/bin/bash -c "
+  #       rm -rf /local/gen/rust-server ;
+  #       $${ENTRYPOINT} generate \\
+  #       -i /local/api/openapi.yaml \\
+  #       -g rust-server \\
+  #       -o /local/gen/rust-server \\
+  #       -p packageVersion=$${PACKAGE_VERSION} \\
+  #       -p packageName=peercast-re-api-server
+  #     "
 
-  build-js:
-    profiles: ["api"]
-    extends:
-      service: base
-    entrypoint: >
-      /usr/bin/bash -c "
-        rm -rf /local/gen/js ;
-        $${ENTRYPOINT} generate \\
-        -i /local/api/openapi.yaml \\
-        -g javascript \\
-        -o /local/gen/js \\
-        #  packageVersion=$${PACKAGE_VERSION}
-      "
+  # build-js:
+  #   profiles: ["api"]
+  #   extends:
+  #     service: base
+  #   entrypoint: >
+  #     /usr/bin/bash -c "
+  #       rm -rf /local/gen/js ;
+  #       $${ENTRYPOINT} generate \\
+  #       -i /local/api/openapi.yaml \\
+  #       -g javascript \\
+  #       -o /local/gen/js \\
+  #       #  packageVersion=$${PACKAGE_VERSION}
+  #     "
 
-  build-ts-fetch:
-    profiles: ["api"]
-    extends:
-      service: base
-    entrypoint: >
-      /usr/bin/bash -c "
-        rm -rf /local/gen/ts-fetch ;
-        $${ENTRYPOINT} generate \\
-        -i /local/api/openapi.yaml \\
-        -g typescript-fetch \\
-        -o /local/gen/ts-fetch \\
-        -p packageVersion=$${PACKAGE_VERSION} \\
-      "
+  # build-ts-fetch:
+  #   profiles: ["api"]
+  #   extends:
+  #     service: base
+  #   entrypoint: >
+  #     /usr/bin/bash -c "
+  #       rm -rf /local/gen/ts-fetch ;
+  #       $${ENTRYPOINT} generate \\
+  #       -i /local/api/openapi.yaml \\
+  #       -g typescript-fetch \\
+  #       -o /local/gen/ts-fetch \\
+  #       -p packageVersion=$${PACKAGE_VERSION} \\
+  #     "
 
-  build-ppc:
-    profiles: ["api", "ppc"]
-    extends:
-      service: base
-    entrypoint: >
-      /usr/bin/bash -c "
-        rm -rf /local/gen/ppc ;
-        $${ENTRYPOINT} generate \\
-        -i /local/api/peercast-port-checkerd.yaml \\
-        -g rust \\
-        -o /local/gen/ppc \\
-        -p packageName=ppc-api \\
-        -p packageVersion=$${PACKAGE_VERSION}
-      "
+  # build-ppc:
+  #   profiles: ["api", "ppc"]
+  #   extends:
+  #     service: base
+  #   entrypoint: >
+  #     /usr/bin/bash -c "
+  #       rm -rf /local/gen/ppc ;
+  #       $${ENTRYPOINT} generate \\
+  #       -i /local/api/peercast-port-checkerd.yaml \\
+  #       -g rust \\
+  #       -o /local/gen/ppc \\
+  #       -p packageName=ppc-api \\
+  #       -p packageVersion=$${PACKAGE_VERSION}
+  #     "
 
-  build-ppc-server:
-    profiles: ["api", "ppc"]
-    extends:
-      service: base
-    entrypoint: >
-      /usr/bin/bash -c "
-        rm -rf /local/gen/ppc-server ;
-        $${ENTRYPOINT} generate \\
-        -i /local/api/peercast-port-checkerd.yaml \\
-        -g rust-server \\
-        -o /local/gen/ppc-server \\
-        -p packageName=ppc-api \\
-        -p packageVersion=$${PACKAGE_VERSION}
-      "
+  # build-ppc-server:
+  #   profiles: ["api", "ppc"]
+  #   extends:
+  #     service: base
+  #   entrypoint: >
+  #     /usr/bin/bash -c "
+  #       rm -rf /local/gen/ppc-server ;
+  #       $${ENTRYPOINT} generate \\
+  #       -i /local/api/peercast-port-checkerd.yaml \\
+  #       -g rust-server \\
+  #       -o /local/gen/ppc-server \\
+  #       -p packageName=ppc-api \\
+  #       -p packageVersion=$${PACKAGE_VERSION}
+  #     "
