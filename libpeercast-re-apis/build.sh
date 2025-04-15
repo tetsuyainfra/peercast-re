@@ -1,6 +1,9 @@
 #!/bin/bash
 
 set -ex
+$SCRIPT_ROOT=$(cd $(dirname $0);pwd)
 
-docker compose -f docker-compose.build-api.yml  --profile api up --remove-orphans
+pushd $SCRIPT_ROOT
+    docker compose -f docker-compose.build-api.yml  --profile api up --remove-orphans
+popd
 
