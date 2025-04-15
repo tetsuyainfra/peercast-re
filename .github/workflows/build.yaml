@@ -48,6 +48,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4  #👈リポジトリのソースを持ってくる
 
+      - name: List files
+        run: ls
+
+      - name: working directory
+        run: pwd
+
       # API-CODEGEN
       - name: Build api-codegen
         run: ./libpeercast-re-apis/build.sh
