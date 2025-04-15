@@ -1,0 +1,9 @@
+FROM ubuntu:noble
+
+WORKDIR /app
+
+COPY ./target/release/peercast-root /app
+
+EXPOSE 7144 7143
+
+CMD ["/app/peercast-root"]
