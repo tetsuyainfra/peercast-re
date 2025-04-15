@@ -108,7 +108,7 @@ jobs:
         run: |
           mkdir dist
           cp -a ${{ join(matrix.files, ' ') }} ./dist
-          tar -c -z -v -f ${{ env.OUTPUT_FILENAME }}.tar.gz dist
+#          tar -c -z -v -f ${{ env.OUTPUT_FILENAME }}.tar.gz dist
 
       # artifacts
       - name: Upload artifact
@@ -116,9 +116,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OUTPUT_FILENAME }}
-          path: ${{ env.OUTPUT_FILENAME }}.tar.gz
+          path: ./dist
           retention-days: 7
-          compression-level: 0 # no compression
+          compression-level: 1 # no compression
 
 
 
