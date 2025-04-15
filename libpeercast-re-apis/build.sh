@@ -2,8 +2,12 @@
 
 set -ex
 SCRIPT_ROOT=$(cd $(dirname $0);pwd)
+USER_ID=$(id -u)
+GROUP_ID=$(id -g)
 
 pushd $SCRIPT_ROOT
-    UID=${UID} GID=${GID} docker compose -f docker-compose.build-api.yml  --profile api up --remove-orphans
+    id
+    docker compose -f docker-compose.build-api.yml  --profile api up --remove-orphans
+    ls -l gen
 popd
 

@@ -4,7 +4,7 @@ services:
   base:
     profiles: ["no_run"]
     image: openapitools/openapi-generator-cli:v7.12.0
-    user: "${UID}:${GID}"
+    user: "0:0"
     volumes:
       #- ./api:/api # Swagger Directory
       - ./:/local
@@ -39,6 +39,7 @@ services:
     profiles: ["api"]
     extends:
       service: base
+    user: "${USER_ID}:${GROUP_ID}"
     entrypoint: >
       /usr/bin/bash -c "
         id
