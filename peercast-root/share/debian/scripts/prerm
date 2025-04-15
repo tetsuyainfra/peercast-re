@@ -1,4 +1,0 @@
-#!/bin/sh
-
-deb-systemd-invoke stop peercast-root
-deb-systemd-invoke stop peercast-port-checkerd
