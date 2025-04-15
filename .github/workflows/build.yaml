@@ -85,6 +85,11 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      # use mold (ld compatible linker)
+      - uses: rui314/setup-mold@v1
+        with:
+          make-default: false
+
 
       - name: Run build script
         # run: ./build.sh
