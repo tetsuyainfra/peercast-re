@@ -70,7 +70,14 @@ pub struct Args {
     )]
     pub access_log: std::path::PathBuf,
 
-    #[arg(long, value_name="FOOTER_FILE.yml", default_value = None)]
+    /// Path to footer file by DEBUG MODE
+    #[cfg(debug_assertions)]
+    #[arg(long, value_name="FOOTER_FILE.toml", default_value = "share/peercast-root_footer.toml")]
+    pub index_txt_footer: Option<std::path::PathBuf>,
+
+    /// Path to footer file
+    #[cfg(not(debug_assertions))]
+    #[arg(long, value_name="FOOTER_FILE.toml", default_value = None)]
     pub index_txt_footer: Option<std::path::PathBuf>,
 
     #[command(flatten)]
