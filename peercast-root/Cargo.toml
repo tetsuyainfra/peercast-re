@@ -7,6 +7,7 @@ edition = "2024"
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
 anyhow = { version = "1.0.95" }
+thiserror = {version = "2.0.12"}
 
 # tracing logging
 tracing = "0.1.41"
@@ -48,6 +49,7 @@ hyper-util = { version = "0.1.10", features = ["full"] }
 serde = { version = "1.0.217", features = ["derive"] }
 # serde_derive = { version = "1.0" } # serde features = ["derive"]しているので必要ない
 serde_json = "1.0.138"
+toml = {version = "0.8.20"}
 
 # url
 url = { version = "2.5.4" }
