@@ -99,34 +99,33 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     });
     //
     _INDEX_TXT_FOOTER.get_or_init(|| {
-        let v = match args.index_txt_footer {
-            Some(ref p) => {
-                // open.p
-                todo!()
-            }
-            None => {
-                let mut ch = JsonChannel::empty();
-                ch.name = "Powered by peercast-re".into();
-                ch.contact_url = "https://beta-yp.007144.xyz/".into();
-                vec![ch]
-            }
-        };
-        v
+        // let v = match args.index_txt_footer {
+        //     Some(ref p) => {
+        //         // open.p
+        //         todo!()
+        //     }
+        //     None => {
+        //         let mut ch = JsonChannel::empty();
+        //         ch.name = "Powered by peercast-re".into();
+        //         ch.contact_url = "https://beta-yp.007144.xyz/".into();
+        //         vec![ch]
+        //     }
+        // };
+        // v
+        vec![]
     });
 
-    // DEBUG
+    if args.create_dummy_channel {
     let mut chinfo = ChannelInfo::new();
-    chinfo.name = "aiueo><><".into();
-    chinfo.url = "http://aiueo/<>".into();
+        chinfo.name = "ダミーチャンネル><><".into();
+        chinfo.genre = "ダミー".into();
+        chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
+        chinfo.url = "https://yp-dev.007144.xyz/".into();
     let config = RootConfig {
         tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
     };
     REPOSITORY().create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
-
-    let mut chinfo = ChannelInfo::new();
-    chinfo.name = "あいうえお".into();
-    chinfo.url = "http://あいうえお".into();
-    REPOSITORY().create_or_get(GnuId::new(), Some(chinfo), None, None);
+    }
 }
 
 async fn root() -> &'static str {

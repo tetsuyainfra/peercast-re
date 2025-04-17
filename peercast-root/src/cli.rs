@@ -80,6 +80,15 @@ pub struct Args {
     #[arg(long, value_name="FOOTER_FILE.toml", default_value = None)]
     pub index_txt_footer: Option<std::path::PathBuf>,
 
+    /// Create dummy channel at initialize.(Default true)
+    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=true)]
+    pub create_dummy_channel: bool,
+
+    /// Create dummy channel at initialize.(Default false)
+    #[cfg(not(debug_assertions))]
+    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=false)]
+    pub create_dummy_channel: bool,
+
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
