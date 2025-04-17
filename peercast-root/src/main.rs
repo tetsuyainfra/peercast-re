@@ -6,30 +6,31 @@ use std::{
     time::{Duration, Instant},
 };
 
-use axum::{response::IntoResponse, routing, Json, Router};
+use anyhow::Context;
+use axum::{Json, Router, response::IntoResponse, routing};
 use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
-use futures_util::{future::BoxFuture, FutureExt, SinkExt, StreamExt};
+use futures_util::{FutureExt, SinkExt, StreamExt, future::BoxFuture};
 use itertools::concat;
 use libpeercast_re::{
-    config,
+    ConnectionId, config,
     pcp::{
+        ChannelInfo, GnuId, Id4, ParentAtom, PcpConnectionFactory, TrackInfo,
         builder::{QuitBuilder, QuitReason, RootBuilder},
         connection::PcpConnection,
         decode::{PcpBroadcast, PcpChannel, PcpHost},
         procedure::PcpHandshake,
-        ChannelInfo, GnuId, Id4, ParentAtom, PcpConnectionFactory, TrackInfo,
     },
     util::{
-        identify_protocol, mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned,
-        ConnectionProtocol,
+        ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned,
+        rwlock_write_poisoned,
     },
-    ConnectionId,
 };
+use peercast_root::{FooterToml, IndexInfo};
 // use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::{
     fs::read,
     io::AsyncWriteExt,
@@ -99,32 +100,30 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     });
     //
     _INDEX_TXT_FOOTER.get_or_init(|| {
-        // let v = match args.index_txt_footer {
-        //     Some(ref p) => {
-        //         // open.p
-        //         todo!()
-        //     }
-        //     None => {
-        //         let mut ch = JsonChannel::empty();
-        //         ch.name = "Powered by peercast-re".into();
-        //         ch.contact_url = "https://beta-yp.007144.xyz/".into();
-        //         vec![ch]
-        //     }
-        // };
-        // v
-        vec![]
+        let mut v = vec![];
+        if let Some(ref path) = args.index_txt_footer {
+            let mut t = FooterToml::from_path(path)
+                .with_context(|| {
+                    let p = path.display();
+                    format!("index.txtのフッターファイル({p})の読み込みに失敗しました。")
+                })
+                .unwrap();
+            let mut infos: Vec<JsonChannel> = t.infomations.into_iter().map(|i| i.into()).collect();
+            v.append(&mut infos);
+        }
+        v
     });
 
     if args.create_dummy_channel {
-    let mut chinfo = ChannelInfo::new();
+        let mut chinfo = ChannelInfo::new();
         chinfo.name = "ダミーチャンネル><><".into();
         chinfo.genre = "ダミー".into();
         chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
         chinfo.url = "https://yp-dev.007144.xyz/".into();
-    let config = RootConfig {
-        tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
-    };
-    REPOSITORY().create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
+        let config = RootConfig {
+            tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
+        };
+        REPOSITORY().create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
     }
 }
 
@@ -596,22 +595,25 @@ fn shutdown_signal(
     .boxed()
 }
 
+fn merged_channels() -> Vec<JsonChannel> {
+    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
+
+    channels.reserve(INDEX_TXT_FOOTER().len());
+    channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
+    channels
+}
+
 async fn index_txt() -> impl IntoResponse {
-    let channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
-    let channels = channels.iter();
-    let footer = INDEX_TXT_FOOTER().iter();
-    let channels = channels.chain(footer).map(|c| c.to_line_of_index_txt());
+    let channels: Vec<String> = merged_channels()
+        .iter()
+        .map(|c| c.to_line_of_index_txt())
+        .collect();
 
     itertools::join(channels, "\n")
 }
 
 async fn index_json() -> Json<Vec<JsonChannel>> {
-    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
-
-    channels.reserve(INDEX_TXT_FOOTER().len());
-    channels.extend(INDEX_TXT_FOOTER().clone());
-
-    channels.into()
+    merged_channels().into()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -697,12 +699,12 @@ impl JsonChannel {
             &self.contact_url,
             &self.genre,
             &self.desc,
+            &self.comment,
             self.number_of_listener,
             self.number_of_relay,
             self.bitrate,
             &self.stream_ext,
             &self.created_at,
-            &self.comment,
         )
     }
     fn empty() -> Self {
@@ -739,12 +741,12 @@ fn create_index_line(
     contact_url: &String,
     genre: &String,
     desc: &String,
+    comment: &String,
     number_of_listener: i32,
     number_of_relay: i32,
     bitrate: i32,
     stream_ext: &String,
     created_at: &DateTime<Utc>,
-    comment: &String,
 ) -> String {
     use html_escape::{encode_quoted_attribute, encode_safe};
     let diff_time = Utc::now() - created_at;
@@ -755,6 +757,7 @@ fn create_index_line(
         .as_ref()
         .map(|a| a.to_string())
         .unwrap_or_default();
+
     format!(
         "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{file_ext}<>\
         <><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>",
@@ -773,6 +776,39 @@ fn create_index_line(
         time_min = min,
         comment = comment
     )
+}
+
+impl From<IndexInfo> for JsonChannel {
+    fn from(value: IndexInfo) -> Self {
+        let mut j = JsonChannel::empty();
+        let IndexInfo {
+            id,
+            name,
+            tracker_addr,
+            contact_url,
+            genre,
+            desc,
+            comment,
+            stream_ext,
+            bitrate,
+            number_of_listener,
+            number_of_relay,
+            created_at,
+        } = value;
+        j.id = id;
+        j.name = name;
+        j.tracker_addr = tracker_addr;
+        j.contact_url = contact_url;
+        j.genre = genre;
+        j.desc = desc;
+        j.comment = comment;
+        j.stream_ext = stream_ext;
+        j.bitrate = bitrate;
+        j.number_of_listener = number_of_listener;
+        j.number_of_relay = number_of_relay;
+        j.created_at = created_at.unwrap_or_else(|| chrono::Utc::now());
+        j
+    }
 }
 
 /*
@@ -998,7 +1034,7 @@ fn process_message(
     */
 #[cfg(test)]
 mod t {
-    use crate::{test_helper::*, RootChannel};
+    use crate::{RootChannel, test_helper::*};
 
     #[test]
     fn check_types() {
