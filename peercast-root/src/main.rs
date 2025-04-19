@@ -683,8 +683,8 @@ impl From<&RootChannel> for JsonChannel {
             stream_type,
             stream_ext,
             bitrate,
-            number_of_listener: 10, //
-            number_of_relay: 10,    //
+            number_of_listener: -1, // TODO: listern数を反映する
+            number_of_relay: -1,    // TODO: relay数を反映する
             created_at: ch.created_at(),
             track: ch.track_info().into(),
         }
