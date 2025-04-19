@@ -2,6 +2,7 @@
 name = "DevYP※お知らせ"
 desc = "更新時刻"
 comment = "実装中"
+contact_url = "https://yp.007144.xyz/"
 
 [[infomations]]
 name = "DevYP※ご注意"
