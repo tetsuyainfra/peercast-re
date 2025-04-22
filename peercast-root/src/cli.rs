@@ -81,6 +81,7 @@ pub struct Args {
     pub index_txt_footer: Option<std::path::PathBuf>,
 
     /// Create dummy channel at initialize.
+    #[cfg(debug_assertions)]
     #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=true)]
     pub create_dummy_channel: bool,
 
