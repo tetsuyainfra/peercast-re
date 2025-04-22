@@ -2,13 +2,13 @@ import { CodeSandboxLogoIcon, PlayIcon } from "@radix-ui/react-icons"
 import {
   ChannelsBroadcastIdDelete200ResponseFromJSON,
   RespChannel,
-} from "../../../gen/ts-fetch/models"
+} from "@peercast-api"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { useState } from "react"
 import { api_config, play_url } from "@/lib/api"
 import { DialogChannelPlayer } from "./ChannelPlayer"
-import { ChannelApi, ChannelsBroadcastIdDeleteRequest } from "@peercast-client"
+import { ChannelApi, ChannelsBroadcastIdDeleteRequest } from "@peercast-api"
 import { string } from "zod"
 
 interface ChannelCardProps {

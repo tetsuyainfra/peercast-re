@@ -230,8 +230,6 @@ tonic = { version = "0.12.3" }
 
 
 [build-dependencies]
-npm_rs = { version = "1.0.0" }
-embed-resource = "3.0.1"
 
 # Buildtime generate info
 # vergen = { version = "9.0.4", features = ["build", "cargo", "rustc", "si"] }

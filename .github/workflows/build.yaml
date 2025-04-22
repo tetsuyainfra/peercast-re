@@ -32,7 +32,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             files:
               - ./README.md
-              - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-re
+              # - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-re # 今は無効
               - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-port-checkerd
               - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-root
 
@@ -48,15 +48,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4  #👈リポジトリのソースを持ってくる
 
+      - name: List files
+        run: ls
+
+      - name: working directory
+        run: pwd
+
       # API-CODEGEN
       - name: Build api-codegen
-        run: ./api.codegen.sh
-
-      # - name: Save api-codegen cahce
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: codegen-cache
-      #     path: ./gen
+        run: ./libpeercast-re-apis/build.sh
 
       # Build client web module
       - name: Set up Node.js
@@ -64,14 +64,14 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: "./client/package-lock.json"
+          cache-dependency-path: "./peercast-re/client/package-lock.json"
       - name: Install dependencies
         # if: steps.cache-node-restore.outputs.cache-hit != 'true'
         run: npm ci
-        working-directory: ./client
+        working-directory: ./peercast-re/client
       - name: Build client
         run: npm run build
-        working-directory: ./client
+        working-directory: ./peercast-re/client
 
       # Build Binary
       - name: Cache cargo registry
@@ -84,6 +84,14 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo
+
+
+      # use mold (ld compatible linker)
+      - uses: rui314/setup-mold@v1
+        with:
+          make-default: false
 
 
       - name: Run build script
@@ -103,7 +111,7 @@ jobs:
         run: |
           mkdir dist
           cp -a ${{ join(matrix.files, ' ') }} ./dist
-          tar -c -z -v -f ${{ env.OUTPUT_FILENAME }}.tar.gz dist
+#          tar -c -z -v -f ${{ env.OUTPUT_FILENAME }}.tar.gz dist
 
       # artifacts
       - name: Upload artifact
@@ -111,9 +119,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OUTPUT_FILENAME }}
-          path: ${{ env.OUTPUT_FILENAME }}.tar.gz
+          path: ./dist
           retention-days: 7
-          compression-level: 0 # no compression
+          compression-level: 1 # no compression
 
 
 

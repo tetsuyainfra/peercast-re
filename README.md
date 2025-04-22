@@ -14,3 +14,7 @@ Generally write it as peercast-re.
 | [peercast-utils](peercast-utils)             | peercast-ping等を含むユーティリティープログラム                                       |
 | [check-specifications](check-specifications) | 作者が使用したライブラリの動作チェックなどに使っているディレクトリ (気にする必要なし) |
 
+# Create Package
+- deb -> cargo-deb
+- rpm -> cargo-generate-rpm
+- tar.gz -> cargo-make

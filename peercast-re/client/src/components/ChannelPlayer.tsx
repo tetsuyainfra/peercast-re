@@ -1,6 +1,6 @@
 import flvjs from "flv.js"
 
-import { RespChannel } from "@peercast-client"
+import { RespChannel } from "@peercast-api"
 import {
   Dialog,
   DialogTrigger,

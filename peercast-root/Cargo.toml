@@ -7,6 +7,7 @@ edition = "2024"
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
 anyhow = { version = "1.0.95" }
+thiserror = {version = "2.0.12"}
 
 # tracing logging
 tracing = "0.1.41"
@@ -48,6 +49,7 @@ hyper-util = { version = "0.1.10", features = ["full"] }
 serde = { version = "1.0.217", features = ["derive"] }
 # serde_derive = { version = "1.0" } # serde features = ["derive"]しているので必要ない
 serde_json = "1.0.138"
+toml = {version = "0.8.20"}
 
 # url
 url = { version = "2.5.4" }
@@ -69,3 +71,15 @@ chrono-tz = "0.10.3"
 # Commandline
 clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
 clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
+
+[package.metadata.deb]
+maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"
+copyright = "2025, tetsuyainfra"
+license-file = ["LICENSE"]
+# changelog = "changelog"
+assets = [
+    ["target/release/peercast-root", "usr/bin/", "755"],
+    ["share/debian/default/peercast-root", "etc/default/", "644"],
+]
+maintainer-scripts = "share/debian/"
+systemd-units = { enable = false }

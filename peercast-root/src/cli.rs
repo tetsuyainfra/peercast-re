@@ -70,8 +70,29 @@ pub struct Args {
     )]
     pub access_log: std::path::PathBuf,
 
-    #[arg(long, value_name="FOOTER_FILE.yml", default_value = None)]
+    /// Path to footer file by DEBUG MODE
+    #[cfg(debug_assertions)]
+    #[arg(long, value_name="FOOTER_FILE.toml", default_value = "share/peercast-root_footer.toml")]
     pub index_txt_footer: Option<std::path::PathBuf>,
+
+    /// Path to footer file
+    #[cfg(not(debug_assertions))]
+    #[arg(long, value_name="FOOTER_FILE.toml", default_value = None)]
+    pub index_txt_footer: Option<std::path::PathBuf>,
+
+    /// Create dummy channel at initialize.
+    #[cfg(debug_assertions)]
+    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=true)]
+    pub create_dummy_channel: bool,
+
+    /// Create dummy channel at initialize.
+    #[cfg(not(debug_assertions))]
+    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=false)]
+    pub create_dummy_channel: bool,
+
+    /// Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
+    #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS )]
+    pub allow_cors: Vec<String>,
 
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
@@ -102,3 +123,8 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+const LONG_HELP_CORS:&str = r#"Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
+※ URL末尾のスラッシュも関係してくるので注意すること
+"#;

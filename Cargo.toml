@@ -2,7 +2,8 @@
 
 members = [
   "check-specifications",
-  "libpeercast-re", "peercast-re",
+  "libpeercast-re",
+  "peercast-re",
   "peercast-root",
   "peercast-utils",
   "libpeercast-re-apis/gen/rust"

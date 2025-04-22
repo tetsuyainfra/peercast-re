@@ -27,7 +27,7 @@ import {
 } from "../ui/form"
 import { SlimFormItem } from "../my-ui/slim-form"
 
-import { Configuration, ChannelApi, ReqCreateChannel } from "@peercast-client"
+import { Configuration, ChannelApi, ReqCreateChannel } from "@peercast-api"
 import { hostname } from "os"
 import { api_config } from "@/lib/api"
 import React from "react"

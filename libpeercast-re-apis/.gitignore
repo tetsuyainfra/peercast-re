@@ -1,2 +1,2 @@
-gen/
-!gen/.keep
+gen/*
+!gen/.keep_dir

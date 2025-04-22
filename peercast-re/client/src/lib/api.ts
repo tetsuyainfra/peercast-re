@@ -1,4 +1,4 @@
-import { Configuration } from "@peercast-client"
+import { Configuration } from "@peercast-api"
 
 function addr_config(): [string, number] {
   let host = location.hostname
