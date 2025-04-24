@@ -1,6 +1,6 @@
 import flvjs from "flv.js"
+// import { RespChannel } from "@re-api"
 
-import { RespChannel } from "@peercast-api"
 import {
   Dialog,
   DialogTrigger,
@@ -14,7 +14,7 @@ import React from "react"
 
 interface ChannelPlayerProps {
   className?: string
-  channel: RespChannel
+  channel: any
 }
 
 const ChannelPlayer: React.FC<ChannelPlayerProps> = ({ channel, className }) => {

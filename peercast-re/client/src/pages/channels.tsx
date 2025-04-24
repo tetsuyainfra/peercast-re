@@ -3,29 +3,28 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BrodcastChannelButton from "@/components/forms/BrodcastChannelForm"
 import React, { useEffect, useState } from "react"
-import { api_config } from "@/lib/api"
-import { ChannelApi } from "@peercast-api"
-import { RespChannel } from "@peercast-api"
 import ChannelCard from "@/components/ChannelCard"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { env } from "process"
+// import { RespChannel } from "@re-api"
 
 export default function Channels() {
   const urlInputId = React.useId()
-  let [channels, channelsSet] = useState<RespChannel[]>([])
+  let [channels, channelsSet] = useState<any []>([])
   useEffect(() => {
-    ;(async () => {
-      let api = new ChannelApi(api_config())
-      await api.channelsGet().then(
-        (channels) => {
-          channelsSet(channels)
-        },
-        (err) => {
-          console.info("channelsGet failed", err)
-        },
-      )
-    })()
+    ;
+    // (async () => {
+    //   let api = new ChannelApi(api_config())
+    //   await api.channelsGet().then(
+    //     (channels) => {
+    //       channelsSet(channels)
+    //     },
+    //     (err) => {
+    //       console.info("channelsGet failed", err)
+    //     },
+    //   )
+    // })()
   }, [])
 
   const addChannel = (evt: React.FormEvent<HTMLFormElement>) => {
@@ -38,19 +37,20 @@ export default function Channels() {
     let id = url.pathname.split("/").at(-1) || ""
     let host = url.searchParams.get("tip") || ""
 
-    let api = new ChannelApi(api_config())
-    api
-      .createRelayChannel({
-        reqCreateRelayChannel: {
-          id: id,
-          host: host,
-        },
-      })
-      .then((channel) => {
-        console.log("createRelayChannel", channel)
-        window.location.reload()
-      })
+  // let api = new ChannelApi(api_config())
+  //   api
+  //     .createRelayChannel({
+  //       reqCreateRelayChannel: {
+  //         id: id,
+  //         host: host,
+  //       },
+  //     })
+  //     .then((channel) => {
+  //       console.log("createRelayChannel", channel)
+  //       window.location.reload()
+  //     })
   }
+
   return (
     <>
       <Tabs defaultValue="all" className="h-full space-y-6">

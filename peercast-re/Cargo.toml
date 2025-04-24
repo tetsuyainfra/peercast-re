@@ -2,11 +2,13 @@
 name = "peercast-re"
 version = "0.1.0"
 edition = "2024"
+default-run = "peercast-re"
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
 anyhow = { version = "1.0.95" }
+thiserror = {version = "*"}
 
 # tracing logging
 tracing = "0.1.41"
@@ -76,7 +78,9 @@ dirs = "6.0.0"
 # prcess exit code
 exitcode = "1"
 bitflags = "2.9.0"
+utoipa = { version = "5.3.1", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
+rust-embed = { version = "8.7.0", features = ["axum", "axum-ex"] }
 
 [build-dependencies]
-npm_rs = { version = "1.0.0" }
 embed-resource = "3.0.1"

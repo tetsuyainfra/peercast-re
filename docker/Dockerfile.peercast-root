@@ -2,7 +2,11 @@ FROM ubuntu:noble
 
 WORKDIR /app
 
-COPY ./target/release/peercast-root /app
+ARG TARGET=.
+ARG PROFILE=release
+
+# default(no build-arg) ./target/release/peercast-root
+COPY ./target/${TARGET}/${PROFILE}/peercast-root /app
 
 EXPOSE 7144 7143
 

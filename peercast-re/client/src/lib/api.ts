@@ -1,4 +1,3 @@
-import { Configuration } from "@peercast-api"
 
 function addr_config(): [string, number] {
   let host = location.hostname
@@ -11,16 +10,16 @@ function addr_config(): [string, number] {
   return [host, port]
 }
 
-function api_config(): Configuration {
-  let [host, port] = addr_config()
-  let config = {
-    basePath: `http://${host}:${port}/api`,
-  }
-  console.log("api_config:", config)
-  return new Configuration(config)
-}
+// function api_config(): Configuration {
+//   let [host, port] = addr_config()
+//   let config = {
+//     basePath: `http://${host}:${port}/api`,
+//   }
+//   console.log("api_config:", config)
+//   return new Configuration(config)
+// }
 
-function play_url(id: string): string {
+export function play_url(id: string): string {
   let [host, port] = addr_config()
   return `http://${host}:${port}/pls/${id}`
 }
@@ -30,4 +29,3 @@ function stream_url(id: string): string {
   return `http://${host}:${port}/stream/${id}`
 }
 
-export { api_config, play_url }

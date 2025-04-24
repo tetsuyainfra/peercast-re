@@ -1,18 +1,14 @@
 import { CodeSandboxLogoIcon, PlayIcon } from "@radix-ui/react-icons"
-import {
-  ChannelsBroadcastIdDelete200ResponseFromJSON,
-  RespChannel,
-} from "@peercast-api"
+// import { deleteChannelsByBroadcastId, RespChannel } from "@re-api"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { useState } from "react"
-import { api_config, play_url } from "@/lib/api"
 import { DialogChannelPlayer } from "./ChannelPlayer"
-import { ChannelApi, ChannelsBroadcastIdDeleteRequest } from "@peercast-api"
 import { string } from "zod"
+import { play_url } from "@/lib/api"
 
 interface ChannelCardProps {
-  channel: RespChannel
+  channel: any
 }
 
 const ChannelCard: React.FC<ChannelCardProps> = ({ channel }) => {
@@ -25,24 +21,16 @@ const ChannelCard: React.FC<ChannelCardProps> = ({ channel }) => {
   }
 
   const stopButton = (evt: React.MouseEvent<HTMLButtonElement>) => {
-    console.log(evt)
+    console.log(evt);
 
-    let api = new ChannelApi(api_config())
-
-    ;(async function () {
-      await api
-        .channelsBroadcastIdDelete({
-          broadcastId: channel.id,
-        })
-        .then(
-          (v) => {
-            window.location.reload()
-          },
-          (err) => {
-            window.location.reload()
-          },
-        )
-    })()
+    // (async function () {
+    //   await deleteChannelsByBroadcastId({ path: { broadcast_id: "a" } }).then((v) => {
+    //     window.location.reload(),
+    //       (err: any) => {
+    //         window.location.reload()
+    //       }
+    //   })
+    // })
 
     evt.preventDefault()
   }

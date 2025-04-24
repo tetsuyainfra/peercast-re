@@ -12,7 +12,7 @@ use serde_json::json;
 use super::AppState;
 use crate::pcp::GnuId;
 
-mod channels;
+// mod channels;
 mod config;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -23,7 +23,7 @@ pub struct Api;
 impl Api {
     pub(super) fn new() -> Router<AppState> {
         Router::new()
-            .nest("/channels", channels::ChannelsSvc::new())
+            // .nest("/channels", channels::ChannelsSvc::new())
             .nest("/config", config::ConfigSvc::new())
             .route("/ping", get(Self::pong))
             .route("/info", get(Self::info))

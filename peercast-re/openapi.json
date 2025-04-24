@@ -1,0 +1,32 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "peercast-re",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/channels": {
+      "get": {
+        "operationId": "list_channels",
+        "responses": {}
+      }
+    },
+    "/api/channels/create": {
+      "post": {
+        "operationId": "create_channel",
+        "responses": {}
+      }
+    }
+  },
+  "components": {},
+  "tags": [
+    {
+      "name": "peercast-re",
+      "description": "PeerCast Re: API"
+    }
+  ]
+}

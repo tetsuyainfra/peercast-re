@@ -14,27 +14,26 @@ env:
   PATH_DOCKER_PULL_CACHE: /tmp/docker-img-arch
 
 jobs:
+  generate-matrix:
+    name: Define matrix from json file
+    runs-on: ubuntu-latest
+
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: set-matrix
+        run: echo "matrix=$(cat matrix.json | jq -c)" >> $GITHUB_OUTPUT
+        working-directory: .github/workflows/
+
   build:
     name: Build binary
+    needs: ["generate-matrix"]
+
     strategy:
-      matrix:
-        os:
-          # - win
-          - linux
-        environment:
-          - name: "debug"
-            opt:
-          # - name: "release"
-          #   opt: "-release"
-        include:
-          - os: linux
-            runs_os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            files:
-              - ./README.md
-              # - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-re # 今は無効
-              - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-port-checkerd
-              - ./target/x86_64-unknown-linux-gnu/$ENVIRONMENT/peercast-root
+      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
 
     runs-on: ${{ matrix.runs_os }}
 
@@ -48,17 +47,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4  #👈リポジトリのソースを持ってくる
 
-      - name: List files
-        run: ls
-
-      - name: working directory
-        run: pwd
-
-      # API-CODEGEN
-      - name: Build api-codegen
-        run: ./libpeercast-re-apis/build.sh
-
-      # Build client web module
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -66,12 +54,20 @@ jobs:
           cache: npm
           cache-dependency-path: "./peercast-re/client/package-lock.json"
       - name: Install dependencies
-        # if: steps.cache-node-restore.outputs.cache-hit != 'true'
         run: npm ci
         working-directory: ./peercast-re/client
-      - name: Build client
-        run: npm run build
-        working-directory: ./peercast-re/client
+
+      - name: Run sccache-cache only on non-release runs
+        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Set Rust caching env vars only on non-release runs
+        if: github.event_name != 'release' && github.event_name != 'workflow_dispatch'
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      - name: Run sccache stat for check
+        shell: bash
+        run: ${SCCACHE_PATH} --show-stats
 
       # Build Binary
       - name: Cache cargo registry
@@ -82,21 +78,20 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
+            ~/.cache/sccache
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo
-
 
       # use mold (ld compatible linker)
       - uses: rui314/setup-mold@v1
         with:
           make-default: false
 
-
       - name: Run build script
-        # run: ./build.sh
-        run: cargo build ${{ matrix.environment.opt }} --target ${{ matrix.target }}
+        run: PROFILE=release TARGET=${{ matrix.target }} ./build.sh
+        # run: cargo build ${{ matrix.environment.opt }} --target ${{ matrix.target }}
 
       - name: ls build dir
         run: ls target
@@ -104,14 +99,12 @@ jobs:
       - name: ls build target dir
         run: ls target/${{ matrix.target }}/${{ matrix.environment.name }}
 
-      # Runs a set of commands using the runners shell
-      - name: Packaging binary
-        env:
-          ENVIRONMENT: ${{ matrix.environment.name }}
-        run: |
-          mkdir dist
-          cp -a ${{ join(matrix.files, ' ') }} ./dist
-#          tar -c -z -v -f ${{ env.OUTPUT_FILENAME }}.tar.gz dist
+      # - name: Packaging binary
+      #   env:
+      #     ENVIRONMENT: ${{ matrix.environment.name }}
+      #   run: |
+      #     mkdir dist
+      #     cp -a ${{ join(matrix.files, ' ') }} ./dist
 
       # artifacts
       - name: Upload artifact
@@ -119,9 +112,82 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.OUTPUT_FILENAME }}
-          path: ./dist
+          # path: ./dist
+          path: "${{ join(matrix.files, '\n') }}"
           retention-days: 7
-          compression-level: 1 # no compression
+          compression-level: 1 # no compression = 0
+          if-no-files-found: error # 'warn' or 'ignore' are also available, defaults to `warn`
 
+  build-docker:
+    name: Build docker image
+    needs: ["generate-matrix", "build"]
 
+    strategy:
+      matrix: ${{ fromJSON(needs.generate-matrix.outputs.matrix) }}
 
+    runs-on: ${{ matrix.runs_os }}
+
+    env:
+      OUTPUT_FILENAME: "${{ matrix.os }}-${{ matrix.environment }}-${{ github.sha }}"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.OUTPUT_FILENAME }}
+          path: .
+
+      - name: check files
+        run: |
+          pwd
+          ls -lh ./
+          ls -lh ./target
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            tetsuyainfra/peercast-root
+          tags: |
+            type=ref,event=branch
+            type=sha
+          # images: |
+          #   my-docker-hub-namespace/my-docker-hub-repository
+          #   ghcr.io/${{ github.repository }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # - name: Log in to the Container registry
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: "./docker/Dockerfile.peercast-root"
+          build-args: |
+            TARGET=${{ matrix.target }}
+            PRIFILE=${{ matrix.environment.name }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # - name: Generate artifact attestation
+      #   uses: actions/attest-build-provenance@v2
+      #   with:
+      #     subject-name: index.docker.io/my-docker-hub-namespace/my-docker-hub-repository
+      #     subject-digest: ${{ steps.push.outputs.digest }}
+      #     push-to-registry: true

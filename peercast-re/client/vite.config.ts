@@ -30,7 +30,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
+      // "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
+      "@re-api": path.resolve(__dirname, "./libapi"),
       "@": path.resolve(__dirname, "./src"),
     },
   },

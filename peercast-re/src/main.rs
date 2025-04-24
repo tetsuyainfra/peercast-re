@@ -1,97 +1,65 @@
+use api::{router, ReStore};
 use clap::Parser;
-use std::path::PathBuf;
-use tracing::debug;
+use std::{net::SocketAddr, path::PathBuf};
+use tracing::{debug, info};
 
-use libpeercast_re::{
-    app::cui::{self, CuiError},
-    config::{Config, ConfigLoader},
-    error::ConfigError,
-};
+
+mod cli;
+mod api;
+mod config;
+mod ui;
+
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Parse args
-///
-#[derive(Debug, Parser)]
-#[clap(
-        name = env!("CARGO_PKG_NAME"),
-        author = env!("CARGO_PKG_AUTHORS"),
-        about = env!("CARGO_PKG_DESCRIPTION"),
-    )]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-struct Cli {
-    #[clap(
-        short = 'C',
-        long = "config",
-        value_name = "CONFIG_FILE",
-        env = "PEERCAST_RE_CONFIG"
-    )]
-    config_file: Option<PathBuf>,
+// MAIN
+//
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let cli = cli::Args::parse();
+    dbg!(&cli);
 
-    #[clap(
-        short = 'b',
-        long = "bind",
-        value_name = "IP_ADDRESS",
-        // default_value = "0.0.0.0"
-    )]
-    server_address: Option<std::net::IpAddr>,
+    // let Ok((config_path, config)) = config::load_config(cli.config_file.clone()) else {
+    //     std::process::exit(exitcode::CONFIG);
+    // };
+    // let config = cli.merge_with(&config);
 
-    #[clap(
-        short='p', long="port", value_name = "PORT",
-        env = "PEERCAST_RE_PORT",
-        //  default_value = "17144",
-        value_parser = clap::value_parser!(u16).range(5000..)
-    )]
-    server_port: Option<u16>,
-}
+    logging_init();
+    let (router, api) = router(ReStore{}.into());
+    let app = router.merge(ui::router());
 
-impl Cli {
-    /// merge Config and Cli instance.
-    fn merge_with(self, config: &Config) -> Config {
-        use libpeercast_re::config::ConfigAddress;
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 17145))
+        .await
+        .unwrap();
 
-        let mut config = config.clone();
+    info!(
+        "listening on http://{}/",
+        listener.local_addr().unwrap(),
+    );
 
-        if let Some(ip) = self.server_address {
-            config.server_address = ConfigAddress::NoConfig(ip)
-        };
-        if let Some(port) = self.server_port {
-            config.server_port = port
-        };
-        config
-    }
-}
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
+    // match cui::CuiApp::run(config_path, config) {
+    //     Ok(_) => std::process::exit(exitcode::OK),
+    //     Err(e) => {
+    //         println!("{e}");
+    //         match e {
+    //             CuiError::LoadConfiguration => std::process::exit(exitcode::CONFIG),
+    //             CuiError::ApplicationError => std::process::exit(exitcode::SOFTWARE),
+    //             CuiError::ShutdownFailed(_) => std::process::exit(exitcode::SOFTWARE),
+    //             CuiError::Io(_) => std::process::exit(exitcode::IOERR),
+    //         }
+    //     }
+    // }
 
-fn load_config(env_or_args: Option<PathBuf>) -> Result<(PathBuf, Config), ConfigError> {
-    let exe_dir = PathBuf::from(std::env::current_exe().unwrap().parent().unwrap());
-
-    let (path, config) = ConfigLoader::<Config>::new()
-        .env_or_args(env_or_args)
-        .add_source(exe_dir.join("peercast-re.ini"))
-        .default_source(
-            dirs::config_dir()
-                .unwrap()
-                .join("peercast-re/peercast-re.ini"),
-        ) // これでいいのか？
-        .load();
-
-    debug!(?config);
-    Ok((path, config?))
+    Ok(())
 }
 
 /// initialize logging
 fn logging_init() {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-    // tracing_subscriber::fmt()
-    //     // enable everything
-    //     .with_max_level(tracing::Level::TRACE)
-    //     // display source code file paths
-    //     .with_file(true)
-    //     // display source code line numbers
-    //     .with_line_number(true)
-    //     // disable targets
-    //     .with_target(false)
-    //     // sets this to be the default, global collector for this application.
-    //     .init();
 
     tracing_subscriber::registry()
         .with(
@@ -105,31 +73,4 @@ fn logging_init() {
             "debug".into()
         }))
         .init();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// MAIN
-//
-fn main() {
-    logging_init();
-    let cli = Cli::parse();
-    println!("{:#?}", &cli);
-
-    let Ok((config_path, config)) = load_config(cli.config_file.clone()) else {
-        std::process::exit(exitcode::CONFIG);
-    };
-    let config = cli.merge_with(&config);
-
-    match cui::CuiApp::run(config_path, config) {
-        Ok(_) => std::process::exit(exitcode::OK),
-        Err(e) => {
-            println!("{e}");
-            match e {
-                CuiError::LoadConfiguration => std::process::exit(exitcode::CONFIG),
-                CuiError::ApplicationError => std::process::exit(exitcode::SOFTWARE),
-                CuiError::ShutdownFailed(_) => std::process::exit(exitcode::SOFTWARE),
-                CuiError::Io(_) => std::process::exit(exitcode::IOERR),
-            }
-        }
-    }
 }

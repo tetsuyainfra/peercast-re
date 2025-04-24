@@ -27,10 +27,9 @@ import {
 } from "../ui/form"
 import { SlimFormItem } from "../my-ui/slim-form"
 
-import { Configuration, ChannelApi, ReqCreateChannel } from "@peercast-api"
 import { hostname } from "os"
-import { api_config } from "@/lib/api"
 import React from "react"
+// import { createBroadcastChannel, ReqCreateChannel } from "@re-api"
 
 const formSchema = z.object({
   name: z.string().min(1).max(64),
@@ -53,20 +52,20 @@ export default function BrodcastChannelButton() {
     // Do something with the form values.
     // ✅ This will be type-safe and validated.
     // let api_config = new Configuration({ basePath: "http://localhost:17144/api" })
-    let api = new ChannelApi(api_config())
 
-    api
-      .createBroadcastChannel({
-        reqCreateChannel: {
-          name: values.name,
-          genre: values.genre,
-        },
-      })
-      .then((resp) => {
-        console.log("channelsPost: ", resp)
-        setOpen(false)
-        window.location.reload()
-      })
+    // let body : ReqCreateChannel = {};
+    // createBroadcastChannel({ body })
+      // createBroadcastChannel({
+      //   reqCreateChannel: {
+      //     name: values.name,
+      //     genre: values.genre,
+      //   },
+      // })
+      // .then((resp) => {
+      //   console.log("channelsPost: ", resp)
+      //   setOpen(false)
+      //   window.location.reload()
+      // })
   }
 
   return (
