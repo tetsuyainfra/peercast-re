@@ -6,6 +6,11 @@ on:
         description: deleted branch-name
         required: true
         type: string
+      limit_num:
+        description: max delete cache count
+        required: false
+        type: number
+        default: 1000
 
 permissions:
   actions: write
@@ -17,18 +22,24 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
       BRANCH: "refs/heads/${{ inputs.branch_name }}"
+      LIMIT_NUM: "${{ inputs.limit_num }}"
     steps:
       - name: Cleanup
+        shell: bash
         run: |
           echo "Fetching list of cache key"
-          cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
+          cacheKeysForPR=$(gh cache list --ref $BRANCH --limit LIMIT_NUM --json id --jq '.[].id' | awk '{print NR,$0}')
 
           ## Setting this to not fail the workflow while deleting cache keys.
           set +e
           echo "Deleting caches..."
+          i=0
           for cacheKey in $cacheKeysForPR
           do
+              echo delete $i
               gh cache delete $cacheKey
+              # bash's increment
+              ((count++))
           done
           echo "Done"
         # if: startsWith(github.event.ref, 'feature/')
