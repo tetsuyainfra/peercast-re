@@ -16,7 +16,6 @@ jobs:
       BRANCH: ${{ inputs.branch_name }}
     steps:
       - name: Cleanup
-        if: startsWith(github.event.ref, 'feature/')
         run: |
           echo "Fetching list of cache key"
           cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
@@ -29,6 +28,7 @@ jobs:
               gh cache delete $cacheKey
           done
           echo "Done"
+        # if: startsWith(github.event.ref, 'feature/')
         # env:
           # pull request
           # BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
