@@ -1,7 +1,7 @@
 use api::{router, ReStore};
 use clap::Parser;
-use std::{net::SocketAddr, path::PathBuf};
-use tracing::{debug, info};
+use std::net::SocketAddr;
+use tracing::info;
 
 
 mod cli;
