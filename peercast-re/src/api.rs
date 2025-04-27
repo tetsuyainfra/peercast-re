@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Json, extract::State};
-use libpeercast_re::http::Api;
 use serde::Serialize;
-use serde_json::json;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 

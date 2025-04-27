@@ -2,15 +2,13 @@
 /// PeerCastのポートが開いているか確認してくれるAPIサーバー
 /// IPv4/IPv6の両方のポートを開いて待つ
 ///
-use std::{net::SocketAddr, process::exit};
+use std::net::SocketAddr;
 
-use anyhow::Context;
 use utoipa::{OpenApi, openapi};
 use utoipa_axum::router::OpenApiRouter;
 
 use clap::Parser;
-use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
-use tracing::{Level, error, info};
+use tracing::{error, info};
 use tracing_subscriber::{EnvFilter, prelude::*};
 use utoipa_swagger_ui::SwaggerUi;
 
