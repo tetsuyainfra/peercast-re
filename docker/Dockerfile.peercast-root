@@ -6,8 +6,10 @@ ARG TARGET=.
 ARG PROFILE=release
 
 # default(no build-arg) ./target/release/peercast-root
-COPY ./target/${TARGET}/${PROFILE}/peercast-root /app
+COPY --chmod=755 ./target/${TARGET}/${PROFILE}/peercast-root      /app
+COPY --chmod=644 ./peercast-root/share/peercast-root_footer.toml  /app
 
 EXPOSE 7144 7143
 
-CMD ["/app/peercast-root"]
+ENTRYPOINT [ "/app/peercast-root" ]
+#CMD ["/app/peercast-root"]
