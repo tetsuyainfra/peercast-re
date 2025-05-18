@@ -32,6 +32,7 @@ use peercast_root::{FooterToml, IndexInfo};
 // use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
+use serde_json::value::Index;
 use tokio::{
     fs::read,
     io::AsyncWriteExt,
@@ -60,7 +61,7 @@ static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
 // Don't use directly. SEE: HTTP_API()
 static _HTTP_API: OnceLock<Router> = OnceLock::new();
 // Don't use directly. SEE: INDEX_TXT_FOOTER()
-static _INDEX_TXT_FOOTER: OnceLock<Vec<JsonChannel>> = OnceLock::new();
+static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct ApiState {}
@@ -85,7 +86,7 @@ pub fn HTTP_API() -> &'static Router {
 
 #[inline]
 #[allow(non_snake_case, private_interfaces)]
-pub fn INDEX_TXT_FOOTER() -> &'static Vec<JsonChannel> {
+pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
 }
 
@@ -110,7 +111,8 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
                     format!("index.txtのフッターファイル({p})の読み込みに失敗しました。")
                 })
                 .unwrap();
-            let mut infos: Vec<JsonChannel> = t.infomations.into_iter().map(|i| i.into()).collect();
+            let mut infos: Vec<IndexInfo> = t.infomations.into_iter().map(|i| i.into()).collect();
+            dbg!(&infos);
             v.append(&mut infos);
         }
         v
@@ -645,7 +647,7 @@ struct JsonChannel {
     // status: String,
     number_of_listener: i32,
     number_of_relay: i32,
-    created_at: DateTime<Utc>,
+    created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
     track: JsonTrack,
 }
 

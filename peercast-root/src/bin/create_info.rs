@@ -61,9 +61,6 @@ pub struct Args {
     pub comment: String,
 
     #[arg(long, default_value="")]
-    pub stream_type: String,
-
-    #[arg(long, default_value="")]
     pub stream_ext: String,
 
     #[arg(long, default_value_t=0)]
