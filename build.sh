@@ -1,8 +1,8 @@
 #!/bin/bash
 SCRIPT_ROOT=$(cd $(dirname $0);pwd)
 
-PROFILE=${PROFILE:-dev}
 TARGET=${TARGET:-x86_64-unknown-linux-gnu}
+PROFILE=${PROFILE:-dev}
 
 set -ex
 
