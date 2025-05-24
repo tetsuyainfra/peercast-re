@@ -42,6 +42,7 @@ tower-http = { version = "0.6.2", features = [
     "request-id",
     "timeout",
     "add-extension",
+    "set-header"
 ] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 

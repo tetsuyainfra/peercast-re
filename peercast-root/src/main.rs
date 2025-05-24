@@ -7,7 +7,12 @@ use std::{
 };
 
 use anyhow::Context;
-use axum::{http::{HeaderValue, Method}, response::IntoResponse, routing, Json, Router};
+use axum::{
+    Json, Router,
+    http::{HeaderValue, Method},
+    response::IntoResponse,
+    routing,
+};
 use axum_extra::headers::Header;
 use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
@@ -40,7 +45,7 @@ use tokio::{
     time::Interval,
 };
 use tokio_util::sync::CancellationToken;
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
 use tracing::{debug, error, info, instrument::WithSubscriber, trace, warn};
 use url::Url;
 
@@ -563,12 +568,18 @@ async fn server_http(
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
     info!("asset_dir: {:?}", &assets_dir);
 
-    let cor_origins: Vec<_> = args.allow_cors.iter().map(|origin| origin.parse::<HeaderValue>().unwrap()).collect();
+    let cor_origins: Vec<_> = args
+        .allow_cors
+        .iter()
+        .map(|origin| origin.parse::<HeaderValue>().unwrap())
+        .collect();
     info!("cor_origins: {:?}", &cor_origins);
+
+    let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
+    info!("cache-control: {}", &cache_control_value);
 
     let tracker = tokio_util::task::TaskTracker::new();
     info!("START HTTP SERVER");
-
 
     let app = Router::new()
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
@@ -578,14 +589,17 @@ async fn server_http(
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        ).layer(
+        )
+        .layer(
             CorsLayer::new()
                 .allow_origin(cor_origins)
                 // .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
-                .allow_methods([Method::GET])
-        );
-
-        // Access-Control-Allow-Origin
+                .allow_methods([Method::GET]),
+        )
+        .layer(SetResponseHeaderLayer::if_not_present(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap()
+        ));
 
     axum::serve(
         listener,

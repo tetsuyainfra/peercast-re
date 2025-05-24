@@ -94,6 +94,9 @@ pub struct Args {
     #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS )]
     pub allow_cors: Vec<String>,
 
+    #[arg(long, value_parser, default_value_t=30)]
+    pub cache_max_age: u32,
+
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
