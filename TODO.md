@@ -11,3 +11,12 @@
 # Debian Script Debug
 - sudo dpkg -D2 -i target/debian/peercast-re_0.1.0-1_amd64.deb
   - dpkg -Dhで詳細
+
+# peercast-re
+- [] 
+
+# peercast-root
+- [] index.txtのfooterにStatus情報を表示
+  - [] memory usage
+  - [] cpu usage
+  - [] uptime
