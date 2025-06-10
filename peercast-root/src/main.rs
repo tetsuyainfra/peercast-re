@@ -129,6 +129,7 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
         chinfo.genre = "ダミー".into();
         chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
         chinfo.url = "https://yp-dev.007144.xyz/".into();
+        chinfo.stream_ext = "RAW".into();
         let config = RootConfig {
             tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
         };
@@ -788,8 +789,7 @@ fn create_index_line(
         .unwrap_or_default();
 
     format!(
-        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{file_ext}<>\
-        <><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>",
+        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{file_ext}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
         name = encode_safe(&name.clone()),
         id = id,
         addr = addr,
