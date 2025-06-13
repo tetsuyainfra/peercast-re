@@ -76,7 +76,9 @@ fn _create(
 
     async move {
         tokio::select! {
-            _ = ctrl_c() => {}
+            _ = ctrl_c() => {
+                println!("\nCtrl-C received, initiating graceful shutdown...");
+            }
             _ = terminate() => {}
         }
         graceful_shutdown.cancel();

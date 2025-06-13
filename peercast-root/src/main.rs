@@ -39,10 +39,7 @@ use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Index;
 use tokio::{
-    fs::read,
-    io::AsyncWriteExt,
-    net::{TcpListener, TcpStream},
-    time::Interval,
+    fs::read, io::AsyncWriteExt, net::{TcpListener, TcpStream}, sync::watch, time::Interval
 };
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
@@ -55,6 +52,8 @@ mod cli;
 mod logging;
 mod repository;
 mod shutdown;
+mod shutdown2;
+mod shutdown3;
 
 #[cfg(test)]
 mod test_helper;
@@ -164,21 +163,21 @@ async fn main() -> anyhow::Result<()> {
         listener_http.local_addr().unwrap(),
     );
 
-    let (shutdown_task, graceful, force) = shutdown::create_task_anyhow();
+    // let (shutdown_task, graceful, force) = shutdown::create_task_anyhow();
+    let (shutdown_task, graceful) = shutdown3::create_task_anyhow();
 
     let shutdown_task = tokio::spawn(shutdown_task);
-    // let peercast_server_task = tokio::spawn(server_peercast(
-    //     args.clone(),
-    //     listener_pcp,
-    //     graceful.clone(),
-    //     force.clone(),
-    // ));
-    let http_server_task = tokio::spawn(server_http(args, listener_http, graceful, force));
+    let peercast_server_task = tokio::spawn(server_peercast(
+        args.clone(),
+        listener_pcp,
+        graceful.clone(),
+    ));
+    let http_server_task = tokio::spawn(server_http(args, listener_http, graceful));
 
     // futures_util::future::join_all(vec![http_server_task])
-    futures_util::future::join_all(vec![shutdown_task, http_server_task])
-        // futures_util::future::join_all(vec![peercast_server_task, http_server_task])
-        // futures_util::future::join_all(vec![shutdown_task, peercast_server_task, http_server_task])
+    // futures_util::future::join_all(vec![shutdown_task, http_server_task])
+    // futures_util::future::join_all(vec![peercast_server_task, http_server_task])
+    futures_util::future::join_all(vec![shutdown_task, peercast_server_task, http_server_task])
         .await;
 
     Ok(())
@@ -188,50 +187,52 @@ async fn server_peercast(
     args: cli::Args,
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
+    // スレッドの終了を検知するためのチャンネル
+    let (closed_tx, closed_rx) = tokio::sync::watch::channel(());
     let tracker = tokio_util::task::TaskTracker::new();
     info!("START PCP SERVER");
 
-    let app: axum::Router =
-        axum::Router::new().route("/", axum::routing::get(|| async { "/ path" }));
-
-    loop {
+    'accept: loop {
+        println!("loop start");
         let cid = ConnectionId::new();
         let name = format!("tcp({})", cid);
         let spawner = tokio::task::Builder::new().name(&name);
         let child_graceful_shutdown = graceful_shutdown.child_token();
-        let child_force_shutdown = force_shutdown.child_token();
+
+        // Dropすることで、全ての接続終了を確認する
+        let closed_rx = closed_rx.clone();
 
         tokio::select! {
             accept = listener.accept() => {
+                println!("accepting connection");
                 match accept {
                     Ok((stream, addr)) => {
-                        let _handle = spawner.spawn(tracker.track_future(serve_peercast( cid, stream, addr, child_graceful_shutdown, child_force_shutdown)));
+                        println!("{}: accept connection from {}", &name, &addr);
+                        let _handle = spawner.spawn(tracker.track_future(serve_peercast( cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
+                        // let _handle = spawner.spawn(serve_peercast( cid, stream, addr, child_graceful_shutdown, closed_rx));
                     }
                     Err(e) => {
                         error!(?e, "something is occured in listener.accept()");
-                        break;
+                        break 'accept;
                     }
                 }
             },
             _ = graceful_shutdown.cancelled() => {
                 info!("GRACEFUL SHUTDOWN REQUESTED");
-                break;
+                break 'accept;
             }
-        }
+        };
     }
 
-    tokio::select! {
-        _ = force_shutdown.cancelled() => {
-            // trackerが存在することでくれるありがたい
-            tracker.close();
-            tracker.wait().await;
+    // 自身で持っている接続を閉じる
+    drop(closed_rx);
+    // 全ての接続が閉じるまで待つ
+    let _ = closed_tx.closed().await;
 
-            // MEMO: こうやってshutdownのタイムアウトを設定してもいいよな・・・
-            // timeout(tracker.wait()).await
-        }
-    }
+    // trackerを閉じて、新規にSpawnできないようにし、全てのスレッドが終了するのを待つ
+    tracker.close();
+    tracker.wait().await;
 
     Ok(())
 }
@@ -242,12 +243,12 @@ async fn serve_peercast(
     mut stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
+    closed_send: watch::Receiver<()>,
 ) {
     info!(?cid, ?remote, "SPAWN SERVE");
     match identify_protocol(&stream).await {
         Ok(ConnectionProtocol::PeerCast) => {
-            serve_root(cid, stream, remote, graceful_shutdown, force_shutdown).await
+            serve_root(cid, stream, remote, graceful_shutdown, closed_send).await
         }
         Ok(ConnectionProtocol::PeerCastHttp) => {
             error!("PeerCastHttp is not allowed");
@@ -278,7 +279,7 @@ async fn serve_root(
     mut stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
+    closed_send: watch::Receiver<()>,
 ) {
     use libpeercast_re::pcp::connection::HandshakeType;
     let read_buf = BytesMut::new();
@@ -329,7 +330,7 @@ async fn serve_root(
         (Some(chid), Some(chpkt)) => (chid, chpkt),
         _ => return,
     };
-    // TODO: HostのIPチェックを行う
+    // TODO: HostのIPチェックを行う？
 
     // Hostの接続先を確定
     let tracker_host = host
@@ -365,7 +366,7 @@ async fn serve_root(
     let ch = repo.create_or_get(*channel_id_in_bcst, channel_info, track_info, Some(config));
 
     // Channelにコネクションを接続
-    let attach_task = ch.attach_connection(conn);
+    let attach_task = ch.attach_connection(conn, graceful_shutdown, closed_send);
     attach_task.await;
 }
 
@@ -417,6 +418,7 @@ impl RootChannel {
         info!(cid = ?self.cid, "ArrivedBroadcast");
         debug!(?bcst);
         // TODO: 不正チェックした方がいいかも
+
         let PcpBroadcast {
             channel_packet,
             host,
@@ -499,7 +501,7 @@ impl RootChannel {
 }
 
 impl RootChannel {
-    fn attach_connection(self, mut pcp_connection: PcpConnection) -> AttachTaskFuture {
+    fn attach_connection(self, mut pcp_connection: PcpConnection, graceful_shutdown: CancellationToken, closed_send: watch::Receiver<()>) -> AttachTaskFuture {
         info!("ATTACH CONNECTION TO CHANNEL ");
         async move {
             info!("START");
@@ -523,6 +525,10 @@ impl RootChannel {
                             }
                         }
                     }
+                    _ = graceful_shutdown.cancelled() => {
+                        warn!("Shutdown signal catched");
+                        break 'main
+                    }
                 };
             } // loop 'main
 
@@ -532,6 +538,9 @@ impl RootChannel {
 
             drop(read_inner);
             drop(write_inner);
+
+            // スレッドの終了を知らせる
+            drop(closed_send);
         }
         .boxed()
     }
@@ -558,7 +567,6 @@ async fn server_http(
     args: cli::Args,
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
     use axum::routing::any;
     use tower_http::{
@@ -606,7 +614,7 @@ async fn server_http(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal(graceful_shutdown, force_shutdown))
+    .with_graceful_shutdown(shutdown_signal(graceful_shutdown ))
     .await
     .unwrap();
 
@@ -615,7 +623,6 @@ async fn server_http(
 
 fn shutdown_signal(
     graceful_shutdown: CancellationToken,
-    _force_shutdown: CancellationToken,
 ) -> BoxFuture<'static, ()> {
     async move {
         //
