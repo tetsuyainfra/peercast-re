@@ -90,7 +90,7 @@ jobs:
           make-default: false
 
       - name: Run build script
-        run: PROFILE=release TARGET=${{ matrix.target }} ./build.sh
+        run: PROFILE=release TARGET=${{ matrix.target }} ./_build.sh
         # run: cargo build ${{ matrix.environment.opt }} --target ${{ matrix.target }}
 
       - name: ls build dir
