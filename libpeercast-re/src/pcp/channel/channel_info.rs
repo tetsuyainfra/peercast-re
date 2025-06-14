@@ -2,6 +2,8 @@ use serde::Serialize;
 
 use crate::pcp::{atom::decode::PcpChannelInfo, Atom, Id4};
 
+use super::merge_field;
+
 /// Channel's info
 /// AtomにするときはNull文字を追加するのを忘れないように
 #[derive(Debug, Clone, Default, Serialize)]
@@ -23,7 +25,17 @@ impl ChannelInfo {
         Default::default()
     }
 
-    pub fn merge_pcp(&mut self, new_val: &PcpChannelInfo) {}
+    pub fn merge_pcp(&mut self, val: PcpChannelInfo) {
+        merge_field!(self, val, typ);
+        merge_field!(self, val, name);
+        merge_field!(self, val, genre);
+        merge_field!(self, val, desc);
+        merge_field!(self, val, comment);
+        merge_field!(self, val, url);
+        merge_field!(self, val, stream_type);
+        merge_field!(self, val, stream_ext);
+        merge_field!(self, val, bitrate);
+    }
 }
 
 impl From<&PcpChannelInfo> for ChannelInfo {
@@ -43,21 +55,21 @@ impl From<&PcpChannelInfo> for ChannelInfo {
     }
 }
 
-// macro_rules! def_accessor {
-//     ($name: ident) => {
-//         def_accessor!($name, String);
-//     };
 
-//     ($name: ident, $type: ty) => {
-//         pub fn $name(mut self, $name: $type) -> Self {
-//             self.$name = $name;
-//             self
-//         }
+#[cfg(test)]
+mod t {
+    use crate::pcp::{decode::PcpChannelInfo, ChannelInfo};
 
-//         paste! {
-//             pub fn [<set_ $name>](&mut self, $name: $type) {
-//                 self.$name = $name;
-//             }
-//         }
-//     };
-// }
+    #[test]
+    fn test_merge(){
+        let mut ci = ChannelInfo::new();
+        let mut info = PcpChannelInfo::default();
+        info.bitrate = Some(1024);
+        let mut i = info.clone();
+
+        ci.merge_pcp(i);
+
+        assert_eq!(ci.bitrate, info.bitrate.unwrap());
+    }
+
+}
