@@ -414,6 +414,7 @@ impl Channel for RootChannel {
     }
 }
 impl RootChannel {
+
     fn arrived_broadcast(&self, bcst: PcpBroadcast, remote_addr: &SocketAddr) {
         info!(cid = ?self.cid, "ArrivedBroadcast");
         debug!(?bcst);
@@ -423,10 +424,11 @@ impl RootChannel {
             channel_packet,
             host,
             ..
-        } = &bcst;
+        } = bcst;
         if channel_packet.is_none() {
             return;
         }
+
         // Host情報の更新
         {
             let tracker_host = host
@@ -444,27 +446,29 @@ impl RootChannel {
             channel_info,
             track_info,
             ..
-        } = channel_packet.as_ref().unwrap();
+        } = channel_packet.unwrap();
         {
-            let mut channel_info_locked = self
+            let mut channel_info_unlocked = self
                 .channel_info
                 .write()
                 .unwrap_or_else(rwlock_write_poisoned);
-            let mut track_info_locked = self
+            let mut track_info_unlocked = self
                 .track_info
                 .write()
                 .unwrap_or_else(rwlock_write_poisoned);
             let mut last_update_locked = self.last_update.lock().unwrap_or_else(mutex_poisoned);
 
-            match channel_info.as_ref() {
+            match channel_info {
                 Some(new_channel_info) => {
-                    channel_info_locked.merge_pcp(new_channel_info);
+                    debug!(?new_channel_info);
+                    channel_info_unlocked.merge_pcp(new_channel_info);
                 }
                 None => (),
             };
-            match track_info.as_ref() {
+            match track_info {
                 Some(new_track_info) => {
-                    track_info_locked.merge_pcp(new_track_info);
+                    debug!(?new_track_info);
+                    track_info_unlocked.merge_pcp(new_track_info);
                 }
                 None => (),
             };
