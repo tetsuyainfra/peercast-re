@@ -150,6 +150,8 @@ impl PcpHost {
                     Id4::PCP_HOST_UPHOST_IP => p.uphost_ip = Some(decode_ip(a)?),
                     Id4::PCP_HOST_UPHOST_PORT => p.uphost_port = Some(decode_i32(a)?),
                     Id4::PCP_HOST_UPHOST_HOPS => p.uphost_hops = Some(decode_i32(a)?),
+                    // TODO: Id4::PCP_HOST_OLDPOS =>
+                    // TODO: Id4::PCP_HOST_NEWPOS =>
                     _ => {
                         warn!("unkown atom arrived :{:?}", &a)
                     }
