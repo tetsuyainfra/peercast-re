@@ -333,7 +333,7 @@ async fn serve_root(
     // Hostの接続先を確定
     let tracker_host = host
         .as_ref()
-        .and_then(|pcp_host| get_tracker_addr(&remote, pcp_host));
+        .and_then(|pcp_host| get_tracker_addr(&remote, &pcp_host.addresses));
 
     let PcpChannel {
         channel_id,
@@ -374,6 +374,8 @@ pub struct RootChannel {
     tracker_addr: Arc<RwLock<Option<SocketAddr>>>,
     channel_info: Arc<RwLock<libpeercast_re::pcp::ChannelInfo>>,
     track_info: Arc<RwLock<libpeercast_re::pcp::TrackInfo>>,
+    number_of_listener: Arc<RwLock<i32>>,
+    number_of_relay: Arc<RwLock<i32>>,
     last_update: Arc<Mutex<DateTime<Utc>>>,
     created_at: Arc<DateTime<Utc>>,
 }
@@ -399,6 +401,8 @@ impl Channel for RootChannel {
             tracker_addr: Arc::new(RwLock::new(tracker_addr)),
             channel_info: RwLock::new(channel_info.unwrap_or_default()).into(),
             track_info: RwLock::new(track_info.unwrap_or_default()).into(),
+            number_of_listener: RwLock::new(0).into(),
+            number_of_relay: RwLock::new(0).into(),
             last_update: Arc::new(Mutex::new(now_.clone())),
             created_at: Arc::new(now_),
         }
@@ -428,15 +432,44 @@ impl RootChannel {
         }
 
         // Host情報の更新
-        {
-            let tracker_host = host
-                .as_ref()
-                .and_then(|pcp_host| get_tracker_addr(remote_addr, pcp_host));
-            let mut tracker_host_locked = self
-                .tracker_addr
-                .write()
-                .unwrap_or_else(rwlock_write_poisoned);
-            *tracker_host_locked = tracker_host;
+        if let Some(pcp_host) = host {
+            let PcpHost {
+                addresses,
+                number_listener,
+                number_relay,
+                ..
+            } = pcp_host;
+            // TrackerのIPアドレスを更新
+            {
+               let tracker_addr = get_tracker_addr(&remote_addr, &addresses);
+               // MEMO: tracker_addr=Noneが帰ってきたらどする？
+               let mut tracker_host_locked = self
+                       .tracker_addr
+                       .write()
+                       .unwrap_or_else(rwlock_write_poisoned);
+                   *tracker_host_locked = tracker_addr;
+            }
+            // listener数を更新
+            {
+               let mut listner_locked = self
+                       .number_of_listener
+                       .write()
+                       .unwrap_or_else(rwlock_write_poisoned);
+                if let Some(listner) = number_listener{
+                    *listner_locked = listner;
+                }
+            }
+            // relay数を更新
+            {
+               let mut relay_locked = self
+                       .number_of_relay
+                       .write()
+                       .unwrap_or_else(rwlock_write_poisoned);
+                if let Some(relay) = number_relay {
+                    *relay_locked = relay;
+                }
+
+            }
         }
 
         //
@@ -497,6 +530,18 @@ impl RootChannel {
             .unwrap_or_else(rwlock_read_poisoned)
             .clone()
     }
+    fn number_of_listener(&self) -> i32 {
+        self.number_of_listener
+            .read()
+            .unwrap_or_else(rwlock_read_poisoned)
+            .clone()
+    }
+    fn number_of_relay(&self) -> i32 {
+        self.number_of_relay
+        .read()
+        .unwrap_or_else(rwlock_read_poisoned)
+        .clone()
+    }
     fn created_at(&self) -> DateTime<Utc> {
         self.created_at.as_ref().clone()
     }
@@ -550,11 +595,10 @@ impl RootChannel {
 
 type AttachTaskFuture = BoxFuture<'static, ()>;
 
-fn get_tracker_addr(remote_addr: &SocketAddr, pcp_host: &PcpHost) -> Option<SocketAddr> {
+fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Option<SocketAddr> {
     // Hostの接続先を確定
     // TODO: firewall checkが必要
-    let host = pcp_host
-        .addresses
+    let host = addresses
         .iter()
         .find(|addr| addr.ip() == remote_addr.ip());
     let tracker_host = host.map(|h| h.clone());
@@ -728,8 +772,8 @@ impl From<&RootChannel> for JsonChannel {
             stream_type,
             stream_ext,
             bitrate,
-            number_of_listener: -1, // TODO: listern数を反映する
-            number_of_relay: -1,    // TODO: relay数を反映する
+            number_of_listener: ch.number_of_listener(),
+            number_of_relay: ch.number_of_relay(),
             created_at: ch.created_at(),
             track: ch.track_info().into(),
         }
