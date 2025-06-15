@@ -72,6 +72,7 @@ chrono-tz = "0.10.3"
 # Commandline
 clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
 clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
+serde_with = "3.13.0"
 
 [package.metadata.deb]
 maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"

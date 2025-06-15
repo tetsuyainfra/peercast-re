@@ -8,10 +8,7 @@ use std::{
 
 use anyhow::Context;
 use axum::{
-    Json, Router,
-    http::{HeaderValue, Method},
-    response::IntoResponse,
-    routing,
+    extract::Query, http::{HeaderValue, Method}, response::IntoResponse, routing, serve::Listener, Json, Router
 };
 use axum_extra::headers::Header;
 use bytes::BytesMut;
@@ -38,6 +35,7 @@ use peercast_root::{FooterToml, IndexInfo};
 use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Index;
+use serde_with::{serde_as, NoneAsEmptyString};
 use tokio::{
     fs::read, io::AsyncWriteExt, net::{TcpListener, TcpStream}, sync::watch, time::Interval
 };
@@ -644,7 +642,13 @@ fn merged_channels() -> Vec<JsonChannel> {
     channels
 }
 
-async fn index_txt() -> impl IntoResponse {
+async fn index_txt(
+    Query(params): Query<IndexTextParams>
+) -> impl IntoResponse {
+    if let Some(host )= params.host {
+        warn!(?host, "NOT IMPLEMENTED {}:{}", file!(), line!());
+    }
+
     let channels: Vec<String> = merged_channels()
         .iter()
         .map(|c| c.to_line_of_index_txt())
@@ -656,6 +660,15 @@ async fn index_txt() -> impl IntoResponse {
 async fn index_json() -> Json<Vec<JsonChannel>> {
     merged_channels().into()
 }
+
+/// index.txtに対するクエリ型
+#[serde_as]
+#[derive(Debug, Deserialize)]
+struct IndexTextParams {
+    #[serde_as(as = "NoneAsEmptyString")]
+    pub host: Option<String>,
+}
+
 
 #[derive(Debug, Clone, Serialize)]
 struct JsonChannel {
