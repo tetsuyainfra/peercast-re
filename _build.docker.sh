@@ -6,9 +6,12 @@ PROFILE=${PROFILE:-dev}
 
 if [ "$PROFILE" = "release" ]; then
     PROFILE_DIR="release"
+    RUST_LOG=${RUST_LOG:-info}
 else
     PROFILE_DIR="debug"
+    RUST_LOG=${RUST_LOG:-debug}
 fi
+
 
 TARGET_IMAGE=${1:-ALL}
 # 大文字に正規化
@@ -17,8 +20,9 @@ if [ "ALL" = "${TARGET_IMAGE^^}" ] ; then
 fi
 
 echo "TARGET_IMAGE: $TARGET_IMAGE"
-echo "TARGET    : $TARGET"
-echo "PROFILE   : $PROFILE"
+echo "TARGET      : $TARGET"
+echo "PROFILE     : $PROFILE"
+echo "RUST_LOG    : $RUST_LOG"
 
 
 pushd $SCRIPT_ROOT
@@ -34,6 +38,7 @@ pushd $SCRIPT_ROOT
         docker build -t peercast-root:latest -f ./docker/Dockerfile.peercast-root \
           --build-arg TARGET=${TARGET} \
           --build-arg PROFILE=${PROFILE_DIR} \
+          --build-arg RUST_LOG=${RUST_LOG} \
           ./
     fi
 
