@@ -112,7 +112,12 @@ pub struct Args {
     #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS, default_value="http://localhost:3000")]
     pub allow_cors: Vec<String>,
 
+    #[cfg(not(debug_assertions))]
     #[arg(long, value_parser, default_value_t=30)]
+    pub cache_max_age: u32,
+
+    #[cfg(debug_assertions)]
+    #[arg(long, value_parser, default_value_t=0)]
     pub cache_max_age: u32,
 
     #[command(flatten)]
