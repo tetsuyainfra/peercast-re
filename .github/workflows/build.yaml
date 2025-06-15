@@ -209,7 +209,7 @@ jobs:
           curl -H "Content-Type: application/json"
           -X POST
           -d '{
-            "content": "[${{ github.repository }}]ビルドが完了しました！ ${{ env.ACTION_URL }}"
+            "content": "[${{ github.repository }}]ビルドが成功しました！ ${{ env.ACTION_URL }}"
           }'
           ${{ secrets.DISCORD_WEBHOOK_URL }}
       ## 失敗していた場合
