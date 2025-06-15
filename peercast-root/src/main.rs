@@ -126,7 +126,7 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
         chinfo.genre = "ダミー".into();
         chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
         chinfo.url = "https://yp-dev.007144.xyz/".into();
-        chinfo.stream_ext = "RAW".into();
+        chinfo.typ = "RAW".into();
         let config = RootConfig {
             tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
         };
@@ -688,6 +688,9 @@ struct JsonChannel {
     number_of_relay: i32,
     created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
     track: JsonTrack,
+
+    #[serde(rename = "type")]
+    typee: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -721,6 +724,7 @@ impl From<&RootChannel> for JsonChannel {
             genre,
             desc,
             comment,
+            typee: typ,
             stream_type,
             stream_ext,
             bitrate,
@@ -757,6 +761,8 @@ impl JsonChannel {
             self.number_of_listener,
             self.number_of_relay,
             self.bitrate,
+            &self.typee,
+            &self.stream_type,
             &self.stream_ext,
             &self.created_at,
         )
@@ -771,6 +777,7 @@ impl JsonChannel {
             genre: "".into(),
             desc: "".into(),
             comment: "".into(),
+            typee: "".into(),
             stream_type: "".into(),
             stream_ext: "".into(),
             bitrate: 0,
@@ -799,6 +806,8 @@ fn create_index_line(
     number_of_listener: i32,
     number_of_relay: i32,
     bitrate: i32,
+    typee: &String,
+    stream_type: &String,
     stream_ext: &String,
     created_at: &DateTime<Utc>,
 ) -> String {
@@ -813,7 +822,7 @@ fn create_index_line(
         .unwrap_or_default();
 
     format!(
-        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{file_ext}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
+        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
         name = encode_safe(&name.clone()),
         id = id,
         addr = addr,
@@ -823,7 +832,7 @@ fn create_index_line(
         number_of_listener = number_of_listener,
         number_of_relay = number_of_relay,
         bitrate = bitrate,
-        file_ext = encode_safe(&stream_ext),
+        typee = encode_safe(&typee),
         name_escaped = encode_safe(&name),
         time_hour = hour,
         time_min = min,
@@ -842,6 +851,8 @@ impl From<IndexInfo> for JsonChannel {
             genre,
             desc,
             comment,
+            typee,
+            stream_type,
             stream_ext,
             bitrate,
             number_of_listener,
@@ -849,6 +860,7 @@ impl From<IndexInfo> for JsonChannel {
             created_at,
         } = value;
         j.id = id;
+        j.typee = typee;
         j.name = name;
         j.tracker_addr = tracker_addr;
         j.contact_url = contact_url;

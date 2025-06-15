@@ -3,13 +3,13 @@ name = "Local※お知らせ"
 desc = "更新時刻"
 comment = "実装中"
 contact_url = "http://yp.007144.xyz/"
-stream_ext = "RAW"
+type = "RAW"
 number_of_listener = -9
 number_of_relay = -9
 
 [[infomations]]
 name = "Local※ご注意"
 comment = "悪い配信には使わないように"
-stream_ext = "RAW"
+type = "RAW"
 number_of_listener = -9
 number_of_relay = -9
