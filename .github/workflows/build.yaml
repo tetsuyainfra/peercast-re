@@ -90,7 +90,7 @@ jobs:
           make-default: false
 
       - name: Run build script
-        run: PROFILE=release TARGET=${{ matrix.target }} ./build.sh
+        run: PROFILE=release TARGET=${{ matrix.target }} ./_build.sh
         # run: cargo build ${{ matrix.environment.opt }} --target ${{ matrix.target }}
 
       - name: ls build dir
@@ -191,3 +191,36 @@ jobs:
       #     subject-name: index.docker.io/my-docker-hub-namespace/my-docker-hub-repository
       #     subject-digest: ${{ steps.push.outputs.digest }}
       #     push-to-registry: true
+  notify:
+    # 依存するjob
+    needs: build-docker
+    # needsの結果によらず必ず実行する
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      # - uses: actions/checkout@v2
+      # Discordへの通知
+      ## 成功した場合
+      - name: Notify success to Discord
+        if: ${{ success() }}
+        env:
+          ACTION_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: >-
+          curl -H "Content-Type: application/json"
+          -X POST
+          -d '{
+            "content": "[${{ github.repository }}]ビルドが成功しました！ ${{ env.ACTION_URL }}"
+          }'
+          ${{ secrets.DISCORD_WEBHOOK_URL }}
+      ## 失敗していた場合
+      - name: Notify failure to Discord
+        if: ${{ failure() }}
+        env:
+          ACTION_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: >-
+          curl -H "Content-Type: application/json"
+          -X POST
+          -d '{
+            "content": "[${{ github.repository }}]ビルドが失敗しました！ ${{ env.ACTION_URL }}"
+          }'
+          ${{ secrets.DISCORD_WEBHOOK_URL }}

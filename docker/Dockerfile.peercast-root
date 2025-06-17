@@ -4,10 +4,14 @@ WORKDIR /app
 
 ARG TARGET=.
 ARG PROFILE=release
+ARG RUST_LOG=INFO
 
 # default(no build-arg) ./target/release/peercast-root
-COPY ./target/${TARGET}/${PROFILE}/peercast-root /app
+COPY --chmod=755 ./target/${TARGET}/${PROFILE}/peercast-root      /app
+COPY --chmod=644 ./peercast-root/share/peercast-root_footer.toml  /app
 
+ENV RUST_LOG=${RUST_LOG}
 EXPOSE 7144 7143
 
-CMD ["/app/peercast-root"]
+ENTRYPOINT [ "/app/peercast-root" ]
+#CMD ["/app/peercast-root"]

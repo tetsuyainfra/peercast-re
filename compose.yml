@@ -1,0 +1,24 @@
+
+
+services:
+  yp:
+    image: tetsuyainfra/yp-ssg:feature-buildsys
+    ports:
+      - 3000:3000
+    volumes:
+      - ./.env:/app/.env
+    command: /bin/sh -c 'npm run build && npm run serve build/yp'
+
+  root:
+    image: peercast-root:latest
+    ports:
+      - 17144:17144
+      - 17143:17143
+    command: >-
+      --bind 0.0.0.0
+      --port 17144
+      --api-bind 0.0.0.0
+      --api-port 17143
+      -L /var/log/peercast-root.log
+      --index-txt-footer /app/peercast-root_footer.toml
+      --allow-cors http://localhost:3000

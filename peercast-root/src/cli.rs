@@ -21,12 +21,24 @@ pub struct Args {
     #[arg(short, long, default_value_t = 17144)]
     pub port: u16,
 
+    #[cfg(not(debug_assertions))]
     /// HTTP API address
     #[arg(long, default_value = "127.0.0.1")]
     pub api_bind: std::net::IpAddr,
 
+    #[cfg(debug_assertions)]
+    /// HTTP API address
+    #[arg(long, default_value = "0.0.0.0")]
+    pub api_bind: std::net::IpAddr,
+
+    #[cfg(not(debug_assertions))]
     /// HTTP API port
     #[arg(long, default_value_t = 7143)]
+    pub api_port: u16,
+
+    #[cfg(debug_assertions)]
+    /// HTTP API port
+    #[arg(long, default_value_t = 17143)]
     pub api_port: u16,
 
     // TODO: TIMEZONEの実装
@@ -90,9 +102,23 @@ pub struct Args {
     #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=false)]
     pub create_dummy_channel: bool,
 
+    #[cfg(not(debug_assertions))]
     /// Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
     #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS )]
     pub allow_cors: Vec<String>,
+
+    #[cfg(debug_assertions)]
+    /// Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
+    #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS, default_value="http://localhost:3000")]
+    pub allow_cors: Vec<String>,
+
+    #[cfg(not(debug_assertions))]
+    #[arg(long, value_parser, default_value_t=30)]
+    pub cache_max_age: u32,
+
+    #[cfg(debug_assertions)]
+    #[arg(long, value_parser, default_value_t=0)]
+    pub cache_max_age: u32,
 
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,

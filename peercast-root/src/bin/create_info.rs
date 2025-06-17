@@ -60,6 +60,9 @@ pub struct Args {
     #[arg(long, default_value="")]
     pub comment: String,
 
+    #[arg(long="type", default_value="")]
+    pub typee: String,
+
     #[arg(long, default_value="")]
     pub stream_type: String,
 
@@ -82,7 +85,7 @@ pub struct Args {
 
 impl From<Args> for IndexInfo {
     fn from(v: Args) -> Self {
-        let mut i = IndexInfo::default();
+        let mut i: IndexInfo = IndexInfo::default();
         i.id = v.id;
         i.name = v.name;
         i.tracker_addr = v.tracker_addr;
@@ -90,6 +93,8 @@ impl From<Args> for IndexInfo {
         i.genre = v.genre;
         i.desc = v.desc;
         i.comment = v.comment;
+        i.typee = v.typee;
+        i.stream_type = v.stream_type;
         i.stream_ext = v.stream_ext;
         i.bitrate = v.bitrate;
         i.number_of_listener = v.number_of_listener;

@@ -53,6 +53,12 @@ pub struct IndexInfo {
     #[serde(default, skip_serializing_if="String::is_empty")]
     pub comment: String,
 
+    #[serde(default, skip_serializing_if="String::is_empty", rename="type")]
+    pub typee: String,
+
+    #[serde(default, skip_serializing_if="String::is_empty")]
+    pub stream_type: String,
+
     #[serde(default, skip_serializing_if="String::is_empty")]
     pub stream_ext: String,
 

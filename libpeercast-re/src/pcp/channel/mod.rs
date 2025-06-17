@@ -23,3 +23,13 @@ pub use track_info::TrackInfo;
 use crate::pcp::{atom, Id4};
 
 use super::Atom;
+
+
+macro_rules! merge_field {
+    ($self:ident, $value:ident, $field:ident) => {
+        if let Some(v) = $value.$field {
+            $self.$field = v;
+        }
+    };
+}
+pub(self) use merge_field;

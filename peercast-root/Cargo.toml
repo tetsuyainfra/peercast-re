@@ -17,6 +17,7 @@ tracing-subscriber = { version = "0.3.19", features = [
     "fmt",
     "local-time",
 ] }
+tracing-journald = "0.3.1"
 
 # Async
 futures-util = { version = "0.3.31", default-features = false, features = [
@@ -42,7 +43,9 @@ tower-http = { version = "0.6.2", features = [
     "request-id",
     "timeout",
     "add-extension",
+    "set-header"
 ] }
+hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 
 # Serialize/Deserialize
@@ -71,6 +74,12 @@ chrono-tz = "0.10.3"
 # Commandline
 clap = { version = "4.5.27", features = ["derive", "env", "unicode"] }
 clap-verbosity-flag = { version = "3.0.2", features = ["tracing"] }
+serde_with = "3.13.0"
+
+# Utoipa for OpenAPI
+utoipa = { version = "5.3.1", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
+utoipa-axum = "0.2"
 
 [package.metadata.deb]
 maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"

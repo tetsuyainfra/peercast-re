@@ -18,13 +18,14 @@ use super::macros::getter;
 
 #[derive(Debug, Clone, Default, Merge)]
 pub struct PcpChannelInfo {
+    // FLV, WMV, RAWなどのタイプ・・・
     pub typ: Option<String>,
     pub name: Option<String>,
     pub genre: Option<String>,
     pub desc: Option<String>,
     pub comment: Option<String>,
     pub url: Option<String>,
-    //
+    // MIME識別子
     pub stream_type: Option<String>,
     // .で始まる拡張子
     pub stream_ext: Option<String>,
