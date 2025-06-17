@@ -1,6 +1,12 @@
 
 
 services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
+
   yp:
     image: tetsuyainfra/yp-ssg:feature-buildsys
     ports:
