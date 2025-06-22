@@ -29,7 +29,7 @@ console-subscriber = { version = "0.4.1" }
 # Axum
 axum-core = { version = "*" }
 axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-extra = { version = "0.10.0", features = ["typed-header", "cookie"] }
 axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
 
 # Axum-option
@@ -53,6 +53,10 @@ httparse = { version = "1.10.1" }
 
 # Redis
 redis = { version = "0.32.0", features = ["tokio-comp"] }
+
+# Connection Pool
+bb8 = "0.9.0"
+bb8-redis = "0.24.0"
 
 
 # Commandline
