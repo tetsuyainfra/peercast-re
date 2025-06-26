@@ -52,6 +52,7 @@ mod repository;
 mod shutdown;
 mod shutdown2;
 mod shutdown3;
+mod filter;
 mod api;
 
 #[cfg(test)]
@@ -65,9 +66,17 @@ static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
 static _HTTP_API: OnceLock<Router> = OnceLock::new();
 // Don't use directly. SEE: INDEX_TXT_FOOTER()
 static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
+// Don't use directly. SEE: REDIS_MASTER_KEY()
+static _REDIS_MASTER_KEY: OnceLock<String> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct ApiState {}
+
+#[inline]
+#[allow(non_snake_case, private_interfaces)]
+pub fn REDIS_MASTER_KEY() -> &'static str {
+    _REDIS_MASTER_KEY.get().unwrap()
+}
 
 #[inline]
 #[allow(non_snake_case)]
@@ -93,7 +102,10 @@ pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
 }
 
+
 fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
+    _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
+    //
     _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     //
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));

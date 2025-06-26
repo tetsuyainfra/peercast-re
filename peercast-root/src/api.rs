@@ -1,19 +1,29 @@
-use std::{net::{SocketAddr, }, path::PathBuf};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, time::Duration};
 
-use axum::{extract::Query, http::HeaderValue, response::IntoResponse, routing, Json, Router};
+use axum::{
+    Json, Router,
+    extract::{FromRef, FromRequestParts, Query, State},
+    http::HeaderValue,
+    response::IntoResponse,
+    routing,
+};
+
 use chrono::{DateTime, TimeZone, Utc};
-use futures_util::{future::BoxFuture, FutureExt};
-use hyper::Method;
+use futures_util::{FutureExt, future::BoxFuture, select};
+use hyper::{Method, StatusCode};
 use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
-use peercast_root::IndexInfo;
+use peercast_root::{ExitCode, IndexInfo};
 use serde::{Deserialize, Serialize};
-use serde_with::{serde_as, NoneAsEmptyString};
+use serde_with::{NoneAsEmptyString, serde_as};
+use tokio::time::timeout;
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
-use tracing::{info, warn};
+use tracing::{debug, error, info, warn};
 
-use crate::{cli, RootChannel, INDEX_TXT_FOOTER, REPOSITORY};
+use bb8_redis::RedisConnectionManager;
+use redis::{AsyncCommands, io::tcp::socket2::Socket};
 
+use crate::{_REDIS_MASTER_KEY, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, RootChannel, cli};
 
 //-------------------------------------------------------------------------------
 // HTTP
@@ -28,6 +38,43 @@ pub async fn server_http(
         services::ServeDir,
         trace::{DefaultMakeSpan, TraceLayer},
     };
+
+    let redis_url = format!("redis://{}", args.redis_server);
+    debug!("connecting to redis: {}", redis_url);
+    let manager = RedisConnectionManager::new(redis_url).unwrap();
+    let pool = bb8::Pool::builder().build(manager).await.unwrap();
+    {
+        // let mut conn = pool.get().await.unwrap();
+        let mut conn = match tokio::time::timeout(Duration::from_millis(2000), pool.get()).await {
+            Ok(Ok(conn)) => conn,
+            Ok(Err(_)) | Err(_) => {
+                error!("redis connect failed");
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
+
+        let key = format!("{}_CHECK", REDIS_MASTER_KEY());
+        // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
+        if let Err(_) = timeout(
+            Duration::from_millis(2000),
+            conn.set::<&str, &str, ()>(&key, "CHECK_ME"),
+        )
+        .await
+        {
+            error!("redis connect failed");
+            std::process::exit(ExitCode::Failure as i32);
+        }
+
+        let result: String = match timeout(Duration::from_millis(1000), conn.get(&key)).await {
+            Ok(Ok(r)) => r,
+            Ok(Err(_)) | Err(_) => {
+                error!("redis connect failed");
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
+        assert_eq!(result, "CHECK_ME");
+    }
+    tracing::debug!("successfully connected to redis and pinged it");
 
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
     info!("asset_dir: {:?}", &assets_dir);
@@ -62,23 +109,22 @@ pub async fn server_http(
         )
         .layer(SetResponseHeaderLayer::if_not_present(
             axum::http::header::CACHE_CONTROL,
-            HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap()
-        ));
+            HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap(),
+        ))
+        .with_state(pool);
 
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal(graceful_shutdown ))
+    .with_graceful_shutdown(shutdown_signal(graceful_shutdown))
     .await
     .unwrap();
 
     Ok(())
 }
 
-fn shutdown_signal(
-    graceful_shutdown: CancellationToken,
-) -> BoxFuture<'static, ()> {
+fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, ()> {
     async move {
         //
         graceful_shutdown.cancelled().await;
@@ -88,11 +134,12 @@ fn shutdown_signal(
 }
 
 async fn index_txt(
-    Query(params): Query<IndexTextParams>
+    // params: IndexParams,
+    Query(params): Query<IndexTextParams>,
+    DatabaseConnection(mut conn): DatabaseConnection,
 ) -> impl IntoResponse {
-    if let Some(host )= params.host {
-        warn!(?host, "NOT IMPLEMENTED {}:{}", file!(), line!());
-    }
+    let level = if let Some(host) = &params.Host { 1 } else { 0 };
+    warn!(?params);
 
     let channels: Vec<String> = merged_channels()
         .iter()
@@ -102,7 +149,7 @@ async fn index_txt(
     itertools::join(channels, "\n")
 }
 
-async fn index_json() -> Json<Vec<JsonChannel>> {
+async fn index_json(DatabaseConnection(mut conn): DatabaseConnection) -> Json<Vec<JsonChannel>> {
     merged_channels().into()
 }
 
@@ -114,15 +161,120 @@ fn merged_channels() -> Vec<JsonChannel> {
     channels
 }
 
+//-------------------------------------------------------------------------------
+// Database mapper
+//-------------------------------------------------------------------------------
+type ConnectionPool = bb8::Pool<RedisConnectionManager>;
+struct DatabaseConnection(bb8::PooledConnection<'static, RedisConnectionManager>);
+impl<S> FromRequestParts<S> for DatabaseConnection
+where
+    ConnectionPool: FromRef<S>,
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
 
-/// index.txtに対するクエリ型
-#[serde_as]
-#[derive(Debug, Deserialize)]
-struct IndexTextParams {
-    #[serde_as(as = "NoneAsEmptyString")]
-    pub host: Option<String>,
+    async fn from_request_parts(
+        _parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let pool = ConnectionPool::from_ref(state);
+
+        // let conn = pool.get_owned().await.map_err(internal_error)?;
+        let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned())
+            .await
+            .map_err(internal_error)?;
+        let conn = ret_conn.map_err(internal_error)?;
+
+        Ok(Self(conn))
+    }
 }
 
+/// Utility function for mapping any error into a `500 Internal Server Error`
+/// response.
+fn internal_error<E>(err: E) -> (StatusCode, String)
+where
+    E: std::error::Error,
+{
+    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+}
+
+//-------------------------------------------------------------------------------
+// Header/Query Mapper
+//-------------------------------------------------------------------------------
+/*
+// 自分で実装する場合
+#[derive(Debug)]
+struct IndexParams {
+    pub host: Option<SocketAddr>,
+}
+
+impl<S> FromRequestParts<S> for IndexParams
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        use axum::extract::RawQuery;
+        use hyper::HeaderMap;
+        let query = RawQuery::from_request_parts(parts, state)
+            .await
+            .ok()
+            .and_then(|q| q.0);
+
+        // クエリ文字列をHashMapにパース
+        let params: HashMap<String, String> =
+            url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
+                .into_owned()
+                .collect();
+
+        // キーを小文字に変換
+        let params_lower: HashMap<String, String> = params
+            .into_iter()
+            .map(|(k, v)| (k.to_lowercase(), v))
+            .collect();
+
+        // Ok(IndexParam { host: params_lower.get })
+        // Ok((headers, params_lower).into())
+        Ok(params_lower.into())
+    }
+}
+
+impl From<HashMap<String, String>> for IndexParams {
+    fn from(mut query: HashMap<std::string::String, std::string::String>) -> Self {
+        info!(?query);
+        let host: Option<SocketAddr> = query.get("host").map(|s| s.parse().ok()).unwrap();
+        let host = "127.0.0.1:7144".parse().ok();
+        IndexParams { host: host }
+    }
+}
+*/
+
+/// index.txtに対するクエリ型
+#[allow(non_snake_case)]
+#[derive(Debug, Deserialize)]
+struct IndexTextParams {
+    #[serde(default, deserialize_with = "empty_string_as_none", alias="host")]
+    pub Host: Option<SocketAddr>,
+}
+
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: std::str::FromStr,
+    T::Err: std::fmt::Display,
+{
+    let opt = Option::<String>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => std::str::FromStr::from_str(s)
+            .map_err(serde::de::Error::custom)
+            .map(Some),
+    }
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonChannel {
