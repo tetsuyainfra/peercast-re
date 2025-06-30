@@ -5,7 +5,10 @@ services:
     image: redis:alpine
     ports:
       - "6379:6379"
-    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - ./docker/redis:/usr/local/etc/redis
+    # command: redis-server --save 60 1 --loglevel warning
+    command: redis-server /usr/local/etc/redis/redis.conf
 
   yp:
     image: tetsuyainfra/yp-ssg:feature-buildsys
