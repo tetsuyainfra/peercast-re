@@ -8,11 +8,14 @@ use axum::{
     routing,
 };
 
+use axum_client_ip::ClientIp;
+use bb8::PooledConnection;
 use chrono::{DateTime, TimeZone, Utc};
 use futures_util::{FutureExt, future::BoxFuture, select};
 use hyper::{Method, StatusCode};
 use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
 use peercast_root::{ExitCode, IndexInfo};
+use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use serde_with::{NoneAsEmptyString, serde_as};
 use tokio::time::timeout;
@@ -39,21 +42,24 @@ pub async fn server_http(
         trace::{DefaultMakeSpan, TraceLayer},
     };
 
-    let redis_url = format!("redis://{}", args.redis_server);
-    debug!("connecting to redis: {}", redis_url);
-    let manager = RedisConnectionManager::new(redis_url).unwrap();
+    debug!("connecting to redis: {}", args.redis_url);
+    let manager = RedisConnectionManager::new(args.redis_url).unwrap();
     let pool = bb8::Pool::builder().build(manager).await.unwrap();
     {
         // let mut conn = pool.get().await.unwrap();
         let mut conn = match tokio::time::timeout(Duration::from_millis(2000), pool.get()).await {
             Ok(Ok(conn)) => conn,
-            Ok(Err(_)) | Err(_) => {
-                error!("redis connect failed");
+            Ok(Err(e)) => {
+                error!("redis connect failed :{}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(e) => {
+                error!("redis connect timeout: {}", e);
                 std::process::exit(ExitCode::Failure as i32);
             }
         };
 
-        let key = format!("{}_CHECK", REDIS_MASTER_KEY());
+        let key = format!("{}:CHECK", REDIS_MASTER_KEY());
         // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
         if let Err(_) = timeout(
             Duration::from_millis(2000),
@@ -61,14 +67,14 @@ pub async fn server_http(
         )
         .await
         {
-            error!("redis connect failed");
+            error!("redis connect set failed");
             std::process::exit(ExitCode::Failure as i32);
         }
 
         let result: String = match timeout(Duration::from_millis(1000), conn.get(&key)).await {
             Ok(Ok(r)) => r,
             Ok(Err(_)) | Err(_) => {
-                error!("redis connect failed");
+                error!("redis connect get failed");
                 std::process::exit(ExitCode::Failure as i32);
             }
         };

@@ -41,8 +41,22 @@ pub struct Args {
     #[arg(long, default_value_t = 17143)]
     pub api_port: u16,
 
+
+    /// redisに使用するnamespace
+    #[arg(long, default_value="devyp")]
+    pub redis_master_key: String,
+
+    /// 接続先のredis_url(DEBUG MODEのみ)
+    #[cfg(not(debug_assertions))]
+    #[arg(long, default_value="redis://127.0.0.1:6379")]
+    pub redis_url: String,
+
+    /// 接続先のredis_url(DEBUG MODE)
+    #[cfg(debug_assertions)]
+    #[arg(long, default_value="redis://yproot:ypbared@127.0.0.1:6379")]
+    pub redis_url: String,
+
     // TODO: TIMEZONEの実装
-    // #[arg(long, default_value_t = 7143)]
     // pub timezone: u16,
     /// Enable daemon-mode
     #[arg(short = 'D', long, default_value_t = false)]
