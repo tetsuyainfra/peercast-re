@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cargo run --bin peercast-root --
+cargo run --bin peercast-root -- $@
