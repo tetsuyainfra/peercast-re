@@ -1,4 +1,10 @@
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    sync::Arc,
+    time::Duration,
+};
 
 use axum::{
     Json, Router,
@@ -24,9 +30,42 @@ use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
 use tracing::{debug, error, info, warn};
 
 use bb8_redis::RedisConnectionManager;
-use redis::{AsyncCommands, io::tcp::socket2::Socket};
 
 use crate::{_REDIS_MASTER_KEY, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, RootChannel, cli};
+
+struct ApiError(anyhow::Error);
+// Tell axum how to convert `AppError` into a response.
+impl IntoResponse for ApiError {
+    fn into_response(self) -> axum::response::Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Something went wrong: {}", self.0),
+        )
+            .into_response()
+    }
+}
+
+// This enables using `?` on functions that return `Result<_, anyhow::Error>` to turn them into
+// `Result<_, AppError>`. That way you don't need to do that manually.
+impl<E> From<E> for ApiError
+where
+    E: Into<anyhow::Error>,
+{
+    fn from(err: E) -> Self {
+        Self(err.into())
+    }
+}
+
+#[derive(Debug)]
+struct ApiConfig {
+    limit_speed: u8,
+    listener_hideable: bool,
+    port_check_level: u8,
+    name_space: String,
+}
+
+#[derive(Debug, Clone)]
+struct AppState(bb8::Pool<RedisConnectionManager>, Arc<ApiConfig>);
 
 //-------------------------------------------------------------------------------
 // HTTP
@@ -95,6 +134,13 @@ pub async fn server_http(
     let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
     info!("cache-control: {}", &cache_control_value);
 
+    let api_config = ApiConfig {
+        limit_speed: args.yp_limit_speed,
+        listener_hideable: args.yp_listerer_hideable,
+        port_check_level: args.yp_port_check_level,
+        name_space: args.yp_name_space,
+    };
+
     let tracker = tokio_util::task::TaskTracker::new();
     info!("START HTTP SERVER");
 
@@ -117,7 +163,8 @@ pub async fn server_http(
             axum::http::header::CACHE_CONTROL,
             HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap(),
         ))
-        .with_state(pool);
+        .layer(args.ip_source.into_extension())
+        .with_state(AppState(pool, Arc::new(api_config)));
 
     axum::serve(
         listener,
@@ -140,23 +187,32 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
 }
 
 async fn index_txt(
-    // params: IndexParams,
-    Query(params): Query<IndexTextParams>,
-    DatabaseConnection(mut conn): DatabaseConnection,
-) -> impl IntoResponse {
-    let level = if let Some(host) = &params.Host { 1 } else { 0 };
-    warn!(?params);
+    client_ip: ClientIp,
+    query_params: Query<IndexTextParams>,
+    mut conn: DatabaseConnection,
+    state_config: State<Arc<ApiConfig>>,
+) -> Result<String, ApiError> {
+    let channels = index_json(client_ip, query_params, conn, state_config).await?;
+    let channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
-    let channels: Vec<String> = merged_channels()
-        .iter()
-        .map(|c| c.to_line_of_index_txt())
-        .collect();
-
-    itertools::join(channels, "\n")
+    Ok(itertools::join(channels, "\n"))
 }
 
-async fn index_json(DatabaseConnection(mut conn): DatabaseConnection) -> Json<Vec<JsonChannel>> {
-    merged_channels().into()
+async fn index_json(
+    ClientIp(ip): ClientIp,
+    Query(params): Query<IndexTextParams>,
+    mut conn: DatabaseConnection,
+    State(config): State<Arc<ApiConfig>>,
+) -> Result<Json<Vec<JsonChannel>>, ApiError> {
+    let own_level = if let Some(host) = &params.Host {
+        get_portcheck_level(&mut conn, ip, host.1).await?
+    } else {
+        PortLevel::None
+    };
+
+    let channels = merged_channels();
+
+    Ok(channels.into())
 }
 
 fn merged_channels() -> Vec<JsonChannel> {
@@ -167,23 +223,105 @@ fn merged_channels() -> Vec<JsonChannel> {
     channels
 }
 
+fn filter_channels_by_limit_level(channels: Vec<JsonChannel>, limit_level: u8) -> Vec<JsonChannel> {
+    channels
+        .into_iter()
+        .filter(|c| {
+            // c.id.level() <= limit_level
+            true
+        })
+        .collect()
+}
+
+//-------------------------------------------------------------------------------
+// PortCheck
+//-------------------------------------------------------------------------------
+
+#[repr(i8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PortLevel {
+    /// ポートチェックが行われていない
+    None = 0,
+
+    /// ポートチェックしたが疎通できなかった
+    Incomplete = -1,
+
+    /// 疎通OK
+    Welldone = 1,
+
+    /// 疎通OK, 速度OK
+    WelldoneReachedUploadSpeed = 2,
+}
+async fn get_portcheck_level(
+    DatabaseConnection(conn): &mut DatabaseConnection,
+    host: IpAddr,
+    port: u16,
+) -> anyhow::Result<PortLevel> {
+    info!(?host, ?port);
+    let key = portcheck_key(host, port);
+    // DBに結果を問い合わせ
+    if let Some::<String>(port_level) = timeout(Duration::from_secs(1), conn.get(&key)).await?? {
+        // あればそれを返す
+        debug!(?port_level);
+        Ok(PortLevel::Welldone)
+    } else {
+        // なければポートチェックする
+        let port_level = portcheck(conn, host, port).await?;
+        let _: Option<String> = timeout(Duration::from_secs(1), conn.set(&key, "true")).await??;
+        Ok(port_level)
+    }
+}
+
+async fn portcheck(
+    conn: &mut bb8::PooledConnection<'static, RedisConnectionManager>,
+    host: IpAddr,
+    port: u16,
+) -> anyhow::Result<PortLevel> {
+    use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
+    let self_addr = "0.0.0.0:7144".parse().unwrap();
+    let factory = PcpConnectionFactory::builder(GnuId::new(), self_addr)
+        .connect_timeout(Duration::from_secs(1))
+        .build();
+
+    let handshake = factory.connect((host, port).into()).await?;
+
+    match handshake.ping().await {
+        Ok(remote_id) => {
+            Ok(PortLevel::Welldone) // ポートチェック成功
+        }
+        Err(_e) => {
+            return Ok(PortLevel::Incomplete); // 失敗した場合は0を返す
+        }
+    }
+}
+
+fn portcheck_key(host: IpAddr, port: u16) -> String {
+    format!("{}_PORTCHECK_{}_{}", REDIS_MASTER_KEY(), host, port)
+}
+
+//-------------------------------------------------------------------------------
+// ApiConfig Mapper
+//-------------------------------------------------------------------------------
+// AppStateからApiConfigを取り出すためのFromRef実装
+impl FromRef<AppState> for Arc<ApiConfig> {
+    fn from_ref(state: &AppState) -> Arc<ApiConfig> {
+        state.1.clone()
+    }
+}
+
 //-------------------------------------------------------------------------------
 // Database mapper
 //-------------------------------------------------------------------------------
 type ConnectionPool = bb8::Pool<RedisConnectionManager>;
 struct DatabaseConnection(bb8::PooledConnection<'static, RedisConnectionManager>);
-impl<S> FromRequestParts<S> for DatabaseConnection
-where
-    ConnectionPool: FromRef<S>,
-    S: Send + Sync,
-{
+impl FromRequestParts<AppState> for DatabaseConnection {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(
         _parts: &mut axum::http::request::Parts,
-        state: &S,
+        state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        let pool = ConnectionPool::from_ref(state);
+        let pool = ConnectionPool::from_ref(&state.0);
 
         // let conn = pool.get_owned().await.map_err(internal_error)?;
         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned())
@@ -194,6 +332,28 @@ where
         Ok(Self(conn))
     }
 }
+
+// impl FromRequestParts<AppState> for DatabaseConnection
+// // where
+// //     ConnectionPool: FromRef<AppState>,
+// {
+//     type Rejection = (StatusCode, String);
+
+//     async fn from_request_parts(
+//         _parts: &mut axum::http::request::Parts,
+//         state: &AppState,
+//     ) -> Result<Self, Self::Rejection> {
+//         let pool = ConnectionPool::from_ref(&state.0);
+
+//         // let conn = pool.get_owned().await.map_err(internal_error)?;
+//         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned())
+//             .await
+//             .map_err(internal_error)?;
+//         let conn = ret_conn.map_err(internal_error)?;
+
+//         Ok(Self(conn))
+//     }
+// }
 
 /// Utility function for mapping any error into a `500 Internal Server Error`
 /// response.
@@ -263,22 +423,24 @@ impl From<HashMap<String, String>> for IndexParams {
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize)]
 struct IndexTextParams {
-    #[serde(default, deserialize_with = "empty_string_as_none", alias="host")]
-    pub Host: Option<SocketAddr>,
+    #[serde(default, deserialize_with = "empty_string_as_none", alias = "host")]
+    pub Host: Option<(String, u16)>,
 }
 
-fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+fn empty_string_as_none<'de, D>(de: D) -> Result<Option<(String, u16)>, D::Error>
 where
     D: serde::Deserializer<'de>,
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
 {
     let opt = Option::<String>::deserialize(de)?;
     match opt.as_deref() {
         None | Some("") => Ok(None),
-        Some(s) => std::str::FromStr::from_str(s)
-            .map_err(serde::de::Error::custom)
-            .map(Some),
+        Some(s) => {
+            let (host, port_str) = s
+                .rsplit_once(':')
+                .ok_or_else(|| serde::de::Error::custom("SplitFailed"))?;
+            let port = port_str.parse::<u16>().map_err(serde::de::Error::custom)?;
+            Ok(Some((host.into(), port)))
+        }
     }
 }
 

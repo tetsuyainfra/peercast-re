@@ -41,6 +41,27 @@ pub struct Args {
     #[arg(long, default_value_t = 17143)]
     pub api_port: u16,
 
+    /// Trackerのジャンル名で指定するYPの名前
+    /// genre: [yp]@Game
+    #[arg(long, default_value = "devyp")]
+    pub yp_name_space: String,
+
+    /// Listener数を表示にできるか
+    /// genre: yp[?]@Game
+    #[arg(long, default_value_t = true)]
+    pub yp_listerer_hideable: bool,
+
+    /// Portcheckのレベル制限
+    /// genre: ypGame ->  制限無し(0)
+    /// genre: yp[@]Game -> ポート解放をチェックする(1)
+    /// genre: yp[@@]Game -> 配信ビットレートで表示制限(2)
+    /// genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(3)
+    #[arg(long, default_value_t = 0)]
+    pub yp_port_check_level: u8,
+
+    /// Portcheckで制限する速度(MBps単位)
+    #[arg(long, default_value_t = 0)]
+    pub yp_limit_speed: u8,
 
     /// redisに使用するnamespace
     #[arg(long, default_value="devyp")]
@@ -133,6 +154,9 @@ pub struct Args {
     #[cfg(debug_assertions)]
     #[arg(long, value_parser, default_value_t=0)]
     pub cache_max_age: u32,
+
+    #[arg(long, default_value="ConnectInfo")]
+    pub ip_source: axum_client_ip::ClientIpSource,
 
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
