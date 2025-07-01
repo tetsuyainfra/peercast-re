@@ -68,7 +68,7 @@ struct ApiConfig {
 struct AppState(bb8::Pool<RedisConnectionManager>, Arc<ApiConfig>);
 
 //-------------------------------------------------------------------------------
-// HTTP
+// Api Server
 //-------------------------------------------------------------------------------
 pub async fn server_http(
     args: cli::Args,
@@ -186,6 +186,9 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
     .boxed()
 }
 
+//-------------------------------------------------------------------------------
+// Api Handlers
+//-------------------------------------------------------------------------------
 async fn index_txt(
     client_ip: ClientIp,
     query_params: Query<IndexTextParams>,
