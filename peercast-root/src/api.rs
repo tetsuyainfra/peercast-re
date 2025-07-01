@@ -31,7 +31,7 @@ use tracing::{debug, error, info, warn};
 
 use bb8_redis::RedisConnectionManager;
 
-use crate::{_REDIS_MASTER_KEY, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, RootChannel, cli};
+use crate::{cli, db::{ConnectionPool, DatabaseConnection}, portcheck::{get_portcheck_level, PortLevel}, RootChannel, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, _REDIS_MASTER_KEY};
 
 struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -233,71 +233,7 @@ fn filter_channels_by_limit_level(channels: Vec<JsonChannel>, limit_level: u8) -
         .collect()
 }
 
-//-------------------------------------------------------------------------------
-// PortCheck
-//-------------------------------------------------------------------------------
 
-#[repr(i8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PortLevel {
-    /// ポートチェックが行われていない
-    None = 0,
-
-    /// ポートチェックしたが疎通できなかった
-    Incomplete = -1,
-
-    /// 疎通OK
-    Welldone = 1,
-
-    /// 疎通OK, 速度OK
-    WelldoneReachedUploadSpeed = 2,
-}
-async fn get_portcheck_level(
-    DatabaseConnection(conn): &mut DatabaseConnection,
-    host: IpAddr,
-    port: u16,
-) -> anyhow::Result<PortLevel> {
-    info!(?host, ?port);
-    let key = portcheck_key(host, port);
-    // DBに結果を問い合わせ
-    if let Some::<String>(port_level) = timeout(Duration::from_secs(1), conn.get(&key)).await?? {
-        // あればそれを返す
-        debug!(?port_level);
-        Ok(PortLevel::Welldone)
-    } else {
-        // なければポートチェックする
-        let port_level = portcheck(conn, host, port).await?;
-        let _: Option<String> = timeout(Duration::from_secs(1), conn.set(&key, "true")).await??;
-        Ok(port_level)
-    }
-}
-
-async fn portcheck(
-    conn: &mut bb8::PooledConnection<'static, RedisConnectionManager>,
-    host: IpAddr,
-    port: u16,
-) -> anyhow::Result<PortLevel> {
-    use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
-    let self_addr = "0.0.0.0:7144".parse().unwrap();
-    let factory = PcpConnectionFactory::builder(GnuId::new(), self_addr)
-        .connect_timeout(Duration::from_secs(1))
-        .build();
-
-    let handshake = factory.connect((host, port).into()).await?;
-
-    match handshake.ping().await {
-        Ok(remote_id) => {
-            Ok(PortLevel::Welldone) // ポートチェック成功
-        }
-        Err(_e) => {
-            return Ok(PortLevel::Incomplete); // 失敗した場合は0を返す
-        }
-    }
-}
-
-fn portcheck_key(host: IpAddr, port: u16) -> String {
-    format!("{}_PORTCHECK_{}_{}", REDIS_MASTER_KEY(), host, port)
-}
 
 //-------------------------------------------------------------------------------
 // ApiConfig Mapper
@@ -312,8 +248,6 @@ impl FromRef<AppState> for Arc<ApiConfig> {
 //-------------------------------------------------------------------------------
 // Database mapper
 //-------------------------------------------------------------------------------
-type ConnectionPool = bb8::Pool<RedisConnectionManager>;
-struct DatabaseConnection(bb8::PooledConnection<'static, RedisConnectionManager>);
 impl FromRequestParts<AppState> for DatabaseConnection {
     type Rejection = (StatusCode, String);
 
@@ -332,7 +266,6 @@ impl FromRequestParts<AppState> for DatabaseConnection {
         Ok(Self(conn))
     }
 }
-
 // impl FromRequestParts<AppState> for DatabaseConnection
 // // where
 // //     ConnectionPool: FromRef<AppState>,

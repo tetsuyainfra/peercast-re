@@ -47,6 +47,7 @@ use url::Url;
 // use crate::channel::{tracker_channel::TrackerChannel, ChannelStore};
 
 mod cli;
+mod db;
 mod logging;
 mod repository;
 mod shutdown;
@@ -54,6 +55,7 @@ mod shutdown2;
 mod shutdown3;
 mod filter;
 mod api;
+mod portcheck;
 
 #[cfg(test)]
 mod test_helper;
