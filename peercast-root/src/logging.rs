@@ -51,7 +51,8 @@ pub fn init(args: &cli::Args) -> anyhow::Result<()> {
         tracing_subscriber::filter::filter_fn(|metadata| metadata.target() == "http_access");
 
     // CONSOLE OUTPUT
-    let fmt_layer = tracing_subscriber::fmt::layer();
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_line_number(true);
 
     tracing_subscriber::registry()
         .with(console_layer)
