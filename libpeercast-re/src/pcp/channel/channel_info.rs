@@ -8,15 +8,24 @@ use super::merge_field;
 /// AtomにするときはNull文字を追加するのを忘れないように
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ChannelInfo {
-    /// typeは予約語なのでtypにしている
+    /// FLV,WMV,MP3などのタイプ
+    /// ※ typeは予約語なのでtypにしている
     pub typ: String,
+    /// チャンネル名
     pub name: String,
+    /// ジャンル
     pub genre: String,
+    /// 詳細
     pub desc: String,
+    /// コメント
     pub comment: String,
+    /// コンタクトURL
     pub url: String,
+    /// MIME
     pub stream_type: String,
+    /// 拡張子
     pub stream_ext: String,
+    /// ビットレート[kbps]
     pub bitrate: i32,
 }
 
