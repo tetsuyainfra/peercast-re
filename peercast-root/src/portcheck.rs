@@ -1,6 +1,7 @@
 use std::{net::IpAddr, time::Duration};
 
 use bb8_redis::RedisConnectionManager;
+use peercast_root::PortLevel;
 use redis::AsyncCommands;
 use tokio::time::timeout;
 use tracing::{debug, info};
@@ -14,23 +15,6 @@ fn portcheck_key(host: IpAddr, port: u16) -> String {
 //-------------------------------------------------------------------------------
 // PortCheck
 //-------------------------------------------------------------------------------
-
-#[repr(i8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PortLevel {
-    /// ポートチェックが行われていない
-    None = 0,
-
-    /// ポートチェックしたが疎通できなかった
-    Incomplete = -1,
-
-    /// 疎通OK
-    Welldone = 1,
-
-    /// 疎通OK, 速度OK
-    WelldoneReachedUploadSpeed = 2,
-}
-
 pub async fn get_portcheck_level(
     DatabaseConnection(conn): &mut DatabaseConnection,
     host: IpAddr,
@@ -45,7 +29,20 @@ pub async fn get_portcheck_level(
         Ok(PortLevel::Welldone)
     } else {
         // なければポートチェックする
-        let port_level = portcheck(conn, host, port).await?;
+        let port_level = match portcheck(conn, host, port).await? {
+            true => {
+                // ポートチェック成功
+                debug!("Port check succeeded for {}:{}", host, port);
+                PortLevel::Welldone
+            }
+            false => {
+                // ポートチェック失敗
+                debug!("Port check failed for {}:{}", host, port);
+                PortLevel::Incomplete
+            }
+        };
+
+        // ポートチェック結果をDBに保存
         let _: Option<String> = timeout(Duration::from_secs(1), conn.set(&key, "true")).await??;
         Ok(port_level)
     }
@@ -55,21 +52,27 @@ pub async fn portcheck(
     conn: &mut bb8::PooledConnection<'static, RedisConnectionManager>,
     host: IpAddr,
     port: u16,
-) -> anyhow::Result<PortLevel> {
+) -> anyhow::Result<bool> {
     use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
     let self_addr = "0.0.0.0:7144".parse().unwrap();
     let factory = PcpConnectionFactory::builder(GnuId::new(), self_addr)
         .connect_timeout(Duration::from_secs(1))
         .build();
 
-    let handshake = factory.connect((host, port).into()).await?;
+    let handshake = match factory.connect((host, port).into()).await {
+        Ok(h) => h,
+        Err(_e) => {
+            debug!("Failed to connect to {}:{}", host, port);
+            return Ok(false)
+        },
+    };
 
     match handshake.ping().await {
         Ok(remote_id) => {
-            Ok(PortLevel::Welldone) // ポートチェック成功
+            Ok(true)
         }
         Err(_e) => {
-            return Ok(PortLevel::Incomplete); // 失敗した場合は0を返す
+            return Ok(false)
         }
     }
 }

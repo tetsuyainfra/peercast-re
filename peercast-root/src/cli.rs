@@ -1,6 +1,7 @@
 use std::process::exit;
 
 use clap::{Parser, Subcommand};
+use peercast_root::{RestrictPortLevel};
 
 /// Simple Daemon Program
 #[derive(Parser, Debug, Clone)]
@@ -43,7 +44,7 @@ pub struct Args {
 
     /// Trackerのジャンル名で指定するYPの名前
     /// genre: [yp]@Game
-    #[arg(long, default_value = "devyp")]
+    #[arg(long, default_value = "yp")]
     pub yp_name_space: String,
 
     /// Listener数を表示にできるか
@@ -52,19 +53,20 @@ pub struct Args {
     pub yp_listerer_hideable: bool,
 
     /// Portcheckのレベル制限
-    /// genre: ypGame ->  制限無し(0)
-    /// genre: yp[@]Game -> ポート解放をチェックする(1)
-    /// genre: yp[@@]Game -> 配信ビットレートで表示制限(2)
-    /// genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(3)
-    #[arg(long, default_value_t = 0)]
-    pub yp_port_check_level: u8,
+    // genre: ypGame ->  制限無し(level=None)
+    // genre: yp[@]Game -> ポート解放をチェックする(level=1)
+    // genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
+    // genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
+    #[arg(long, default_value="port-check")]
+    pub yp_restrict_port_level: RestrictPortLevel,
 
-    /// Portcheckで制限する速度(MBps単位)
-    #[arg(long, default_value_t = 0)]
-    pub yp_limit_speed: u8,
+    /// Portcheckの規制速度(KBps単位、500以上)
+    #[arg(long, default_value_t = 2000,
+         value_parser = clap::value_parser!(u32).range(peercast_root::YP_LIMIT_SPEED_MIN as i64..))]
+    pub yp_limit_speed: u32,
 
     /// redisに使用するnamespace
-    #[arg(long, default_value="devyp")]
+    #[arg(long, default_value="yproot")]
     pub redis_master_key: String,
 
     /// 接続先のredis_url(DEBUG MODEのみ)
@@ -192,3 +194,25 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
 const LONG_HELP_CORS:&str = r#"Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
 ※ URL末尾のスラッシュも関係してくるので注意すること
 "#;
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_args_yp_limit_speed() {
+        let args = Args::try_parse_from(vec![
+            "peercast-root",
+        ]).unwrap();
+        assert_eq!(args.yp_limit_speed, 2000);
+    }
+
+    #[test]
+    fn test_args_yp_port_check_level() {
+        let args = Args::try_parse_from(vec![
+            "peercast-root",
+        ]).unwrap();
+        assert_eq!(args.yp_restrict_port_level, RestrictPortLevel::None);
+    }
+}

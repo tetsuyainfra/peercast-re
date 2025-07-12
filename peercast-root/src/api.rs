@@ -20,7 +20,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures_util::{FutureExt, future::BoxFuture, select};
 use hyper::{Method, StatusCode};
 use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
-use peercast_root::{ExitCode, IndexInfo};
+use peercast_root::{ExitCode, IndexInfo, PortLevel, RestrictPortLevel, };
 use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use serde_with::{NoneAsEmptyString, serde_as};
@@ -31,7 +31,7 @@ use tracing::{debug, error, info, warn};
 
 use bb8_redis::RedisConnectionManager;
 
-use crate::{cli, db::{ConnectionPool, DatabaseConnection}, portcheck::{get_portcheck_level, PortLevel}, RootChannel, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, _REDIS_MASTER_KEY};
+use crate::{cli, db::{ConnectionPool, DatabaseConnection}, filter::filter_channels, portcheck::{get_portcheck_level, }, RootChannel, INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY, _REDIS_MASTER_KEY};
 
 struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -58,9 +58,9 @@ where
 
 #[derive(Debug)]
 struct ApiConfig {
-    limit_speed: u8,
+    restrict_speed: u32,
     listener_hideable: bool,
-    port_check_level: u8,
+    port_check_level: RestrictPortLevel,
     name_space: String,
 }
 
@@ -100,24 +100,38 @@ pub async fn server_http(
 
         let key = format!("{}:CHECK", REDIS_MASTER_KEY());
         // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
-        if let Err(_) = timeout(
+        match timeout(
             Duration::from_millis(2000),
             conn.set::<&str, &str, ()>(&key, "CHECK_ME"),
         )
-        .await
-        {
-            error!("redis connect set failed");
-            std::process::exit(ExitCode::Failure as i32);
-        }
-
-        let result: String = match timeout(Duration::from_millis(1000), conn.get(&key)).await {
-            Ok(Ok(r)) => r,
-            Ok(Err(_)) | Err(_) => {
-                error!("redis connect get failed");
+        .await {
+            Ok(Ok(())) => {
+                debug!("redis connect SET COMMAND success");
+            }
+            Ok(Err(e)) => {
+                error!("redis connect SET COMMAND failed: {}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(_) => {
+                error!("redis connect SET COMMAND timeout");
                 std::process::exit(ExitCode::Failure as i32);
             }
         };
-        assert_eq!(result, "CHECK_ME");
+
+        match timeout(Duration::from_millis(1000), conn.get::<_, String>(&key)).await  {
+            Ok(Ok(r))  => {
+                debug!("redis connect GET COMMAND success: {}", r);
+                assert_eq!(r, "CHECK_ME");
+            }
+            Ok(Err(e)) => {
+                error!("redis connect GET COMMAND failed: {}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(_) => {
+                error!("redis connect GET COMMAND timeout");
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
     }
     tracing::debug!("successfully connected to redis and pinged it");
 
@@ -135,9 +149,9 @@ pub async fn server_http(
     info!("cache-control: {}", &cache_control_value);
 
     let api_config = ApiConfig {
-        limit_speed: args.yp_limit_speed,
+        restrict_speed: args.yp_limit_speed,
         listener_hideable: args.yp_listerer_hideable,
-        port_check_level: args.yp_port_check_level,
+        port_check_level: args.yp_restrict_port_level,
         name_space: args.yp_name_space,
     };
 
@@ -148,7 +162,6 @@ pub async fn server_http(
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .route("/index.txt", routing::get(index_txt))
         .route("/api/index.json", routing::get(index_json))
-        // logging so we can see what's going on
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::default().include_headers(true)),
@@ -156,7 +169,6 @@ pub async fn server_http(
         .layer(
             CorsLayer::new()
                 .allow_origin(cor_origins)
-                // .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
                 .allow_methods([Method::GET]),
         )
         .layer(SetResponseHeaderLayer::if_not_present(
@@ -201,6 +213,7 @@ async fn index_txt(
     Ok(itertools::join(channels, "\n"))
 }
 
+#[inline]
 async fn index_json(
     ClientIp(ip): ClientIp,
     Query(params): Query<IndexTextParams>,
@@ -208,12 +221,29 @@ async fn index_json(
     State(config): State<Arc<ApiConfig>>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
     let own_level = if let Some(host) = &params.Host {
-        get_portcheck_level(&mut conn, ip, host.1).await?
+        get_portcheck_level(&mut conn, ip, host.1).await.unwrap_or_else(|e| {
+            error!("Failed to get_portcheck_level for {}:{} -> {}", host.0, host.1, e);
+            PortLevel::None
+        })
     } else {
         PortLevel::None
     };
 
-    let channels = merged_channels();
+    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
+
+    let mut channels: Vec<JsonChannel> = filter_channels(
+        &config.name_space,
+        config.listener_hideable,
+        config.port_check_level,
+        config.restrict_speed,
+        own_level,
+        0,
+        channels,
+    );
+
+    // Footerを追加する
+    channels.reserve(INDEX_TXT_FOOTER().len());
+    channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
 
     Ok(channels.into())
 }
@@ -225,17 +255,6 @@ fn merged_channels() -> Vec<JsonChannel> {
     channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
     channels
 }
-
-fn filter_channels_by_limit_level(channels: Vec<JsonChannel>, limit_level: u8) -> Vec<JsonChannel> {
-    channels
-        .into_iter()
-        .filter(|c| {
-            // c.id.level() <= limit_level
-            true
-        })
-        .collect()
-}
-
 
 
 //-------------------------------------------------------------------------------
@@ -269,27 +288,6 @@ impl FromRequestParts<AppState> for DatabaseConnection {
         Ok(Self(conn))
     }
 }
-// impl FromRequestParts<AppState> for DatabaseConnection
-// // where
-// //     ConnectionPool: FromRef<AppState>,
-// {
-//     type Rejection = (StatusCode, String);
-
-//     async fn from_request_parts(
-//         _parts: &mut axum::http::request::Parts,
-//         state: &AppState,
-//     ) -> Result<Self, Self::Rejection> {
-//         let pool = ConnectionPool::from_ref(&state.0);
-
-//         // let conn = pool.get_owned().await.map_err(internal_error)?;
-//         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned())
-//             .await
-//             .map_err(internal_error)?;
-//         let conn = ret_conn.map_err(internal_error)?;
-
-//         Ok(Self(conn))
-//     }
-// }
 
 /// Utility function for mapping any error into a `500 Internal Server Error`
 /// response.
@@ -303,58 +301,6 @@ where
 //-------------------------------------------------------------------------------
 // Header/Query Mapper
 //-------------------------------------------------------------------------------
-/*
-// 自分で実装する場合
-#[derive(Debug)]
-struct IndexParams {
-    pub host: Option<SocketAddr>,
-}
-
-impl<S> FromRequestParts<S> for IndexParams
-where
-    S: Send + Sync,
-{
-    type Rejection = (StatusCode, String);
-
-    async fn from_request_parts(
-        parts: &mut axum::http::request::Parts,
-        state: &S,
-    ) -> Result<Self, Self::Rejection> {
-        use axum::extract::RawQuery;
-        use hyper::HeaderMap;
-        let query = RawQuery::from_request_parts(parts, state)
-            .await
-            .ok()
-            .and_then(|q| q.0);
-
-        // クエリ文字列をHashMapにパース
-        let params: HashMap<String, String> =
-            url::form_urlencoded::parse(query.unwrap_or_default().as_bytes())
-                .into_owned()
-                .collect();
-
-        // キーを小文字に変換
-        let params_lower: HashMap<String, String> = params
-            .into_iter()
-            .map(|(k, v)| (k.to_lowercase(), v))
-            .collect();
-
-        // Ok(IndexParam { host: params_lower.get })
-        // Ok((headers, params_lower).into())
-        Ok(params_lower.into())
-    }
-}
-
-impl From<HashMap<String, String>> for IndexParams {
-    fn from(mut query: HashMap<std::string::String, std::string::String>) -> Self {
-        info!(?query);
-        let host: Option<SocketAddr> = query.get("host").map(|s| s.parse().ok()).unwrap();
-        let host = "127.0.0.1:7144".parse().ok();
-        IndexParams { host: host }
-    }
-}
-*/
-
 /// index.txtに対するクエリ型
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize)]
@@ -380,36 +326,42 @@ where
     }
 }
 
+//-------------------------------------------------------------------------------
+// Response structs
+//-------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonChannel {
-    id: GnuId,
-    name: String,
-    tracker_addr: Option<SocketAddr>,
-    contact_url: String,
-    genre: String,
-    desc: String,
-    comment: String,
-    stream_type: String,
-    stream_ext: String,
-    bitrate: i32,
+    pub id: GnuId,
+    pub name: String,
+    pub tracker_addr: Option<SocketAddr>,
+    pub contact_url: String,
+    pub genre: String,
+    pub raw_genre: String, // namespace, listener_hideable, PortLimitを含むgenre
+    pub desc: String,
+    pub comment: String,
+    /// MIME
+    pub stream_type: String,
+    /// 拡張子
+    pub stream_ext: String,
+    pub bitrate: i32,
     // filetype: String,
     // status: String,
-    number_of_listener: i32,
-    number_of_relay: i32,
-    created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
-    track: JsonTrack,
+    pub number_of_listener: i32,
+    pub number_of_relay: i32,
+    pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
+    pub track: JsonTrack,
 
     #[serde(rename = "type")]
-    typee: String,
+    pub typee: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct JsonTrack {
-    title: String,
-    creator: String,
-    url: String,
-    album: String,
-    genre: String,
+pub struct JsonTrack {
+    pub title: String,
+    pub creator: String,
+    pub url: String,
+    pub album: String,
+    pub genre: String,
 }
 
 impl From<&RootChannel> for JsonChannel {
@@ -431,7 +383,8 @@ impl From<&RootChannel> for JsonChannel {
             name,
             tracker_addr: ch.tracker_addr(),
             contact_url: url,
-            genre,
+            genre: genre.clone(),
+            raw_genre: genre,
             desc,
             comment,
             typee: typ,
@@ -477,7 +430,7 @@ impl JsonChannel {
             &self.created_at,
         )
     }
-    fn empty() -> Self {
+    pub fn empty() -> Self {
         // println!("DATETIME              {}", Utc.timestamp_opt(0, 0).unwrap());
         Self {
             id: GnuId::NONE,
@@ -485,6 +438,7 @@ impl JsonChannel {
             tracker_addr: None,
             contact_url: "".into(),
             genre: "".into(),
+            raw_genre: "".into(),
             desc: "".into(),
             comment: "".into(),
             typee: "".into(),
@@ -574,7 +528,8 @@ impl From<IndexInfo> for JsonChannel {
         j.name = name;
         j.tracker_addr = tracker_addr;
         j.contact_url = contact_url;
-        j.genre = genre;
+        j.genre = genre.clone();
+        j.raw_genre = genre;
         j.desc = desc;
         j.comment = comment;
         j.stream_ext = stream_ext;

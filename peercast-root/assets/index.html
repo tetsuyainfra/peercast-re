@@ -6,11 +6,14 @@
     <a href="/index.txt?Host=localhost:71447">/index.txt?Host=localhost:71447</a>
 </li>
 <li>
-    <input type="text" id="host" value="localhost:7144">
-    <button id="get-indextxt">Get index.txt</button>
+    <a href="/api/index.json">/api/index.json</a>
+    <a href="/api/index.json?Host=localhost:7144">/api/index.json?Host=localhost:7144</a>
+    <a href="/api/index.json?Host=localhost:71447">/api/index.json?Host=localhost:71447</a>
 </li>
 <li>
-    <a href="/api/index.json">/api/index.json</a>
+    <input type="text" id="host" value="localhost:7144">
+    <button id="get-indextxt">Get index.txt</button>
+    <button id="get-indexjson">Get index.json</button>
 </li>
 </ol>
 <a>Open the console to see stuff, then refresh to initiate exchange.</a>
@@ -47,6 +50,29 @@ document.getElementById('get-indextxt').addEventListener('click', function() {
         .then(data => {
             console.log('Data received:', data);
             document.getElementById('output').textContent = data;
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
+            document.getElementById('output').textContent = 'Error: ' + error.message;
+        });
+});
+
+document.getElementById('get-indexjson').addEventListener('click', function() {
+    let host_val = document.getElementById('host').value;
+    document.cookie = 'host=' + host_val + '; path=/; max-age=3600'; // Set cookie for 1 hour
+
+    let url = '/api/index.json?host=' + host_val;
+    console.log('Fetching:', url);
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.statusText);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Data received:', data);
+            document.getElementById('output').textContent =JSON.stringify(data, null, 2);
         })
         .catch(error => {
             console.error('There was a problem with the fetch operation:', error);

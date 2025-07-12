@@ -1,9 +1,6 @@
 #![allow(unused)]
 use std::{
-    net::{IpAddr, SocketAddr},
-    path::PathBuf,
-    sync::{Arc, Mutex, OnceLock, RwLock},
-    time::{Duration, Instant},
+    net::{IpAddr, SocketAddr}, path::PathBuf, process::exit, sync::{Arc, Mutex, OnceLock, RwLock}, time::{Duration, Instant}
 };
 
 use anyhow::Context;
@@ -30,7 +27,7 @@ use libpeercast_re::{
         rwlock_write_poisoned,
     },
 };
-use peercast_root::{FooterToml, IndexInfo};
+use peercast_root::{ExitCode, FooterToml, IndexInfo};
 // use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
@@ -93,12 +90,6 @@ pub fn CONN_FACTORY() -> &'static PcpConnectionFactory {
 }
 
 #[inline]
-#[allow(non_snake_case)]
-pub fn HTTP_API() -> &'static Router {
-    _HTTP_API.get().unwrap()
-}
-
-#[inline]
 #[allow(non_snake_case, private_interfaces)]
 pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
@@ -107,18 +98,8 @@ pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
 
 fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
-    //
     _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
-    //
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
-    //
-    _HTTP_API.get_or_init(|| {
-        axum::Router::new()
-            .route("/", axum::routing::get(root))
-            .route("/ws", axum::routing::get(root))
-            .with_state(ApiState {})
-    });
-    //
     _INDEX_TXT_FOOTER.get_or_init(|| {
         let mut v = vec![];
         if let Some(ref path) = args.index_txt_footer {
@@ -137,8 +118,18 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
 
     if args.create_dummy_channel {
         let mut chinfo = ChannelInfo::new();
-        chinfo.name = "ダミーチャンネル><><".into();
-        chinfo.genre = "ダミー".into();
+        let level_fmt = match args.yp_restrict_port_level {
+            peercast_root::RestrictPortLevel::None => "",
+            peercast_root::RestrictPortLevel::PortCheck => "@",
+            peercast_root::RestrictPortLevel::BroadcastSpeed => "@@",
+            peercast_root::RestrictPortLevel::RestrictSpeed => "@@@",
+            v => {
+                        error!("Invalid port check level: {:?}", v);
+                        exit(ExitCode::Failure as i32);
+            }
+        };
+        chinfo.name = "ダミーチャンネル".into();
+        chinfo.genre = format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into();
         chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
         chinfo.url = "https://yp-dev.007144.xyz/".into();
         chinfo.typ = "RAW".into();
@@ -621,228 +612,6 @@ fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Op
     tracker_host
 }
 
-
-/*
-async fn serve_http(
-    cid: ConnectionId,
-    mut stream: TcpStream,
-    remote: SocketAddr,
-    graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
-) {
-    let socket = hyper_util::rt::TokioIo::new(stream);
-
-    let hyper_service = hyper_util::service::TowerToHyperService::new(HTTP_API().clone());
-
-    let builder =
-        hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new());
-    // builder.http2().enable_connect_protocol(); // ENABLE HTTP2
-    let conn = builder.serve_connection_with_upgrades(socket, hyper_service);
-
-    futures_util::pin_mut!(conn);
-    loop {
-        tokio::select! {
-            // HTTP1.1以降の接続の使い回しができるようになっている？
-            result = conn.as_mut() => {
-                if let Err(_err) = result {
-                    trace!("failed to serve connection: {_err:#}");
-                }
-                break;
-            }
-        }
-    }
-}
-
-async fn ws_handler(
-    ws: axum::extract::WebSocketUpgrade,
-    user_agent: Option<axum_extra::TypedHeader<axum_extra::headers::UserAgent>>,
-    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,
-) -> impl axum::response::IntoResponse {
-    let user_agent = if let Some(axum_extra::TypedHeader(user_agent)) = user_agent {
-        user_agent.to_string()
-    } else {
-        String::from("Unknown browser")
-    };
-    // println!("`{user_agent}` at {addr} connected.");
-    // finalize the upgrade process by returning upgrade callback.
-    // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, addr))
-}
-/// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: axum::extract::ws::WebSocket, who: SocketAddr) {
-    use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocketUpgrade};
-    use bytes::Bytes;
-
-    /*
-    socket
-        .send(Message::Ping(Bytes::from_static(b"1234")))
-        .await;
-
-    // send a ping (unsupported by some browsers) just to kick things off and get a response
-    if socket
-        .send(Message::Ping(bytes::Bytes::from_static(&[1, 2, 3])))
-        .await
-        .is_ok()
-    {
-        println!("Pinged {who}...");
-    } else {
-        println!("Could not send ping {who}!");
-        // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine anyway.
-        return;
-    } */
-
-    // receive single message from a client (we can either receive or send with socket).
-    // this will likely be the Pong for our Ping or a hello message from client.
-    // waiting for message from a client will block this task, but will not block other client's
-    // connections.
-    if let Some(msg) = socket.recv().await {
-        if let Ok(msg) = msg {
-            if process_message(msg, who).is_break() {
-                return;
-            }
-        } else {
-            println!("client {who} abruptly disconnected");
-            return;
-        }
-    }
-
-    // Since each client gets individual statemachine, we can pause handling
-    // when necessary to wait for some external event (in this case illustrated by sleeping).
-    // Waiting for this client to finish getting its greetings does not prevent other clients from
-    // connecting to server and receiving their greetings.
-    // for i in 1..5 {
-    //     if socket
-    //         .send(Message::Text(format!("Hi {i} times!").into()))
-    //         .await
-    //         .is_err()
-    //     {
-    //         println!("client {who} abruptly disconnected");
-    //         return;
-    //     }
-    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    // }
-
-    // By splitting socket we can send and receive at the same time. In this example we will send
-    // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
-    let (mut sender, mut receiver) = socket.split();
-
-    // Spawn a task that will push several messages to the client (does not matter what client does)
-    let mut send_task = tokio::spawn(async move {
-        let n_msg = 20;
-
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
-        let mut i = 0;
-        loop {
-            tokio::select! {
-                r =  sender.send(Message::Text(format!("Server message {i} ...").into())) => {
-                    if r.is_err() { break }
-                }
-            }
-            i += 1;
-            interval.tick().await;
-        }
-        // for i in 0..n_msg {
-        //     // In case of any websocket error, we exit.
-        //     if sender
-        //         .send(Message::Text(format!("Server message {i} ...").into()))
-        //         .await
-        //         .is_err()
-        //     {
-        //         return i;
-        //     }
-
-        //     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        // }
-
-        // println!("Sending close to {who}...");
-        // if let Err(e) = sender
-        //     .send(Message::Close(Some(CloseFrame {
-        //         code: axum::extract::ws::close_code::NORMAL,
-        //         reason: Utf8Bytes::from_static("Goodbye"),
-        //     })))
-        //     .await
-        // {
-        //     println!("Could not send Close due to {e}, probably it is ok?");
-        // }
-        // n_msg
-        i
-    });
-
-    // This second task will receive messages from client and print them on server console
-    let mut recv_task = tokio::spawn(async move {
-        let mut cnt = 0;
-        while let Some(Ok(msg)) = receiver.next().await {
-            cnt += 1;
-            // print message and break if instructed to do so
-            if process_message(msg, who).is_break() {
-                break;
-            }
-        }
-        cnt
-    });
-
-    // If any one of the tasks exit, abort the other.
-    tokio::select! {
-        rv_a = (&mut send_task) => {
-            match rv_a {
-                Ok(a) => println!("{a} messages sent to {who}"),
-                Err(a) => println!("Error sending messages {a:?}")
-            }
-            recv_task.abort();
-        },
-        rv_b = (&mut recv_task) => {
-            match rv_b {
-                Ok(b) => println!("Received {b} messages"),
-                Err(b) => println!("Error receiving messages {b:?}")
-            }
-            send_task.abort();
-        }
-    }
-
-    // returning from the handler closes the websocket connection
-    println!("Websocket context {who} destroyed");
-}
-
-/// helper to print contents of messages to stdout. Has special treatment for Close.
-fn process_message(
-    msg: axum::extract::ws::Message,
-    who: SocketAddr,
-) -> std::ops::ControlFlow<(), ()> {
-    use axum::extract::ws::Message;
-    use std::ops::ControlFlow;
-    match msg {
-        Message::Text(t) => {
-            println!(">>> {who} sent str: {t:?}");
-        }
-        Message::Binary(d) => {
-            println!(">>> {} sent {} bytes: {:?}", who, d.len(), d);
-        }
-        Message::Close(c) => {
-            if let Some(cf) = c {
-                println!(
-                    ">>> {} sent close with code {} and reason `{}`",
-                    who, cf.code, cf.reason
-                );
-            } else {
-                println!(">>> {who} somehow sent close message without CloseFrame");
-            }
-            return ControlFlow::Break(());
-        }
-
-        Message::Pong(v) => {
-            println!(">>> {who} sent pong with {v:?}");
-        }
-        // You should never need to manually handle Message::Ping, as axum's websocket library
-        // will do so for you automagically by replying with Pong and copying the v according to
-        // spec. But if you need the contents of the pings you can see them here.
-        Message::Ping(v) => {
-            println!(">>> {who} sent ping with {v:?}");
-        }
-    }
-    ControlFlow::Continue(())
-}
-    */
 #[cfg(test)]
 mod t {
     use crate::{RootChannel, test_helper::*};
