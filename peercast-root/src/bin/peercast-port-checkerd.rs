@@ -16,12 +16,10 @@ use utoipa_swagger_ui::SwaggerUi;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Public API Bind adress
-    #[cfg(debug_assertions)]
     #[arg(short, long, default_value = "0.0.0.0")]
     bind: std::net::IpAddr,
 
     /// Public API Port
-    #[cfg(debug_assertions)]
     #[arg(short, long, default_value_t = 7145)]
     port: u16,
 
@@ -30,12 +28,10 @@ struct Args {
     path: String,
 
     /// Private API Bind adress
-    #[cfg(debug_assertions)]
     #[arg(short, long, default_value = "0.0.0.0")]
     api_bind: std::net::IpAddr,
 
     /// Private API Port
-    #[cfg(debug_assertions)]
     #[arg(short, long, default_value_t = 7146)]
     api_port: u16,
 
