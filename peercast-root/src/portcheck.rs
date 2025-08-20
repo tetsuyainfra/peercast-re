@@ -20,7 +20,6 @@ pub async fn get_portcheck_level(
     host: IpAddr,
     port: u16,
 ) -> anyhow::Result<PortLevel> {
-    info!(?host, ?port);
     let key = portcheck_key(host, port);
     // DBに結果を問い合わせ
     if let Some::<String>(port_level) = timeout(Duration::from_secs(1), conn.get(&key)).await?? {
@@ -31,12 +30,10 @@ pub async fn get_portcheck_level(
         // なければポートチェックする
         let port_level = match portcheck(conn, host, port).await? {
             true => {
-                // ポートチェック成功
                 debug!("Port check succeeded for {}:{}", host, port);
                 PortLevel::Welldone
             }
             false => {
-                // ポートチェック失敗
                 debug!("Port check failed for {}:{}", host, port);
                 PortLevel::Incomplete
             }
@@ -62,16 +59,19 @@ pub async fn portcheck(
     let handshake = match factory.connect((host, port).into()).await {
         Ok(h) => h,
         Err(_e) => {
-            debug!("Failed to connect to {}:{}", host, port);
+            info!("Failed to connect to {}:{}", host, port);
             return Ok(false)
         },
     };
 
     match handshake.ping().await {
         Ok(remote_id) => {
-            Ok(true)
+            info!("Success to PCP connect to {}:{}({})", host, port, remote_id);
+            // HACKME: handshakeの切断処理を確認する
+            return Ok(true)
         }
         Err(_e) => {
+            info!("Failed to PCP connect to {}:{}", host, port);
             return Ok(false)
         }
     }
