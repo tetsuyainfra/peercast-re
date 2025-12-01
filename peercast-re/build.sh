@@ -7,6 +7,7 @@ set -ex
 
 pushd $SCRIPT_ROOT
     pushd ./client
+        npm install
         npm run clean
         npm run gen-api
         npm run gen-api2
