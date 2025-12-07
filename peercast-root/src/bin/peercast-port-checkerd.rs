@@ -15,17 +15,29 @@ use utoipa_swagger_ui::SwaggerUi;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
-    // #[arg(short, long, default_value = "0.0.0.0")]
+    /// Public API Bind adress
     #[arg(short, long, default_value = "0.0.0.0")]
     bind: std::net::IpAddr,
 
-    /// Name of the person to greet
+    /// Public API Port
     #[arg(short, long, default_value_t = 7145)]
     port: u16,
 
+    /// Public API Path
     #[arg(long, default_value = "/api/v1/ppc")]
     path: String,
+
+    /// Private API Bind adress
+    #[arg(short, long, default_value = "0.0.0.0")]
+    api_bind: std::net::IpAddr,
+
+    /// Private API Port
+    #[arg(short, long, default_value_t = 7146)]
+    api_port: u16,
+
+    /// Private API Path
+    #[arg(long, default_value = "/api/v1/admin")]
+    api_path: String,
 
     #[arg(long, default_value_t = 3000, value_name="CONNECT_TIMEOUT_MILLI_SECS")]
     connect_timeout: u64,

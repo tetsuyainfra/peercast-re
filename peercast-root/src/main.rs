@@ -1,9 +1,6 @@
 #![allow(unused)]
 use std::{
-    net::{IpAddr, SocketAddr},
-    path::PathBuf,
-    sync::{Arc, Mutex, OnceLock, RwLock},
-    time::{Duration, Instant},
+    net::{IpAddr, SocketAddr}, path::PathBuf, process::exit, sync::{Arc, Mutex, OnceLock, RwLock}, time::{Duration, Instant}
 };
 
 use anyhow::Context;
@@ -30,7 +27,7 @@ use libpeercast_re::{
         rwlock_write_poisoned,
     },
 };
-use peercast_root::{FooterToml, IndexInfo};
+use peercast_root::{ExitCode, FooterToml, IndexInfo};
 // use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
@@ -47,11 +44,15 @@ use url::Url;
 // use crate::channel::{tracker_channel::TrackerChannel, ChannelStore};
 
 mod cli;
+mod db;
 mod logging;
 mod repository;
 mod shutdown;
 mod shutdown2;
 mod shutdown3;
+mod filter;
+mod api;
+mod portcheck;
 
 #[cfg(test)]
 mod test_helper;
@@ -64,9 +65,17 @@ static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
 static _HTTP_API: OnceLock<Router> = OnceLock::new();
 // Don't use directly. SEE: INDEX_TXT_FOOTER()
 static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
+// Don't use directly. SEE: REDIS_MASTER_KEY()
+static _REDIS_MASTER_KEY: OnceLock<String> = OnceLock::new();
 
 #[derive(Debug, Clone)]
 struct ApiState {}
+
+#[inline]
+#[allow(non_snake_case, private_interfaces)]
+pub fn REDIS_MASTER_KEY() -> &'static str {
+    _REDIS_MASTER_KEY.get().unwrap()
+}
 
 #[inline]
 #[allow(non_snake_case)]
@@ -81,29 +90,16 @@ pub fn CONN_FACTORY() -> &'static PcpConnectionFactory {
 }
 
 #[inline]
-#[allow(non_snake_case)]
-pub fn HTTP_API() -> &'static Router {
-    _HTTP_API.get().unwrap()
-}
-
-#[inline]
 #[allow(non_snake_case, private_interfaces)]
 pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
 }
 
+
 fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
+    _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
     _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
-    //
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
-    //
-    _HTTP_API.get_or_init(|| {
-        axum::Router::new()
-            .route("/", axum::routing::get(root))
-            .route("/ws", axum::routing::get(root))
-            .with_state(ApiState {})
-    });
-    //
     _INDEX_TXT_FOOTER.get_or_init(|| {
         let mut v = vec![];
         if let Some(ref path) = args.index_txt_footer {
@@ -122,8 +118,18 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
 
     if args.create_dummy_channel {
         let mut chinfo = ChannelInfo::new();
-        chinfo.name = "ダミーチャンネル><><".into();
-        chinfo.genre = "ダミー".into();
+        let level_fmt = match args.yp_restrict_port_level {
+            peercast_root::RestrictPortLevel::None => "",
+            peercast_root::RestrictPortLevel::PortCheck => "@",
+            peercast_root::RestrictPortLevel::BroadcastSpeed => "@@",
+            peercast_root::RestrictPortLevel::RestrictSpeed => "@@@",
+            v => {
+                        error!("Invalid port check level: {:?}", v);
+                        exit(ExitCode::Failure as i32);
+            }
+        };
+        chinfo.name = "ダミーチャンネル".into();
+        chinfo.genre = format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into();
         chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
         chinfo.url = "https://yp-dev.007144.xyz/".into();
         chinfo.typ = "RAW".into();
@@ -170,7 +176,7 @@ async fn main() -> anyhow::Result<()> {
         listener_pcp,
         graceful.clone(),
     ));
-    let http_server_task = tokio::spawn(server_http(args, listener_http, graceful));
+    let http_server_task = tokio::spawn(api::server_http(args, listener_http, graceful));
 
     // futures_util::future::join_all(vec![http_server_task])
     // futures_util::future::join_all(vec![shutdown_task, http_server_task])
@@ -606,541 +612,6 @@ fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Op
     tracker_host
 }
 
-//-------------------------------------------------------------------------------
-// HTTP
-//-------------------------------------------------------------------------------
-async fn server_http(
-    args: cli::Args,
-    listener: TcpListener,
-    graceful_shutdown: CancellationToken,
-) -> anyhow::Result<()> {
-    use axum::routing::any;
-    use tower_http::{
-        services::ServeDir,
-        trace::{DefaultMakeSpan, TraceLayer},
-    };
-
-    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
-    info!("asset_dir: {:?}", &assets_dir);
-
-    let cor_origins: Vec<_> = args
-        .allow_cors
-        .iter()
-        .map(|origin| origin.parse::<HeaderValue>().unwrap())
-        .collect();
-    info!("cor_origins: {:?}", &cor_origins);
-
-    let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
-    info!("cache-control: {}", &cache_control_value);
-
-    let tracker = tokio_util::task::TaskTracker::new();
-    info!("START HTTP SERVER");
-
-    let app = Router::new()
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
-        .route("/index.txt", routing::get(index_txt))
-        .route("/api/index.json", routing::get(index_json))
-        // logging so we can see what's going on
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        )
-        .layer(
-            CorsLayer::new()
-                .allow_origin(cor_origins)
-                // .allow_origin("http://localhost:3000".parse::<HeaderValue>().unwrap())
-                .allow_methods([Method::GET]),
-        )
-        .layer(SetResponseHeaderLayer::if_not_present(
-            axum::http::header::CACHE_CONTROL,
-            HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap()
-        ));
-
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal(graceful_shutdown ))
-    .await
-    .unwrap();
-
-    Ok(())
-}
-
-fn shutdown_signal(
-    graceful_shutdown: CancellationToken,
-) -> BoxFuture<'static, ()> {
-    async move {
-        //
-        graceful_shutdown.cancelled().await;
-        info!("HTTP start graceful shutdown");
-    }
-    .boxed()
-}
-
-fn merged_channels() -> Vec<JsonChannel> {
-    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
-
-    channels.reserve(INDEX_TXT_FOOTER().len());
-    channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
-    channels
-}
-
-async fn index_txt(
-    Query(params): Query<IndexTextParams>
-) -> impl IntoResponse {
-    if let Some(host )= params.host {
-        warn!(?host, "NOT IMPLEMENTED {}:{}", file!(), line!());
-    }
-
-    let channels: Vec<String> = merged_channels()
-        .iter()
-        .map(|c| c.to_line_of_index_txt())
-        .collect();
-
-    itertools::join(channels, "\n")
-}
-
-async fn index_json() -> Json<Vec<JsonChannel>> {
-    merged_channels().into()
-}
-
-/// index.txtに対するクエリ型
-#[serde_as]
-#[derive(Debug, Deserialize)]
-struct IndexTextParams {
-    #[serde_as(as = "NoneAsEmptyString")]
-    pub host: Option<String>,
-}
-
-
-#[derive(Debug, Clone, Serialize)]
-struct JsonChannel {
-    id: GnuId,
-    name: String,
-    tracker_addr: Option<SocketAddr>,
-    contact_url: String,
-    genre: String,
-    desc: String,
-    comment: String,
-    stream_type: String,
-    stream_ext: String,
-    bitrate: i32,
-    // filetype: String,
-    // status: String,
-    number_of_listener: i32,
-    number_of_relay: i32,
-    created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
-    track: JsonTrack,
-
-    #[serde(rename = "type")]
-    typee: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct JsonTrack {
-    title: String,
-    creator: String,
-    url: String,
-    album: String,
-    genre: String,
-}
-
-impl From<&RootChannel> for JsonChannel {
-    fn from(ch: &RootChannel) -> Self {
-        let ChannelInfo {
-            typ,
-            name,
-            genre,
-            desc,
-            comment,
-            url,
-            stream_type,
-            stream_ext,
-            bitrate,
-        } = ch.channel_info();
-
-        JsonChannel {
-            id: ch.id(),
-            name,
-            tracker_addr: ch.tracker_addr(),
-            contact_url: url,
-            genre,
-            desc,
-            comment,
-            typee: typ,
-            stream_type,
-            stream_ext,
-            bitrate,
-            number_of_listener: ch.number_of_listener(),
-            number_of_relay: ch.number_of_relay(),
-            created_at: ch.created_at(),
-            track: ch.track_info().into(),
-        }
-    }
-}
-
-impl From<TrackInfo> for JsonTrack {
-    fn from(t: TrackInfo) -> Self {
-        JsonTrack {
-            title: t.title,
-            creator: t.creator,
-            url: t.url,
-            album: t.album,
-            genre: t.genre,
-        }
-    }
-}
-
-impl JsonChannel {
-    fn to_line_of_index_txt(&self) -> String {
-        create_index_line(
-            &self.name,
-            &self.id,
-            &self.tracker_addr,
-            &self.contact_url,
-            &self.genre,
-            &self.desc,
-            &self.comment,
-            self.number_of_listener,
-            self.number_of_relay,
-            self.bitrate,
-            &self.typee,
-            &self.stream_type,
-            &self.stream_ext,
-            &self.created_at,
-        )
-    }
-    fn empty() -> Self {
-        // println!("DATETIME              {}", Utc.timestamp_opt(0, 0).unwrap());
-        Self {
-            id: GnuId::NONE,
-            name: "".into(),
-            tracker_addr: None,
-            contact_url: "".into(),
-            genre: "".into(),
-            desc: "".into(),
-            comment: "".into(),
-            typee: "".into(),
-            stream_type: "".into(),
-            stream_ext: "".into(),
-            bitrate: 0,
-            number_of_listener: 0,
-            number_of_relay: 0,
-            created_at: Utc.timestamp_opt(0, 0).unwrap(),
-            track: JsonTrack {
-                title: "".into(),
-                creator: "".into(),
-                url: "".into(),
-                album: "".into(),
-                genre: "".into(),
-            },
-        }
-    }
-}
-
-fn create_index_line(
-    name: &String,
-    id: &GnuId,
-    tracker_addr: &Option<SocketAddr>,
-    contact_url: &String,
-    genre: &String,
-    desc: &String,
-    comment: &String,
-    number_of_listener: i32,
-    number_of_relay: i32,
-    bitrate: i32,
-    typee: &String,
-    stream_type: &String,
-    stream_ext: &String,
-    created_at: &DateTime<Utc>,
-) -> String {
-    use html_escape::{encode_quoted_attribute, encode_safe};
-    let diff_time = Utc::now() - created_at;
-    let hour = diff_time.num_hours();
-    let min = diff_time.num_minutes() % 60;
-
-    let addr = tracker_addr
-        .as_ref()
-        .map(|a| a.to_string())
-        .unwrap_or_default();
-
-    format!(
-        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
-        name = encode_safe(&name.clone()),
-        id = id,
-        addr = addr,
-        contact_url = encode_quoted_attribute(&contact_url),
-        genre = encode_safe(&genre),
-        desc = encode_safe(&desc),
-        number_of_listener = number_of_listener,
-        number_of_relay = number_of_relay,
-        bitrate = bitrate,
-        typee = encode_safe(&typee),
-        name_escaped = encode_safe(&name),
-        time_hour = hour,
-        time_min = min,
-        comment = comment
-    )
-}
-
-impl From<IndexInfo> for JsonChannel {
-    fn from(value: IndexInfo) -> Self {
-        let mut j = JsonChannel::empty();
-        let IndexInfo {
-            id,
-            name,
-            tracker_addr,
-            contact_url,
-            genre,
-            desc,
-            comment,
-            typee,
-            stream_type,
-            stream_ext,
-            bitrate,
-            number_of_listener,
-            number_of_relay,
-            created_at,
-        } = value;
-        j.id = id;
-        j.typee = typee;
-        j.name = name;
-        j.tracker_addr = tracker_addr;
-        j.contact_url = contact_url;
-        j.genre = genre;
-        j.desc = desc;
-        j.comment = comment;
-        j.stream_ext = stream_ext;
-        j.bitrate = bitrate;
-        j.number_of_listener = number_of_listener;
-        j.number_of_relay = number_of_relay;
-        j.created_at = created_at.unwrap_or_else(|| chrono::Utc::now());
-        j
-    }
-}
-
-/*
-async fn serve_http(
-    cid: ConnectionId,
-    mut stream: TcpStream,
-    remote: SocketAddr,
-    graceful_shutdown: CancellationToken,
-    force_shutdown: CancellationToken,
-) {
-    let socket = hyper_util::rt::TokioIo::new(stream);
-
-    let hyper_service = hyper_util::service::TowerToHyperService::new(HTTP_API().clone());
-
-    let builder =
-        hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new());
-    // builder.http2().enable_connect_protocol(); // ENABLE HTTP2
-    let conn = builder.serve_connection_with_upgrades(socket, hyper_service);
-
-    futures_util::pin_mut!(conn);
-    loop {
-        tokio::select! {
-            // HTTP1.1以降の接続の使い回しができるようになっている？
-            result = conn.as_mut() => {
-                if let Err(_err) = result {
-                    trace!("failed to serve connection: {_err:#}");
-                }
-                break;
-            }
-        }
-    }
-}
-
-async fn ws_handler(
-    ws: axum::extract::WebSocketUpgrade,
-    user_agent: Option<axum_extra::TypedHeader<axum_extra::headers::UserAgent>>,
-    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,
-) -> impl axum::response::IntoResponse {
-    let user_agent = if let Some(axum_extra::TypedHeader(user_agent)) = user_agent {
-        user_agent.to_string()
-    } else {
-        String::from("Unknown browser")
-    };
-    // println!("`{user_agent}` at {addr} connected.");
-    // finalize the upgrade process by returning upgrade callback.
-    // we can customize the callback by sending additional info such as address.
-    ws.on_upgrade(move |socket| handle_socket(socket, addr))
-}
-/// Actual websocket statemachine (one will be spawned per connection)
-async fn handle_socket(mut socket: axum::extract::ws::WebSocket, who: SocketAddr) {
-    use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocketUpgrade};
-    use bytes::Bytes;
-
-    /*
-    socket
-        .send(Message::Ping(Bytes::from_static(b"1234")))
-        .await;
-
-    // send a ping (unsupported by some browsers) just to kick things off and get a response
-    if socket
-        .send(Message::Ping(bytes::Bytes::from_static(&[1, 2, 3])))
-        .await
-        .is_ok()
-    {
-        println!("Pinged {who}...");
-    } else {
-        println!("Could not send ping {who}!");
-        // no Error here since the only thing we can do is to close the connection.
-        // If we can not send messages, there is no way to salvage the statemachine anyway.
-        return;
-    } */
-
-    // receive single message from a client (we can either receive or send with socket).
-    // this will likely be the Pong for our Ping or a hello message from client.
-    // waiting for message from a client will block this task, but will not block other client's
-    // connections.
-    if let Some(msg) = socket.recv().await {
-        if let Ok(msg) = msg {
-            if process_message(msg, who).is_break() {
-                return;
-            }
-        } else {
-            println!("client {who} abruptly disconnected");
-            return;
-        }
-    }
-
-    // Since each client gets individual statemachine, we can pause handling
-    // when necessary to wait for some external event (in this case illustrated by sleeping).
-    // Waiting for this client to finish getting its greetings does not prevent other clients from
-    // connecting to server and receiving their greetings.
-    // for i in 1..5 {
-    //     if socket
-    //         .send(Message::Text(format!("Hi {i} times!").into()))
-    //         .await
-    //         .is_err()
-    //     {
-    //         println!("client {who} abruptly disconnected");
-    //         return;
-    //     }
-    //     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    // }
-
-    // By splitting socket we can send and receive at the same time. In this example we will send
-    // unsolicited messages to client based on some sort of server's internal event (i.e .timer).
-    let (mut sender, mut receiver) = socket.split();
-
-    // Spawn a task that will push several messages to the client (does not matter what client does)
-    let mut send_task = tokio::spawn(async move {
-        let n_msg = 20;
-
-        let mut interval = tokio::time::interval(Duration::from_secs(1));
-        let mut i = 0;
-        loop {
-            tokio::select! {
-                r =  sender.send(Message::Text(format!("Server message {i} ...").into())) => {
-                    if r.is_err() { break }
-                }
-            }
-            i += 1;
-            interval.tick().await;
-        }
-        // for i in 0..n_msg {
-        //     // In case of any websocket error, we exit.
-        //     if sender
-        //         .send(Message::Text(format!("Server message {i} ...").into()))
-        //         .await
-        //         .is_err()
-        //     {
-        //         return i;
-        //     }
-
-        //     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-        // }
-
-        // println!("Sending close to {who}...");
-        // if let Err(e) = sender
-        //     .send(Message::Close(Some(CloseFrame {
-        //         code: axum::extract::ws::close_code::NORMAL,
-        //         reason: Utf8Bytes::from_static("Goodbye"),
-        //     })))
-        //     .await
-        // {
-        //     println!("Could not send Close due to {e}, probably it is ok?");
-        // }
-        // n_msg
-        i
-    });
-
-    // This second task will receive messages from client and print them on server console
-    let mut recv_task = tokio::spawn(async move {
-        let mut cnt = 0;
-        while let Some(Ok(msg)) = receiver.next().await {
-            cnt += 1;
-            // print message and break if instructed to do so
-            if process_message(msg, who).is_break() {
-                break;
-            }
-        }
-        cnt
-    });
-
-    // If any one of the tasks exit, abort the other.
-    tokio::select! {
-        rv_a = (&mut send_task) => {
-            match rv_a {
-                Ok(a) => println!("{a} messages sent to {who}"),
-                Err(a) => println!("Error sending messages {a:?}")
-            }
-            recv_task.abort();
-        },
-        rv_b = (&mut recv_task) => {
-            match rv_b {
-                Ok(b) => println!("Received {b} messages"),
-                Err(b) => println!("Error receiving messages {b:?}")
-            }
-            send_task.abort();
-        }
-    }
-
-    // returning from the handler closes the websocket connection
-    println!("Websocket context {who} destroyed");
-}
-
-/// helper to print contents of messages to stdout. Has special treatment for Close.
-fn process_message(
-    msg: axum::extract::ws::Message,
-    who: SocketAddr,
-) -> std::ops::ControlFlow<(), ()> {
-    use axum::extract::ws::Message;
-    use std::ops::ControlFlow;
-    match msg {
-        Message::Text(t) => {
-            println!(">>> {who} sent str: {t:?}");
-        }
-        Message::Binary(d) => {
-            println!(">>> {} sent {} bytes: {:?}", who, d.len(), d);
-        }
-        Message::Close(c) => {
-            if let Some(cf) = c {
-                println!(
-                    ">>> {} sent close with code {} and reason `{}`",
-                    who, cf.code, cf.reason
-                );
-            } else {
-                println!(">>> {who} somehow sent close message without CloseFrame");
-            }
-            return ControlFlow::Break(());
-        }
-
-        Message::Pong(v) => {
-            println!(">>> {who} sent pong with {v:?}");
-        }
-        // You should never need to manually handle Message::Ping, as axum's websocket library
-        // will do so for you automagically by replying with Pong and copying the v according to
-        // spec. But if you need the contents of the pings you can see them here.
-        Message::Ping(v) => {
-            println!(">>> {who} sent ping with {v:?}");
-        }
-    }
-    ControlFlow::Continue(())
-}
-    */
 #[cfg(test)]
 mod t {
     use crate::{RootChannel, test_helper::*};

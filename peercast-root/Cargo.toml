@@ -30,10 +30,11 @@ tokio-util = { version = "0.7.13", features = ["rt"] }
 console-subscriber = { version = "0.4.1" }
 
 # Axum
-axum-core = { version = "*" }
-axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum-core = { version = "0.5.2" }
+axum = { version = "0.8.4", features = ["tokio", "form", "ws", "tracing", "macros"] }
+axum-extra = { version = "0.10.1", features = ["typed-header"] }
 axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
+axum-client-ip = "1.1.3"
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",
@@ -47,6 +48,10 @@ tower-http = { version = "0.6.2", features = [
 ] }
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
+
+bb8 = { version= "0.9.0" }
+bb8-redis = { version= "0.24.0" }
+redis = { version = "0.32.2" }
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }

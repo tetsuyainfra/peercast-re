@@ -1,6 +1,7 @@
 use std::process::exit;
 
 use clap::{Parser, Subcommand};
+use peercast_root::{RestrictPortLevel};
 
 /// Simple Daemon Program
 #[derive(Parser, Debug, Clone)]
@@ -41,8 +42,44 @@ pub struct Args {
     #[arg(long, default_value_t = 17143)]
     pub api_port: u16,
 
+    /// Trackerのジャンル名で指定するYPの名前
+    /// genre: [yp]@Game
+    #[arg(long, default_value = "yp")]
+    pub yp_name_space: String,
+
+    /// Listener数を表示にできるか
+    /// genre: yp[?]@Game
+    #[arg(long, default_value_t = true)]
+    pub yp_listerer_hideable: bool,
+
+    /// Portcheckのレベル制限
+    // genre: ypGame ->  制限無し(level=None)
+    // genre: yp[@]Game -> ポート解放をチェックする(level=1)
+    // genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
+    // genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
+    #[arg(long, default_value="port-check")]
+    pub yp_restrict_port_level: RestrictPortLevel,
+
+    /// Portcheckの規制速度(KBps単位、500以上)
+    #[arg(long, default_value_t = 2000,
+         value_parser = clap::value_parser!(u32).range(peercast_root::YP_LIMIT_SPEED_MIN as i64..))]
+    pub yp_limit_speed: u32,
+
+    /// redisに使用するnamespace
+    #[arg(long, default_value="yproot")]
+    pub redis_master_key: String,
+
+    /// 接続先のredis_url(DEBUG MODEのみ)
+    #[cfg(not(debug_assertions))]
+    #[arg(long, default_value="redis://127.0.0.1:6379")]
+    pub redis_url: String,
+
+    /// 接続先のredis_url(DEBUG MODE)
+    #[cfg(debug_assertions)]
+    #[arg(long, default_value="redis://yproot:ypbared@127.0.0.1:6379")]
+    pub redis_url: String,
+
     // TODO: TIMEZONEの実装
-    // #[arg(long, default_value_t = 7143)]
     // pub timezone: u16,
     /// Enable daemon-mode
     #[arg(short = 'D', long, default_value_t = false)]
@@ -120,6 +157,9 @@ pub struct Args {
     #[arg(long, value_parser, default_value_t=0)]
     pub cache_max_age: u32,
 
+    #[arg(long, default_value="ConnectInfo")]
+    pub ip_source: axum_client_ip::ClientIpSource,
+
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
@@ -154,3 +194,25 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
 const LONG_HELP_CORS:&str = r#"Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
 ※ URL末尾のスラッシュも関係してくるので注意すること
 "#;
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_args_yp_limit_speed() {
+        let args = Args::try_parse_from(vec![
+            "peercast-root",
+        ]).unwrap();
+        assert_eq!(args.yp_limit_speed, 2000);
+    }
+
+    #[test]
+    fn test_args_yp_port_check_level() {
+        let args = Args::try_parse_from(vec![
+            "peercast-root",
+        ]).unwrap();
+        assert_eq!(args.yp_restrict_port_level, RestrictPortLevel::None);
+    }
+}
