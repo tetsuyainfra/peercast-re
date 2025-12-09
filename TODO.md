@@ -13,7 +13,7 @@
   - dpkg -Dhで詳細
 
 # peercast-re
-- [] 
+- [] Configロードの仕組み作る
 
 # peercast-root
 - [] index.txtのfooterにStatus情報を表示
