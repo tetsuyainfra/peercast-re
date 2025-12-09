@@ -13,8 +13,6 @@
     "gen-api2": "openapi-typescript  ../openapi.json -o re-api.ts"
   },
   "dependencies": {
-    "@hookform/resolvers": "3.10.0",
-    "clsx": "^2.1.1",
     "flv.js": "^1.6.2",
     "react": "19.2.1",
     "react-dom": "19.2.1",
