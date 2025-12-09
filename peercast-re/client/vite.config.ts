@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react-swc"
 import { env } from "process"
+import { visualizer } from 'rollup-plugin-visualizer'
 
 const PEERCAST_HOST = env.PEERCAST_RE_HOST || "localhost"
 const PEERCAST_PORT = env.PEERCAST_RE_PORT || 17144
@@ -28,7 +29,15 @@ export default defineConfig({
       },
     },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    visualizer({
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+    })
+  ],
   resolve: {
     alias: {
       // "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
