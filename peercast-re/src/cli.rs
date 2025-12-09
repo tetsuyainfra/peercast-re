@@ -1,13 +1,13 @@
 use std::path::PathBuf;
 
 use clap::{Parser, command};
+use tower_http::follow_redirect::policy::PolicyExt;
 
-use crate::config::{Config, ConfigAddress};
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Parse args
 ///
-#[derive(Debug, Parser)]
+#[derive(Clone, Debug, Parser)]
 #[clap(
         name = env!("CARGO_PKG_NAME"),
         author = env!("CARGO_PKG_AUTHORS"),
@@ -38,20 +38,4 @@ pub struct Args {
         value_parser = clap::value_parser!(u16).range(5000..)
     )]
     pub server_port: Option<u16>,
-}
-
-impl Args {
-    /// merge Config and Cli instance.
-    pub fn merge_with(self, config: &Config) -> Config {
-
-        let mut config = config.clone();
-
-        if let Some(ip) = self.server_address {
-            config.server_address = ConfigAddress::NoConfig(ip)
-        };
-        if let Some(port) = self.server_port {
-            config.server_port = port
-        };
-        config
-    }
 }

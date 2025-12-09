@@ -5,6 +5,8 @@ use serde::Serialize;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+use crate::app::Store;
+
 const RE_TAG: &str = "peercast-re";
 
 #[derive(OpenApi)]
@@ -15,13 +17,11 @@ const RE_TAG: &str = "peercast-re";
 )]
 pub struct ApiDoc;
 
-#[derive(Debug, Clone)]
-pub struct ReStore {}
 
 #[derive(Debug, Serialize)]
 pub struct Channel {}
 
-pub fn router(store: Arc<ReStore>) -> (axum::Router, utoipa::openapi::OpenApi) {
+pub fn build_api(store: Arc<Store>) -> (axum::Router, utoipa::openapi::OpenApi) {
     let open_api_router = OpenApiRouter::new()
         .routes(routes!(list_channels, create_channel))
         // .routes(routes!(ip_check))
@@ -33,8 +33,13 @@ pub fn router(store: Arc<ReStore>) -> (axum::Router, utoipa::openapi::OpenApi) {
         .split_for_parts()
 }
 
+pub fn build_router(store: Arc<Store>) -> axum::Router {
+    let (router, _api) = build_api(store);
+    router
+}
+
 #[utoipa::path(get, path = "/channels")]
-async fn list_channels(State(store): State<Arc<ReStore>>) -> Json<Vec<Channel>> {
+async fn list_channels(State(_store): State<Arc<Store>>) -> Json<Vec<Channel>> {
     let channels = vec![Channel {}];
     Json(channels)
 }

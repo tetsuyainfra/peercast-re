@@ -1,35 +1,38 @@
-use api::{router, ReStore};
+use anyhow::{Context, bail};
 use clap::Parser;
 use std::net::SocketAddr;
 use tracing::info;
 
-
-mod cli;
-mod api;
-mod config;
-mod ui;
-
+use peercast_re::{app, cli, config, handler};
 
 ////////////////////////////////////////////////////////////////////////////////
 // MAIN
 //
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let cli = cli::Args::parse();
-    dbg!(&cli);
-
-    // let Ok((config_path, config)) = config::load_config(cli.config_file.clone()) else {
-    //     std::process::exit(exitcode::CONFIG);
-    // };
-    // let config = cli.merge_with(&config);
-
     logging_init();
-    let (router, api) = router(ReStore{}.into());
-    let app = router.merge(ui::router());
 
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 17145))
+    let args = cli::Args::parse();
+    dbg!(&args);
+
+    let config = config::load_config(args.clone()).context("Failed to Load configuration")?;
+
+
+    let store = app::Store {
+        config,
+        // config_path: Some(config_path.clone()),
+    };
+    let store = std::sync::Arc::new(store);
+    let router = axum::Router::new()
+        .route("/",  axum::routing::get(|| async { "/" }))
+        .nest("/api", handler::api::build_router(store))
+        .nest("/ui", handler::ui::build_router());
+
+    let addr  = SocketAddr::from(([127, 0, 0, 1], 17145));
+
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .unwrap();
+        .with_context(|| { format!("Failed to bind Address: {}", addr)})?;
 
     info!(
         "listening on http://{}/",
@@ -38,9 +41,9 @@ async fn main() -> anyhow::Result<()> {
 
     axum::serve(
         listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
+        router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await?;
+    .await.context("Serving Application Error")?;
     // match cui::CuiApp::run(config_path, config) {
     //     Ok(_) => std::process::exit(exitcode::OK),
     //     Err(e) => {
