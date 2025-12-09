@@ -7,10 +7,10 @@ set -ex
 
 pushd $SCRIPT_ROOT
     pushd ./client
-        npm install
-        npm run clean
-        npm run gen-api
-        npm run gen-api2
-        npm run build
+        pnpm install --frozen-lockfile
+        pnpm run clean
+        pnpm run gen-api
+        pnpm run gen-api2
+        pnpm run build
     popd
 popd
