@@ -1,7 +1,8 @@
 import Root from "../routes/root"
-import Index from "../routes/_index"
+// import Index from "../routes/_index"
 import { createBrowserRouter } from "react-router-dom"
 import ErrorPage from "@/pages/error-pages"
+import Index from "@/pages/index"
 import Config from "@/pages/config"
 import Channels from "@/pages/channels"
 
@@ -9,7 +10,7 @@ const router = createBrowserRouter(
   [
     {
       path: "/",
-      element: <Root />,
+      // element: <Root />,
       errorElement: <ErrorPage />,
       children: [
         {
