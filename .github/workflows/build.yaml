@@ -58,7 +58,7 @@ jobs:
         with:
           node-version: '22.x'
           cache: pnpm
-          cache-dependency-path: "./peercast-re/client/pnpm-lock.json"
+          cache-dependency-path: "./peercast-re/client/pnpm-lock.yaml"
       - name: Install dependencies
         run: pnpm i --frozen-lockfile
         working-directory: ./peercast-re/client
