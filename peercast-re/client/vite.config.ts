@@ -1,4 +1,5 @@
 import path from "path"
+import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react-swc"
 import { env } from "process"
@@ -27,7 +28,7 @@ export default defineConfig({
       },
     },
   },
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       // "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
