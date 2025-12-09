@@ -18,17 +18,17 @@ importers:
         specifier: 19.2.1
         version: 19.2.1(react@19.2.1)
       react-hook-form:
-        specifier: ^7.54.2
+        specifier: ^7.68.0
         version: 7.68.0(react@19.2.1)
       react-router-dom:
-        specifier: ^7.6.3
+        specifier: ^7.10.1
         version: 7.10.1(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
     devDependencies:
       '@hey-api/openapi-ts':
         specifier: ^0.88.1
         version: 0.88.1(typescript@5.9.3)
       '@types/node':
-        specifier: ^22.10.7
+        specifier: ^22.19.1
         version: 22.19.1
       '@types/react':
         specifier: ^19.2.7
@@ -37,31 +37,31 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.7)
       '@typescript-eslint/eslint-plugin':
-        specifier: ^8.20.0
+        specifier: ^8.48.1
         version: 8.48.1(@typescript-eslint/parser@8.48.1(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/parser':
-        specifier: ^8.20.0
+        specifier: ^8.48.1
         version: 8.48.1(eslint@9.39.1(jiti@2.6.1))(typescript@5.9.3)
       '@vitejs/plugin-react-swc':
         specifier: ^4.2.2
         version: 4.2.2(vite@7.2.7(@types/node@22.19.1)(jiti@2.6.1))
       eslint:
-        specifier: ^9.18.0
+        specifier: ^9.39.1
         version: 9.39.1(jiti@2.6.1)
       eslint-plugin-react-hooks:
         specifier: ^7.0.1
         version: 7.0.1(eslint@9.39.1(jiti@2.6.1))
       eslint-plugin-react-refresh:
-        specifier: ^0.4.18
+        specifier: ^0.4.24
         version: 0.4.24(eslint@9.39.1(jiti@2.6.1))
       openapi-typescript:
-        specifier: ^7.6.1
+        specifier: ^7.10.1
         version: 7.10.1(typescript@5.9.3)
       prettier:
-        specifier: ^3.4.2
+        specifier: ^3.7.4
         version: 3.7.4
       rimraf:
-        specifier: ^6.0.1
+        specifier: ^6.1.2
         version: 6.1.2
       typescript:
         specifier: ^5.9.3
