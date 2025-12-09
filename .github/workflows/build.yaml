@@ -47,6 +47,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6  #👈リポジトリのソースを持ってくる
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
 
       - name: Set up Node.js
         uses: actions/setup-node@v6.1.0
