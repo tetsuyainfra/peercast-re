@@ -48,3 +48,25 @@ async fn list_channels(State(_store): State<Arc<Store>>) -> Json<Vec<Channel>> {
 async fn create_channel() -> Json<Channel> {
     Json(Channel {})
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_list_channels() {
+        let store = Arc::new(Store {config: Default::default()});
+        let response = list_channels(State(store)).await;
+        let channels = response.0;
+        assert_eq!(channels.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_channel() {
+        let response = create_channel().await;
+        let channel = response.0;
+        // Add assertions as needed for channel fields
+        unimplemented!();
+    }
+}
