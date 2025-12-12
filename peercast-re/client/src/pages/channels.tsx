@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { env } from "process"
+import MainLayout from "@/layouts/mainLayout"
 // import { RespChannel } from "@re-api"
 
 export default function Channels() {
@@ -45,7 +46,8 @@ export default function Channels() {
   }
 
   return (
-    <>
-    </>
+    <MainLayout pageTitle="Channels">
+      Channels
+    </MainLayout>
   )
 }

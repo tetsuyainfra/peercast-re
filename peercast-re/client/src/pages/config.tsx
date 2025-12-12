@@ -1,5 +1,6 @@
 // import {  Configuration, ConfigApi } from "@peercast-api"
 import React, { useEffect } from "react"
+import MainLayout from "@/layouts/mainLayout";
 
 export default function Config() {
   let [config, setConfig] = React.useState("")
@@ -12,9 +13,11 @@ export default function Config() {
     })()
   }, [])
   return (
-    <>
-      <h1>Config Page</h1>
-      <pre>{config}</pre>
-    </>
+    <MainLayout pageTitle="Configuration">
+      {config}
+    </MainLayout>
   )
 }
+
+
+
