@@ -1,5 +1,5 @@
-use anyhow::{Context, bail};
-use axum::{response::Redirect, serve::Listener};
+use anyhow::Context;
+use axum::response::Redirect;
 use clap::Parser;
 use std::net::SocketAddr;
 use tracing::info;
@@ -16,11 +16,12 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     dbg!(&args);
 
-    let (config, config_path) = config::load_config(args.clone()).context("Failed to Load configuration")?;
+    let (config, config_path) =
+        config::load_config(args.clone()).context("Failed to Load configuration")?;
 
     let store = app::Store {
         config: config.clone(),
-        config_path
+        config_path,
     };
     let store = std::sync::Arc::new(store);
     let router = axum::Router::new()
@@ -38,8 +39,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
 
-    info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap(),);
-    info!("  UI/API listening on http://{}/ui", api_listener.local_addr().unwrap(),);
+    info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap());
+    info!("  UI/API listening on http://{}/ui", api_listener.local_addr().unwrap());
 
     axum::serve(
         api_listener,
@@ -47,7 +48,6 @@ async fn main() -> anyhow::Result<()> {
     )
     .await
     .context("Serving Application Error")?;
-
 
     Ok(())
 }
