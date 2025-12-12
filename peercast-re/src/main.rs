@@ -18,33 +18,30 @@ async fn main() -> anyhow::Result<()> {
 
     let config = config::load_config(args.clone()).context("Failed to Load configuration")?;
 
-
     let store = app::Store {
         config,
         // config_path: Some(config_path.clone()),
     };
     let store = std::sync::Arc::new(store);
     let router = axum::Router::new()
-        .route("/",  axum::routing::get(|| async { Redirect::to("/ui") }))
+        .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
         .nest("/api", handler::api::build_router(store))
         .nest("/ui", handler::ui::build_router());
 
-    let addr  = SocketAddr::from(([127, 0, 0, 1], 17145));
+    let addr = SocketAddr::from(([127, 0, 0, 1], 17145));
 
     let listener = tokio::net::TcpListener::bind(addr)
         .await
-        .with_context(|| { format!("Failed to bind Address: {}", addr)})?;
+        .with_context(|| format!("Failed to bind Address: {}", addr))?;
 
-    info!(
-        "listening on http://{}/",
-        listener.local_addr().unwrap(),
-    );
+    info!("listening on http://{}/", listener.local_addr().unwrap(),);
 
     axum::serve(
         listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await.context("Serving Application Error")?;
+    .await
+    .context("Serving Application Error")?;
     // match cui::CuiApp::run(config_path, config) {
     //     Ok(_) => std::process::exit(exitcode::OK),
     //     Err(e) => {
@@ -63,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
 
 /// initialize logging
 fn logging_init() {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
     tracing_subscriber::registry()
         .with(

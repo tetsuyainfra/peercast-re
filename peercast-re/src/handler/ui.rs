@@ -1,4 +1,8 @@
-use axum::{Router, http::{ StatusCode, Uri}, response::{Html, IntoResponse, Response}};
+use axum::{
+    Router,
+    http::{StatusCode, Uri},
+    response::{Html, IntoResponse, Response},
+};
 use rust_embed::Embed;
 use tracing::debug;
 
@@ -15,7 +19,6 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     debug!("Static file request: {}", uri.path());
     let path = uri.path().trim_start_matches('/');
 
-
     match path {
         "" => {
             return index_html().await;
@@ -26,7 +29,11 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     match Assets::get(path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+            (
+                [(axum::http::header::CONTENT_TYPE, mime.as_ref())],
+                content.data,
+            )
+                .into_response()
         }
         None => {
             if path.contains('.') {
@@ -37,24 +44,20 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-
 async fn index_html() -> Response {
-  match Assets::get(INDEX_HTML) {
-    Some(content) => Html(content.data).into_response(),
-    None => not_found().await,
-  }
+    match Assets::get(INDEX_HTML) {
+        Some(content) => Html(content.data).into_response(),
+        None => not_found().await,
+    }
 }
 
 async fn not_found() -> Response {
-  (StatusCode::NOT_FOUND, "404").into_response()
+    (StatusCode::NOT_FOUND, "404").into_response()
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-
 
     #[tokio::test]
     async fn test_index_html() {

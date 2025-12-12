@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use clap::{Parser, command};
 use tower_http::follow_redirect::policy::PolicyExt;
 
-
 ////////////////////////////////////////////////////////////////////////////////
 /// Parse args
 ///

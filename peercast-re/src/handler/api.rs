@@ -17,7 +17,6 @@ const RE_TAG: &str = "peercast-re";
 )]
 pub struct ApiDoc;
 
-
 #[derive(Debug, Serialize)]
 pub struct Channel {}
 
@@ -49,14 +48,15 @@ async fn create_channel() -> Json<Channel> {
     Json(Channel {})
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
     async fn test_list_channels() {
-        let store = Arc::new(Store {config: Default::default()});
+        let store = Arc::new(Store {
+            config: Default::default(),
+        });
         let response = list_channels(State(store)).await;
         let channels = response.0;
         assert_eq!(channels.len(), 1);
