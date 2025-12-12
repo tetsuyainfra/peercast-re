@@ -25,9 +25,8 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 
     match Assets::get(path) {
         Some(content) => {
-            // let mime = mime_guess::from_path(path).first_or_octet_stream();
-            // ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
-            Html(content.data).into_response()
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
             if path.contains('.') {
@@ -81,5 +80,19 @@ mod tests {
         let uri: Uri = "/nonexistentfile.xyz".parse().unwrap();
         let response = static_handler(uri).await.into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn test_correct_url_not_found() {
+        let uri: Uri = "/ui".parse().unwrap();
+        let response = static_handler(uri).await.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_correct_url_slash_not_found() {
+        let uri: Uri = "/ui/".parse().unwrap();
+        let response = static_handler(uri).await.into_response();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

@@ -55,7 +55,7 @@ toml = { version = "0.9.8" }
 # url
 url = { version = "2.5.4" }
 html-escape = { version = "0.2.13" }
-
+mime_guess = { version = "2.0.5" }
 
 # バイナリ操作
 bytes = { version = "1.10.0", features = ["serde"] }
