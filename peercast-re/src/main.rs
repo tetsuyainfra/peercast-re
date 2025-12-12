@@ -1,4 +1,5 @@
 use anyhow::{Context, bail};
+use axum::response::Redirect;
 use clap::Parser;
 use std::net::SocketAddr;
 use tracing::info;
@@ -24,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let store = std::sync::Arc::new(store);
     let router = axum::Router::new()
-        .route("/",  axum::routing::get(|| async { "/" }))
+        .route("/",  axum::routing::get(|| async { Redirect::to("/ui") }))
         .nest("/api", handler::api::build_router(store))
         .nest("/ui", handler::ui::build_router());
 
