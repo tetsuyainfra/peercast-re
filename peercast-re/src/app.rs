@@ -4,5 +4,5 @@ use crate::config::Config;
 pub struct Store {
     #[allow(dead_code)]
     pub config: Config, // #[allow(dead_code)]
-                        // pub config_path: Option<std::path::PathBuf>,
+    pub config_path: std::path::PathBuf,
 }

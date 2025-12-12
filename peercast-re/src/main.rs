@@ -16,11 +16,11 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     dbg!(&args);
 
-    let config = config::load_config(args.clone()).context("Failed to Load configuration")?;
+    let (config, config_path) = config::load_config(args.clone()).context("Failed to Load configuration")?;
 
     let store = app::Store {
-        config,
-        // config_path: Some(config_path.clone()),
+        config: config.clone(),
+        config_path
     };
     let store = std::sync::Arc::new(store);
     let router = axum::Router::new()

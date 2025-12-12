@@ -36,7 +36,7 @@ pub enum ConfigAddress {
     Config(IpAddr),
 }
 
-pub fn load_config(args: cli::Args) -> anyhow::Result<Config> {
+pub fn load_config(args: cli::Args) -> anyhow::Result<(Config, PathBuf)> {
     let exe_dir = std::env::current_exe()
         .context("Failed to get current exec path")?
         .parent()
@@ -90,7 +90,7 @@ pub fn load_config(args: cli::Args) -> anyhow::Result<Config> {
     info!("Using configuration file: {:?}", config_path);
     let config = load_toml(&config_path)?.merge_cli_args(args);
 
-    Ok(config)
+    Ok((config, config_path))
 }
 
 fn load_toml(path: &PathBuf) -> anyhow::Result<Config> {
