@@ -1,5 +1,5 @@
 use anyhow::{Context, bail};
-use axum::response::Redirect;
+use axum::{response::Redirect, serve::Listener};
 use clap::Parser;
 use std::net::SocketAddr;
 use tracing::info;
@@ -28,32 +28,26 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api", handler::api::build_router(store))
         .nest("/ui", handler::ui::build_router());
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 17145));
-
-    let listener = tokio::net::TcpListener::bind(addr)
+    let svr_addr = SocketAddr::from((config.server_address, config.server_port));
+    let svr_listener = tokio::net::TcpListener::bind(svr_addr)
         .await
-        .with_context(|| format!("Failed to bind Address: {}", addr))?;
+        .with_context(|| format!("Failed to bind Server Address: {}", svr_addr))?;
 
-    info!("listening on http://{}/", listener.local_addr().unwrap(),);
+    let api_addr = SocketAddr::from((config.api_address, config.api_port));
+    let api_listener = tokio::net::TcpListener::bind(api_addr)
+        .await
+        .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
+
+    info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap(),);
+    info!("  UI/API listening on http://{}/ui", api_listener.local_addr().unwrap(),);
 
     axum::serve(
-        listener,
+        api_listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
     .context("Serving Application Error")?;
-    // match cui::CuiApp::run(config_path, config) {
-    //     Ok(_) => std::process::exit(exitcode::OK),
-    //     Err(e) => {
-    //         println!("{e}");
-    //         match e {
-    //             CuiError::LoadConfiguration => std::process::exit(exitcode::CONFIG),
-    //             CuiError::ApplicationError => std::process::exit(exitcode::SOFTWARE),
-    //             CuiError::ShutdownFailed(_) => std::process::exit(exitcode::SOFTWARE),
-    //             CuiError::Io(_) => std::process::exit(exitcode::IOERR),
-    //         }
-    //     }
-    // }
+
 
     Ok(())
 }
