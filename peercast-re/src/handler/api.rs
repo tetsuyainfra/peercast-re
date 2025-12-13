@@ -50,12 +50,15 @@ async fn create_channel() -> Json<Channel> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
 
     #[tokio::test]
     async fn test_list_channels() {
         let store = Arc::new(Store {
             config: Default::default(),
+            config_path: PathBuf::new(),
         });
         let response = list_channels(State(store)).await;
         let channels = response.0;
