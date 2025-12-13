@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::{net::IpAddr, path::PathBuf};
+use std::{net::{IpAddr, Ipv4Addr}, path::PathBuf};
 
 use anyhow::{Context, Ok};
 use serde::{Deserialize, Serialize};
@@ -7,6 +7,10 @@ use tracing::{debug, info};
 
 use crate::cli;
 
+const DEFAULT_SERVER_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(0,0,0,0));
+const DEFAULT_SERVER_PORT : u16 = 17144;
+const DEFAULT_API_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(127,0,0,1));
+const DEFAULT_API_PORT : u16 = 17145;
 const CONFIG_NAME: &str = "Settings.toml";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,12 +24,10 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            server_address: "0.0.0.0".parse().unwrap(),
-            // server_address: ConfigAddress::NoConfig("0.0.0.0".parse().unwrap()),
-            server_port: 17144,
-            api_address: "127.0.0.1".parse().unwrap(),
-            // api_address: ConfigAddress::NoConfig("0.0.0.0".parse().unwrap()),
-            api_port: 17145,
+            server_address: DEFAULT_SERVER_BIND,
+            server_port: DEFAULT_SERVER_PORT,
+            api_address: DEFAULT_API_BIND,
+            api_port: DEFAULT_API_PORT,
         }
     }
 }
@@ -118,6 +120,12 @@ impl Config {
         if let Some(port) = args.server_port {
             self.server_port = port;
         }
+        if let Some(addr) = args.api_address {
+            self.api_address = addr;
+        }
+        if let Some(port) = args.api_port {
+            self.api_port = port;
+        }
         self
     }
 }
@@ -136,18 +144,24 @@ mod tests {
         let args = Args {
             config_file: Some(PathBuf::from("test_config.toml")),
             server_address: Some("127.0.0.127".parse().unwrap()),
-            server_port: Some(18000),
+            server_port: None,
+            api_address: None,
+            api_port: Some(18000),
         };
 
         let config = Config::default();
-        assert_eq!(config.server_address, "0.0.0.0".parse::<IpAddr>().unwrap());
-        assert_eq!(config.server_port, 17144);
+        assert_eq!(config.server_address, DEFAULT_SERVER_BIND);
+        assert_eq!(config.server_port, DEFAULT_SERVER_PORT);
+        assert_eq!(config.api_address, DEFAULT_API_BIND);
+        assert_eq!(config.api_port, DEFAULT_API_PORT);
 
         let config = config.merge_cli_args(args);
         assert_eq!(
             config.server_address,
             "127.0.0.127".parse::<IpAddr>().unwrap()
         );
-        assert_eq!(config.server_port, 18000);
+        assert_eq!(config.server_port, DEFAULT_SERVER_PORT);
+        assert_eq!(config.api_address, DEFAULT_API_BIND);
+        assert_eq!(config.api_port, 18000);
     }
 }
