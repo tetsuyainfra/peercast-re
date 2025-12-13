@@ -132,7 +132,6 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use serde::{Deserialize, Serialize};
     use std::path::PathBuf;
 
     use crate::cli::Args;
