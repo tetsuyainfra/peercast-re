@@ -1,4 +1,4 @@
-use peercast_re::{app::Store, handler::api::build_api};
+use peercast_re::{peercast::Store, handler::api::build_api};
 
 fn main() {
     let (_, api) = build_api(Store::default().into());

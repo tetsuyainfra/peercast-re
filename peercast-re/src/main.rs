@@ -5,10 +5,10 @@ use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
 use tracing::info;
 
-use peercast_re::{app, cli, config, handler};
+use peercast_re::{peercast, cli, config, handler};
 
 ////////////////////////////////////////////////////////////////////////////////
-// MAIN
+// main
 //
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let (config, config_path) =
         config::load_config(args.clone()).context("Failed to Load configuration")?;
 
-    let store = app::Store {
+    let store = peercast::Store {
         config: config.clone(),
         config_path,
     };
@@ -82,10 +82,12 @@ enum ServerThread {
     ShutdownNotifier,
 }
 
-///
+////////////////////////////////////////////////////////////////////////////////
+// PeerCast Server
+//
 async fn peercast_server(
     wait_signal: tokio_util::sync::CancellationToken,
-    _store: std::sync::Arc<app::Store>,
+    _store: std::sync::Arc<peercast::Store>,
     svr_listener: tokio::net::TcpListener,
 ) -> anyhow::Result<ServerThread> {
     let listener = svr_listener;
@@ -176,10 +178,12 @@ async fn spawned_peercast_connection_handler(
     Ok(())
 }
 
-///
+////////////////////////////////////////////////////////////////////////////////
+// API Server
+//
 async fn api_server(
     wait_signal: tokio_util::sync::CancellationToken,
-    store: std::sync::Arc<app::Store>,
+    store: std::sync::Arc<peercast::Store>,
     api_listener: tokio::net::TcpListener,
 ) -> anyhow::Result<ServerThread> {
     let router = axum::Router::new()

@@ -5,7 +5,7 @@ use serde::Serialize;
 use utoipa::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::app::Store;
+use crate::peercast::Store;
 
 const RE_TAG: &str = "peercast-re";
 
