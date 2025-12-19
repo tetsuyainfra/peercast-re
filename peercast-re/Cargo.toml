@@ -7,35 +7,40 @@ default-run = "peercast-re"
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
-anyhow = { version = "1.0.95" }
-thiserror = {version = "*"}
+# Error handling
+thiserror = { version = "*" }
+anyhow = { version = "*" }
 
 # tracing logging
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = [
+tracing = "*"
+tracing-subscriber = { version = "*", features = [
     "env-filter",
     "json",
     "fmt",
     "local-time",
 ] }
+tracing-futures = "*"
+tracing-attributes = "*"
+tracing-appender = "*"
+tracing-test = "*"
+tracing-log = "*"
 
-# Async
-futures-util = { version = "0.3.31", default-features = false, features = [
+# Async Thread
+futures-util = { version = "*", default-features = false, features = [
     "alloc",
 ] }
-tokio = { version = "1.43.0", features = ["full", "tracing"] }
-tokio-stream = { version = "0.1.17" }
-tokio-test = { version = "0.4.4" }
-tokio-util = { version = "0.7.13", features = ["rt"] }
-console-subscriber = { version = "0.5.0" }
+tokio = { version = "*", features = ["full", "tracing"] }
+tokio-stream = { version = "*" }
+tokio-test = { version = "*" }
+tokio-util = { version = "*", features = ["rt"] }
+# tokio-graceful-shutdown = { version = "*", features = ["tracing"] }
 
-# Axum
-axum = { version = "0.8.7", features = ["tokio", "form", "ws", "tracing"] }
-axum-core = { version = "*" }
-axum-extra = { version = "0.12.2", features = ["typed-header"] }
-# axum-server = { version = "0.8.0" } # THIS IS NOT Axum Community build
-tower = { version = "0.5.2" }
-tower-http = { version = "0.6.2", features = [
+# HTTP
+axum = { version = "*", features = ["tokio", "form", "ws", "tracing"] }
+axum-core = "*"
+axum-extra = { version = "*", features = ["typed-header"] }
+tower = { version = "*" }
+tower-http = { version = "*", features = [
     "fs",
     "trace",
     "cors",
@@ -44,7 +49,9 @@ tower-http = { version = "0.6.2", features = [
     "timeout",
     "add-extension",
 ] }
-#hyper-util = { version = "0.1.10", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
+hyper-util = { version = "*", features = ["full"] }
+
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }
