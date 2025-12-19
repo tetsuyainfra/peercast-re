@@ -38,7 +38,6 @@ console-subscriber = { version = "0.4.1" }
 axum-core = { version = "0.5.2" }
 axum = { version = "0.8.3", features = ["tokio", "form", "ws", "tracing"] }
 axum-extra = { version = "0.10.0", features = ["typed-header"] }
-axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
 
 # Tower
 tower = { version = "0.5.2" }
