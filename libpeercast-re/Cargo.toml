@@ -70,15 +70,15 @@ httparse = { version = "1.10.1" }
 
 # http-server
 
-axum-core = { version = "0.5.2" }
-axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
+axum = { version = "0.8.7", features = ["tokio", "form", "ws", "tracing"] }
+axum-core = { version = "*" }
+axum-extra = { version = "0.12.2", features = ["typed-header"] }
 # axum = { git = "https://github.com/tokio-rs/axum", branch = "main", features = [
 #     "form",
 #     "ws",
 #     "tracing",
 # ] }
-axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
+# axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",

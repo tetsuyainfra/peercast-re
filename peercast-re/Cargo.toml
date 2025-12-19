@@ -30,10 +30,10 @@ tokio-util = { version = "0.7.13", features = ["rt"] }
 console-subscriber = { version = "0.4.1" }
 
 # Axum
+axum = { version = "0.8.7", features = ["tokio", "form", "ws", "tracing"] }
 axum-core = { version = "*" }
-axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
-axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
+axum-extra = { version = "0.12.2", features = ["typed-header"] }
+# axum-server = { version = "0.8.0" } # THIS IS NOT Axum Community build
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",
@@ -44,7 +44,7 @@ tower-http = { version = "0.6.2", features = [
     "timeout",
     "add-extension",
 ] }
-hyper-util = { version = "0.1.10", features = ["full"] }
+#hyper-util = { version = "0.1.10", features = ["full"] }
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }
