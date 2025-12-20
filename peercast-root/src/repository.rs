@@ -133,7 +133,7 @@ where
         self.session_id.clone()
     }
 
-    pub fn channels_lock(&self, func: fn(channels: &mut HashMap<GnuId, C>)) {
+    pub fn channels_map(&self, func: fn(channels: &mut HashMap<GnuId, C>)) {
         let mut lock = self.channels.lock().unwrap();
         func(&mut (*lock));
     }
