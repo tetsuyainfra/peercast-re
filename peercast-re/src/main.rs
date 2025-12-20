@@ -31,26 +31,10 @@ async fn main() -> anyhow::Result<()> {
 
     peercast::app_init(&config);
 
-    enum Command {
-        Listen { url: String },
-    }
     match args.command {
         Some(cli::Commands::Listen { url }) => {
             info!("Starting PeerCast Re Listen for URL: {}", url);
-            let ipc_addr = config.ipc_path;
-            let mut ipc_stream = tokio::net::UnixSocket::new_stream()?
-                .connect(ipc_addr)
-                .await?;
-            // Send Listen Command via IPC
-            ipc_stream
-                .write_all(format!("LISTEN {}\n", url).as_bytes())
-                .await
-                .context("Failed to send LISTEN command via IPC")?;
-            info!("Sent LISTEN(url: {}) command via IPC", url);
-            ipc_stream
-                .shutdown()
-                .await
-                .context("Failed to shutdown IPC stream")?;
+            // TODO: http で requestする
             return Ok(());
         }
         Some(_) | None => {
@@ -74,9 +58,6 @@ async fn main() -> anyhow::Result<()> {
     let api_listener = tokio::net::TcpListener::bind(api_addr)
         .await
         .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
-    let ipc_addr = config.ipc_path;
-    let ipc_listener = tokio::net::UnixListener::bind(ipc_addr.clone())
-        .with_context(|| format!("Failed to bind IPC Address: {}", ipc_addr))?;
 
     info!(
         "PeerCast listening on pcp://{}/",
@@ -85,14 +66,6 @@ async fn main() -> anyhow::Result<()> {
     info!(
         "  UI/API listening on http://{}/ui",
         api_listener.local_addr().unwrap()
-    );
-    info!(
-        "     IPC listening on unix:{}",
-        ipc_listener
-            .local_addr()?
-            .as_pathname()
-            .context("cant get pathname")?
-            .display()
     );
 
     // Start Server Tasks
@@ -115,11 +88,6 @@ async fn main() -> anyhow::Result<()> {
         shutdown_token.child_token(),
         store.clone(),
         api_listener,
-    ));
-    set.spawn(ipc_server(
-        shutdown_token.child_token(),
-        store,
-        ipc_listener,
     ));
 
     // shutdown notifier
@@ -146,9 +114,7 @@ enum ServerThread {
     PeerCast,
     PeerCastTask,
     Api,
-    Ipc,
     ShutdownNotifier,
-    Command,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -280,64 +246,6 @@ async fn api_server(
 
     info!("API Server has shut down");
     Ok(ServerThread::Api)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// API Server
-//
-async fn ipc_server(
-    shutdown_token: tokio_util::sync::CancellationToken,
-    store: std::sync::Arc<peercast::Store>,
-    ipc_listener: tokio::net::UnixListener,
-) -> anyhow::Result<ServerThread> {
-    'accept: loop {
-        let (mut stream, remote_addr) = tokio::select! {
-            _ = shutdown_token.cancelled() => {
-                tracing::debug!("received shutdown signal");
-                break 'accept;
-            }
-            r = ipc_listener.accept() => {
-                match r {
-                    Err(e) => {
-                        tracing::error!("Failed to accept IPC connection: {}", e);
-                        break 'accept;
-                    }
-                    Ok((conn, addr)) => {
-                        tracing::info!("Accepted IPC connection from {:?}", addr);
-                        // Handle the IPC connection here
-                        (conn, addr)
-                    }
-                }
-            }
-        };
-        let mut buf  = BytesMut::with_capacity(4096);
-        let n = stream.read_buf(&mut buf).await?;
-        let cmd_str = String::from_utf8_lossy(&buf[..n]);
-        log::info!("Received IPC command: {}", cmd_str);
-    }
-
-    // Shutdown処理
-    match ipc_listener.local_addr() {
-        Err(e) => {
-            tracing::error!("Failed to get IPC socket local address : {}", e);
-        }
-        Ok(addr) => match addr.as_pathname() {
-            None => {
-                tracing::error!("IPC socket address is not a valid pathname");
-            }
-            Some(path) => match std::fs::remove_file(path) {
-                Err(e) => {
-                    tracing::error!("Failed to remove IPC socket file {:?}: {}", path, e);
-                }
-                Ok(_) => {
-                    tracing::info!("Removed IPC socket file {:?}", path);
-                }
-            },
-        },
-    };
-
-    info!("IPC Server has shut down");
-    Ok(ServerThread::Ipc)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
