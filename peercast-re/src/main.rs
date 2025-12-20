@@ -33,9 +33,24 @@ async fn main() -> anyhow::Result<()> {
 
     match args.command {
         Some(cli::Commands::Listen { url }) => {
-            info!("Starting PeerCast Re Listen for URL: {}", url);
-            // TODO: http で requestする
-            return Ok(());
+            // TODO: DELETE ME after implement internal API client
+            info!("Starting LISTEN Request {}", url);
+            tokio::spawn(async move {
+                // HACKME: http で requestする
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                let mut command = tokio::process::Command::new("curl");
+                command.arg("-v").arg(url.as_str());
+                let output = command.output().await;
+                match output {
+                    Ok(r) => {
+                        info!( "LISTEN Request Stdout: \n{}", String::from_utf8_lossy(&r.stdout));
+                        info!( "LISTEN Request Stderr: \n{}", String::from_utf8_lossy(&r.stderr));
+                    }
+                    Err(e) => {
+                        error!("LISTEN Request Failed: {}", e);
+                    },
+                }
+            });
         }
         Some(_) | None => {
             info!("Starting PeerCast Re Server (default command)...");
