@@ -7,6 +7,7 @@ use tracing::{debug, info};
 
 use crate::cli;
 
+const DEFAULT_IPC_PATH: &str = "/tmp/peercast-re.sock";
 const DEFAULT_SERVER_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(0,0,0,0));
 const DEFAULT_SERVER_PORT : u16 = 17144;
 const DEFAULT_API_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(127,0,0,1));
@@ -16,6 +17,7 @@ const CONFIG_NAME: &str = "Settings.toml";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub ipc_path: String,
     pub server_address: IpAddr,
     pub server_port: u16,
     pub api_address: IpAddr,
@@ -24,6 +26,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            ipc_path: DEFAULT_IPC_PATH.into(),
             server_address: DEFAULT_SERVER_BIND,
             server_port: DEFAULT_SERVER_PORT,
             api_address: DEFAULT_API_BIND,
@@ -142,10 +145,12 @@ mod tests {
     fn test_cli_args_source() {
         let args = Args {
             config_file: Some(PathBuf::from("test_config.toml")),
+            ipc_path: Some(PathBuf::from("/tmp/peercast-re.sock")),
             server_address: Some("127.0.0.127".parse().unwrap()),
             server_port: None,
             api_address: None,
             api_port: Some(18000),
+            command: None,
         };
 
         let config = Config::default();

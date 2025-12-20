@@ -1,28 +1,20 @@
 use anyhow::Context;
 use axum::response::Redirect;
+use bytes::BytesMut;
 use clap::Parser;
-use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
-use std::{net::SocketAddr, sync::OnceLock};
+use futures_util::FutureExt;
+use libpeercast_re::ConnectionId;
+use std::{
+    net::{Shutdown, SocketAddr},
+    sync::OnceLock,
+};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::info;
+use utoipa::openapi::info;
 
-use peercast_re::{channel::ReChannel, cli, config, handler, peercast, repository::ReChannelRepository};
-
-////////////////////////////////////////////////////////////////////////////////
-// Global Variables
-//
-static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
-#[inline]
-#[allow(non_snake_case)]
-pub fn PcpConnectionFactory() -> &'static PcpConnectionFactory {
-    _CONN_FACTORY.get().unwrap()
-}
-
-static _REPOSITORY: OnceLock<ReChannelRepository<ReChannel>> = OnceLock::new();
-#[inline]
-#[allow(non_snake_case)]
-pub fn Repository() -> &'static ReChannelRepository<ReChannel> {
-    _REPOSITORY.get().unwrap()
-}
+use peercast_re::{
+    channel::ReChannel, cli, config, handler, peercast, repository::ReChannelRepository,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // main
@@ -37,26 +29,54 @@ async fn main() -> anyhow::Result<()> {
     let (config, config_path) =
         config::load_config(args.clone()).context("Failed to Load configuration")?;
 
+    peercast::app_init(&config);
+
+    enum Command {
+        Listen { url: String },
+    }
+    match args.command {
+        Some(cli::Commands::Listen { url }) => {
+            info!("Starting PeerCast Re Listen for URL: {}", url);
+            let ipc_addr = config.ipc_path;
+            let mut ipc_stream = tokio::net::UnixSocket::new_stream()?
+                .connect(ipc_addr)
+                .await?;
+            // Send Listen Command via IPC
+            ipc_stream
+                .write_all(format!("LISTEN {}\n", url).as_bytes())
+                .await
+                .context("Failed to send LISTEN command via IPC")?;
+            info!("Sent LISTEN(url: {}) command via IPC", url);
+            ipc_stream
+                .shutdown()
+                .await
+                .context("Failed to shutdown IPC stream")?;
+            return Ok(());
+        }
+        Some(_) | None => {
+            info!("Starting PeerCast Re Server (default command)...");
+        }
+    }
+
+    // Create Store
     let store = peercast::Store {
         config: config.clone(),
         config_path,
     };
     let store = std::sync::Arc::new(store);
 
-    let self_session_id = libpeercast_re::pcp::GnuId::new();
-    let self_socket =  (config.server_address, config.server_port).into();
-    _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
-
-
+    // Start Server Listeners
     let svr_addr = SocketAddr::from((config.server_address, config.server_port));
     let svr_listener = tokio::net::TcpListener::bind(svr_addr)
         .await
         .with_context(|| format!("Failed to bind Server Address: {}", svr_addr))?;
-
     let api_addr = SocketAddr::from((config.api_address, config.api_port));
     let api_listener = tokio::net::TcpListener::bind(api_addr)
         .await
         .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
+    let ipc_addr = config.ipc_path;
+    let ipc_listener = tokio::net::UnixListener::bind(ipc_addr.clone())
+        .with_context(|| format!("Failed to bind IPC Address: {}", ipc_addr))?;
 
     info!(
         "PeerCast listening on pcp://{}/",
@@ -66,9 +86,26 @@ async fn main() -> anyhow::Result<()> {
         "  UI/API listening on http://{}/ui",
         api_listener.local_addr().unwrap()
     );
+    info!(
+        "     IPC listening on unix:{}",
+        ipc_listener
+            .local_addr()?
+            .as_pathname()
+            .context("cant get pathname")?
+            .display()
+    );
 
+    // Start Server Tasks
     let shutdown_token = tokio_util::sync::CancellationToken::new();
     let mut set = tokio::task::JoinSet::new();
+    set.spawn(
+        peercast::task_runner(shutdown_token.child_token()).then(|r| async {
+            match r {
+                Ok(_) => Ok(ServerThread::PeerCastTask),
+                Err(e) => Err(e),
+            }
+        }),
+    );
     set.spawn(peercast_server(
         shutdown_token.child_token(),
         store.clone(),
@@ -76,9 +113,16 @@ async fn main() -> anyhow::Result<()> {
     ));
     set.spawn(api_server(
         shutdown_token.child_token(),
-        store,
+        store.clone(),
         api_listener,
     ));
+    set.spawn(ipc_server(
+        shutdown_token.child_token(),
+        store,
+        ipc_listener,
+    ));
+
+    // shutdown notifier
     set.spawn(async move {
         tokio::signal::ctrl_c()
             .await
@@ -100,8 +144,11 @@ async fn main() -> anyhow::Result<()> {
 #[derive(Debug)]
 enum ServerThread {
     PeerCast,
+    PeerCastTask,
     Api,
+    Ipc,
     ShutdownNotifier,
+    Command,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -118,7 +165,7 @@ async fn peercast_server(
     let token = tokio_util::sync::CancellationToken::new();
 
     'accept: loop {
-        let cid = ConnectionId::new();
+        let cid: ConnectionId = ConnectionId::new();
         let child_token = token.child_token();
 
         tokio::select! {
@@ -175,12 +222,14 @@ async fn spawned_peercast_connection_handler(
                 Ok(ConnectionProtocol::PeerCast) => {
                     tracing::info!(?cid, ?remote, "STREAM is PeerCast Protocol");
                     // serve_root(cid, stream, remote, graceful_shutdown, closed_send).await
-                    serve_root(cid, conn, remote, child_shutdown).await
+                    // serve_root(cid, conn, remote, child_shutdown).await
+                    unimplemented!("PeerCast is not allowed");
                 }
                 Ok(ConnectionProtocol::PeerCastHttp) => {
                     tracing::error!(?cid, ?remote, "STERAM si PeerCastHttp Protocol");
                     // let _ = conn.shutdown().await;
-                    unimplemented!("PeerCastHttp is not allowed");
+                    // unimplemented!("PeerCastHttp is not allowed");
+                    peercast::serve_pcphttp(cid, conn, remote, child_shutdown).await
                 }
                 Ok(ConnectionProtocol::Http) => {
                     tracing::error!(?cid, ?remote, "STREAM is HTTP Protocol");
@@ -203,110 +252,6 @@ async fn spawned_peercast_connection_handler(
     }
 
     tracing::debug!("Connection({}) handler for {} has exited", cid, remote);
-    Ok(())
-}
-
-
-
-async fn serve_root(
-    cid: ConnectionId,
-    mut conn: tokio::net::TcpStream,
-    remote: SocketAddr,
-    _graceful_shutdown: tokio_util::sync::CancellationToken,
-) -> anyhow::Result<()> {
-    use libpeercast_re::pcp::{
-        builder::RootBuilder,
-        connection::HandshakeType,
-    };
-    let read_buf = bytes::BytesMut::new();
-
-    // HandshakeFutureにすればよさそう
-    let handshake = PcpConnectionFactory().accept(cid, conn, remote);
-
-    // // Handshake時に送ってもらうAtomを作成する
-    // let root_atom = RootBuilder::default()
-    //     .set_update_interval(10)
-    //     .set_next_update_interval(10)
-    //     .build();
-
-    // let mut conn = match handshake.incoming(root_atom.into()).await {
-    //     Err(e) => {
-    //         todo!();
-    //         #[allow(unused)]
-    //         return Ok(());
-    //     }
-    //     Ok(HandshakeType::Ping) => return Ok(()),
-    //     Ok(HandshakeType::YellowPage(conn)) => conn,
-    // };
-
-    // // RootならTrackerに次の情報を送って、情報のアップデートを求める(Broadcastを遅らせる)
-    // let root_atom = RootBuilder::build_update_request();
-    // conn.write_atom(root_atom).await;
-
-    // // 最初のAtomはBroadcastが確定する
-    // let first_atom = match conn.read_atom().await {
-    //     Ok(a) => a,
-    //     Err(_) => return,
-    // };
-    // dbg!(&first_atom);
-
-    // let bcst = match PcpBroadcast::parse(&first_atom) {
-    //     Ok(b) => b,
-    //     Err(_) => return,
-    // };
-    // dbg!(&bcst);
-
-    // // パケットの中身が適正か確認する
-    // let PcpBroadcast {
-    //     channel_id,
-    //     channel_packet,
-    //     host,
-    //     ..
-    // } = &bcst;
-    // let (channel_id_in_bcst, channel_packet) = match (channel_id, channel_packet) {
-    //     (Some(chid), Some(chpkt)) => (chid, chpkt),
-    //     _ => return,
-    // };
-    // // TODO: HostのIPチェックを行う？
-
-    // // Hostの接続先を確定
-    // let tracker_host = host
-    //     .as_ref()
-    //     .and_then(|pcp_host| get_tracker_addr(&remote, &pcp_host.addresses));
-
-    // let PcpChannel {
-    //     channel_id,
-    //     broadcast_id,
-    //     channel_info,
-    //     track_info,
-    //     ..
-    // } = channel_packet;
-
-    // let (channel_id_in_chpkt, braodcast_id) = match (channel_id, broadcast_id) {
-    //     (Some(chid), Some(bcid)) => (chid, bcid),
-    //     _ => return,
-    // };
-
-    // // 不正チェック
-    // if channel_id_in_bcst != channel_id_in_chpkt {
-    //     return;
-    // }
-
-    // // チャンネル情報の変換
-    // let channel_info = channel_info.as_ref().map(|i| i.into());
-    // let track_info = track_info.as_ref().map(|t| t.into());
-    // //
-    // let config = RootConfig { tracker_host };
-
-    // // 対象チャンネルを取得
-    // let repo = REPOSITORY();
-    // let ch = repo.create_or_get(*channel_id_in_bcst, channel_info, track_info, Some(config));
-
-    // // Channelにコネクションを接続
-    // let attach_task = ch.attach_connection(conn, graceful_shutdown, closed_send);
-    // attach_task.await;
-
-    // conn.shutdown().await?;
     Ok(())
 }
 
@@ -337,7 +282,67 @@ async fn api_server(
     Ok(ServerThread::Api)
 }
 
-/// initialize logging
+////////////////////////////////////////////////////////////////////////////////
+// API Server
+//
+async fn ipc_server(
+    shutdown_token: tokio_util::sync::CancellationToken,
+    store: std::sync::Arc<peercast::Store>,
+    ipc_listener: tokio::net::UnixListener,
+) -> anyhow::Result<ServerThread> {
+    'accept: loop {
+        let (mut stream, remote_addr) = tokio::select! {
+            _ = shutdown_token.cancelled() => {
+                tracing::debug!("received shutdown signal");
+                break 'accept;
+            }
+            r = ipc_listener.accept() => {
+                match r {
+                    Err(e) => {
+                        tracing::error!("Failed to accept IPC connection: {}", e);
+                        break 'accept;
+                    }
+                    Ok((conn, addr)) => {
+                        tracing::info!("Accepted IPC connection from {:?}", addr);
+                        // Handle the IPC connection here
+                        (conn, addr)
+                    }
+                }
+            }
+        };
+        let mut buf  = BytesMut::with_capacity(4096);
+        let n = stream.read_buf(&mut buf).await?;
+        let cmd_str = String::from_utf8_lossy(&buf[..n]);
+        log::info!("Received IPC command: {}", cmd_str);
+    }
+
+    // Shutdown処理
+    match ipc_listener.local_addr() {
+        Err(e) => {
+            tracing::error!("Failed to get IPC socket local address : {}", e);
+        }
+        Ok(addr) => match addr.as_pathname() {
+            None => {
+                tracing::error!("IPC socket address is not a valid pathname");
+            }
+            Some(path) => match std::fs::remove_file(path) {
+                Err(e) => {
+                    tracing::error!("Failed to remove IPC socket file {:?}: {}", path, e);
+                }
+                Ok(_) => {
+                    tracing::info!("Removed IPC socket file {:?}", path);
+                }
+            },
+        },
+    };
+
+    info!("IPC Server has shut down");
+    Ok(ServerThread::Ipc)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Initialization Logging
+//
 fn logging_init() {
     use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 

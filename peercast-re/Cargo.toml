@@ -24,12 +24,14 @@ tracing-attributes = "*"
 tracing-appender = "*"
 tracing-test = "*"
 tracing-log = "*"
+log = "*"
 
 # Async Thread
 futures-util = { version = "*", default-features = false, features = [
     "alloc",
 ] }
-tokio = { version = "*", features = ["full", "tracing"] }
+# tokio -> [target.'cfg(target_os = XXX)'.dependencies]
+tokio = { version = "*", features = ["full", "tracing", "net"] }
 tokio-stream = { version = "*" }
 tokio-test = { version = "*" }
 tokio-util = { version = "*", features = ["rt"] }
@@ -89,6 +91,14 @@ bitflags = "2.9.0"
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-axum = "0.2.0"
 rust-embed = { version = "8.9.0", features = ["axum", "axum-ex"] }
+
+
+#[target.'cfg(target_os = "windows")'.dependencies]
+#tokio = { version = "*", features = ["full", "tracing"] }
+
+#[target.'cfg(target_os = "linux")'.dependencies]
+#tokio = { version = "*", features = ["full", "tracing", "unix"] }
+
 
 [build-dependencies]
 embed-resource = "3.0.1"
