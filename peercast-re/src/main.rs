@@ -1,16 +1,10 @@
 use anyhow::Context;
 use axum::response::Redirect;
-use bytes::BytesMut;
 use clap::Parser;
 use futures_util::FutureExt;
 use libpeercast_re::ConnectionId;
-use std::{
-    net::{Shutdown, SocketAddr},
-    sync::OnceLock,
-};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::info;
-use utoipa::openapi::info;
+use std::{net::{ SocketAddr}};
+use tracing::{error, info};
 
 use peercast_re::{
     channel::ReChannel, cli, config, handler, peercast, repository::ReChannelRepository,
