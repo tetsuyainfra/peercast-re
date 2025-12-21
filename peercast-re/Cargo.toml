@@ -54,6 +54,11 @@ tower-http = { version = "*", features = [
 hyper = { version = "*", features = ["full"] }
 hyper-util = { version = "*", features = ["full"] }
 
+# API
+utoipa = { version = "5.4.0", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version="*", features = ["axum", "vendored"], default-features = false }
+
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }
@@ -88,8 +93,6 @@ dirs = "6.0.0"
 # prcess exit code
 exitcode = "1"
 bitflags = "2.9.0"
-utoipa = { version = "5.3.1", features = ["axum_extras"] }
-utoipa-axum = "0.2.0"
 rust-embed = { version = "8.9.0", features = ["axum", "axum-ex"] }
 
 

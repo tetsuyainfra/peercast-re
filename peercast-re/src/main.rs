@@ -4,7 +4,7 @@ use clap::Parser;
 use futures_util::FutureExt;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use peercast_re::{
     channel::ReChannel, cli, config, handler, peercast, repository::ReChannelRepository,
@@ -79,7 +79,11 @@ async fn main() -> anyhow::Result<()> {
         svr_listener.local_addr().unwrap()
     );
     info!(
-        "  UI/API listening on http://{}/ui",
+        "      UI listening on http://{}/ui",
+        api_listener.local_addr().unwrap()
+    );
+    info!(
+        "     API listening on http://{}/api",
         api_listener.local_addr().unwrap()
     );
 
@@ -236,7 +240,7 @@ async fn spawned_peercast_connection_handler(
     Ok(())
 }
 
-////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // API Server
 //
 async fn api_server(
@@ -246,8 +250,20 @@ async fn api_server(
 ) -> anyhow::Result<ServerThread> {
     let router = axum::Router::new()
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
-        .nest("/api", handler::api::build_router(store))
-        .nest("/ui", handler::ui::build_router());
+        .nest("/ui", handler::ui::build_router())
+        .nest("/api", handler::api::build_router(&store));
+
+    let router = if cfg!(debug_assertions) {
+        let addr = api_listener
+            .local_addr()
+            .map_or("UNKNOWN".to_string(), |addr| addr.to_string());
+        info!("API Swagger UI is enabled at http://{}{}", addr, peercast_re::SWAGGER_PATH);
+        router.merge(handler::api::build_swagger())
+    } else {
+        router
+    };
+
+    // debug!("API Router: {:#?}", router);
     axum::serve(
         api_listener,
         router.into_make_service_with_connect_info::<SocketAddr>(),
