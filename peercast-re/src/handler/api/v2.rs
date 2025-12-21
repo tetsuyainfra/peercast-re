@@ -2,7 +2,7 @@
 /// API v1 handler
 ///
 use std::sync::Arc;
-use axum::{extract::State, routing};
+use axum::routing;
 
 use crate::peercast::Store;
 use utoipa::OpenApi;

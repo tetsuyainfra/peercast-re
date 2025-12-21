@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
 use axum::{extract::State, routing};
-/// src/handler/api/v1.rs
-/// API v1 handler
-///
-use utoipa_axum::{router::OpenApiRouter, routes};
 
 ////////////////////////////////////////////////////////////////////////////////
 // API

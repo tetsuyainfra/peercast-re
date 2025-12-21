@@ -53,11 +53,11 @@ pub async fn task_runner(shutdown_token: tokio_util::sync::CancellationToken) ->
 
 pub async fn serve_pcphttp(
     cid: ConnectionId,
-    mut conn: tokio::net::TcpStream,
+    conn: tokio::net::TcpStream,
     remote: SocketAddr,
     _graceful_shutdown: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
-    use libpeercast_re::pcp::{builder::RootBuilder, connection::HandshakeType};
+    
     let read_buf = bytes::BytesMut::new();
 
     // HandshakeFutureにすればよさそう

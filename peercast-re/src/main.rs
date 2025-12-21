@@ -4,10 +4,10 @@ use clap::Parser;
 use futures_util::FutureExt;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use peercast_re::{
-    channel::ReChannel, cli, config, handler, peercast, repository::ReChannelRepository,
+    cli, config, handler, peercast,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
