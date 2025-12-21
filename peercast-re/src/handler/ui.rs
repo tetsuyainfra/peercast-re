@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Router,
     http::{StatusCode, Uri},
@@ -6,12 +8,14 @@ use axum::{
 use rust_embed::Embed;
 use tracing::debug;
 
+use crate::peercast::Store;
+
 #[derive(Embed)]
 #[folder = "client/dist/"]
 struct Assets;
 static INDEX_HTML: &str = "index.html";
 
-pub fn build_router() -> axum::Router {
+pub fn build_router(_store: &Arc<Store>) -> axum::Router {
     Router::new().fallback(static_handler)
 }
 

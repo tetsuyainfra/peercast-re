@@ -250,7 +250,7 @@ async fn api_server(
 ) -> anyhow::Result<ServerThread> {
     let router = axum::Router::new()
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
-        .nest("/ui", handler::ui::build_router())
+        .nest("/ui", handler::ui::build_router(&store))
         .nest("/api", handler::api::build_router(&store));
 
     let router = if cfg!(debug_assertions) {
