@@ -254,10 +254,11 @@ async fn api_server(
         .nest("/api", handler::api::build_router(&store));
 
     let router = if cfg!(debug_assertions) {
-        let addr = api_listener
-            .local_addr()
-            .map_or("UNKNOWN".to_string(), |addr| addr.to_string());
-        info!("API Swagger UI is enabled at http://{}{}", addr, peercast_re::SWAGGER_PATH);
+        info!(
+            "Swagger listening on http://{}{}",
+            api_listener.local_addr().unwrap(),
+            peercast_re::SWAGGER_PATH
+        );
         router.merge(handler::api::build_swagger())
     } else {
         router
