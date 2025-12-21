@@ -3,7 +3,7 @@ use axum::response::Redirect;
 use clap::Parser;
 use futures_util::FutureExt;
 use libpeercast_re::ConnectionId;
-use std::{net::{ SocketAddr}};
+use std::net::SocketAddr;
 use tracing::{error, info};
 
 use peercast_re::{
@@ -37,12 +37,18 @@ async fn main() -> anyhow::Result<()> {
                 let output = command.output().await;
                 match output {
                     Ok(r) => {
-                        info!( "LISTEN Request Stdout: \n{}", String::from_utf8_lossy(&r.stdout));
-                        info!( "LISTEN Request Stderr: \n{}", String::from_utf8_lossy(&r.stderr));
+                        info!(
+                            "LISTEN Request Stdout: \n{}",
+                            String::from_utf8_lossy(&r.stdout)
+                        );
+                        info!(
+                            "LISTEN Request Stderr: \n{}",
+                            String::from_utf8_lossy(&r.stderr)
+                        );
                     }
                     Err(e) => {
                         error!("LISTEN Request Failed: {}", e);
-                    },
+                    }
                 }
             });
         }
@@ -261,23 +267,22 @@ async fn api_server(
 // Initialization Logging
 //
 fn logging_init() {
-    use tracing_log::LogTracer;
     use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
     // `log` クレートを `tracing` に統合
-    LogTracer::init().expect("Failed to set logger");
+    tracing_log::LogTracer::init().expect("failed to initialize tracing");
 
     // `tracing` のSubscriberを初期化
-    tracing_subscriber::registry()
-        .with(
-            fmt::layer()
-                .with_file(true)
-                .with_line_number(true)
-                .with_target(false),
-        )
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+    let subscriber = fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true)
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             println!("RUST_LOG=debug");
             "debug".into()
         }))
-        .init();
+        .finish();
+
+    // グローバルのデフォルトに設定
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }
