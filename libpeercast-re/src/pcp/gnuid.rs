@@ -7,7 +7,6 @@ use std::{
 
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use thiserror::Error;
-use tracing_subscriber::field::debug;
 
 use crate::error;
 
@@ -129,19 +128,22 @@ impl<'de> Visitor<'de> for IGnuIdVisitor {
         write!(formatter, "an str between 0 and 2^128")
     }
 
-
-    fn visit_str<E>(self, value: &str) -> Result<GnuId, E> where E: serde::de::Error {
+    fn visit_str<E>(self, value: &str) -> Result<GnuId, E>
+    where
+        E: serde::de::Error,
+    {
         // println!("visit_str: {}", value);
         let id = GnuId::from_str(value);
-        id.map_err(|e | E::custom(format!("{}", e)))
+        id.map_err(|e| E::custom(format!("{}", e)))
     }
 }
 
 impl<'de> Deserialize<'de> for GnuId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de> {
-            deserializer.deserialize_str(IGnuIdVisitor)
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(IGnuIdVisitor)
     }
 }
 
@@ -176,12 +178,7 @@ pub enum GnuIdParseError {
 mod converter {
     #[allow(dead_code)]
     pub fn conv_std(v: &u128) -> String {
-        let hex_str: String = v
-            .to_be_bytes()
-            .iter()
-            .map(|i| format!("{i:02X}"))
-            .collect::<Vec<String>>()
-            .join("");
+        let hex_str: String = v.to_be_bytes().iter().map(|i| format!("{i:02X}")).collect::<Vec<String>>().join("");
         hex_str
     }
 
@@ -227,9 +224,7 @@ mod tests {
         // println!("{:?}", &g);
 
         assert_eq!(
-            GnuId::from_str("1A00000000000000000000000000000B")
-                .unwrap()
-                .0,
+            GnuId::from_str("1A00000000000000000000000000000B").unwrap().0,
             0x1A00000000000000000000000000000B_u128
         );
 

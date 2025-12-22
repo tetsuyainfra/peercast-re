@@ -14,7 +14,6 @@ use pbkdf2::{
 };
 use rand_core::OsRng;
 use tracing::{debug, info, warn};
-use tracing_subscriber::field::debug;
 
 use crate::{
     error::{AuthError, ConfigError, ParseVariableError},
@@ -63,17 +62,13 @@ impl Config {
             root_session_id,
         } = Config::default();
 
-        let (server_address, server_port, rtmp_port, local_address) = match conf
-            .section(Some(SECTION_SERVER))
-        {
+        let (server_address, server_port, rtmp_port, local_address) = match conf.section(Some(SECTION_SERVER)) {
             None => (server_address, server_port, rtmp_port, local_address),
             Some(sec) => {
                 let server_address = match sec.get("server_address") {
                     None | Some("") => server_address,
                     Some(s) => {
-                        let ip = s
-                            .parse::<IpAddr>()
-                            .map_err(|e| ParseVariableError::from(e))?;
+                        let ip = s.parse::<IpAddr>().map_err(|e| ParseVariableError::from(e))?;
                         ConfigAddress::Config(ip)
                     }
                 };
@@ -111,7 +106,9 @@ impl Config {
                             }
                             // 平文のパスワード
                             Err(e) => {
-                                warn!("config password is error occured({e}). if you set Plain Text to {SECTION_PRIVACY}.password, don't reminde this message.");
+                                warn!(
+                                    "config password is error occured({e}). if you set Plain Text to {SECTION_PRIVACY}.password, don't reminde this message."
+                                );
                                 Some(ConfigPassword::Plain(s.to_string()))
                             }
                         }
@@ -160,31 +157,14 @@ impl Config {
             .set("server_address", &self.server_address)
             .set("server_port", &self.server_port.to_string())
             .set("rtmp_port", &self.rtmp_port.to_string())
-            .set(
-                "permit_address",
-                serde_json::to_string(&self.local_address).unwrap(),
-            );
+            .set("permit_address", serde_json::to_string(&self.local_address).unwrap());
 
         ini.with_section(Some(SECTION_PRIVACY))
-            .set(
-                "username",
-                self.username
-                    .as_ref()
-                    .map_or(String::new(), |name| name.clone()),
-            )
-            .set(
-                "password",
-                self.password.as_ref().map_or(String::new(), |pw| pw.into()),
-            );
+            .set("username", self.username.as_ref().map_or(String::new(), |name| name.clone()))
+            .set("password", self.password.as_ref().map_or(String::new(), |pw| pw.into()));
         ini.with_section(Some(SECTION_ROOT))
             .set("root_mode", &self.root_mode.to_string())
-            .set(
-                "root_session_id",
-                &self
-                    .root_session_id
-                    .as_ref()
-                    .map_or(String::new(), |id| id.to_string()),
-            );
+            .set("root_session_id", &self.root_session_id.as_ref().map_or(String::new(), |id| id.to_string()));
 
         let mut buf = Vec::new();
         let _r = ini.write_to(&mut buf).unwrap();
@@ -291,10 +271,7 @@ impl ConfigPassword {
             ConfigPassword::Plain(plain_password) => {
                 let salt = SaltString::generate(&mut OsRng);
                 // Hash password to PHC string ($pbkdf2-sha256$...)
-                let hashed_password = Pbkdf2
-                    .hash_password(plain_password.as_bytes(), &salt)
-                    .unwrap()
-                    .to_string();
+                let hashed_password = Pbkdf2.hash_password(plain_password.as_bytes(), &salt).unwrap().to_string();
                 ConfigPassword::Hashed(hashed_password)
             }
         }
@@ -329,10 +306,7 @@ mod test {
     #[test]
     fn test_config_default() {
         let config = Config::default();
-        assert_eq!(
-            config.server_address,
-            ConfigAddress::NoConfig(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)))
-        );
+        assert_eq!(config.server_address, ConfigAddress::NoConfig(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))));
         assert_eq!(config.server_port, 17144_u16);
         assert_eq!(config.username, None);
         assert_eq!(config.password, None);
@@ -385,10 +359,7 @@ mod test {
 
         let s = render!(include_str!("config.test.ini.j2"),  server_port => 1, password=>"plain_password");
         let conf = Config::load_str(&s).unwrap();
-        assert_eq!(
-            conf.password,
-            Some(ConfigPassword::Plain("plain_password".to_string()))
-        );
+        assert_eq!(conf.password, Some(ConfigPassword::Plain("plain_password".to_string())));
     }
 
     #[test]
