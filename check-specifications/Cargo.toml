@@ -30,7 +30,7 @@ console-subscriber = { version = "0.4.1" }
 axum-core = { version = "*" }
 axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
 axum-extra = { version = "0.10.0", features = ["typed-header", "cookie"] }
-axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
+axum-server = { version = "0.8.0" } # THIS IS NOT Axum Community build
 
 # Axum-option
 axum-client-ip = { version = "0.7.0" }
