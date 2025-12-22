@@ -251,22 +251,43 @@ async fn api_server(
 // Initialization Logging
 //
 fn logging_init() {
+    use tracing_subscriber::prelude::*;
     use tracing_subscriber::{EnvFilter, fmt};
+    // use tracing_subscriber::layer::SubscriberExt;
 
-    // `log` クレートを `tracing` に統合
-    tracing_log::LogTracer::init().expect("failed to initialize tracing");
+    // subscriberの構築
+    let subscriber = tracing_subscriber::registry();
 
-    // `tracing` のSubscriberを初期化
-    let subscriber = fmt()
-        .with_file(true)
-        .with_line_number(true)
-        .with_target(true)
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+    // tokio-conosole を有効化
+    #[cfg(debug_assertions)]
+    let subscriber = {
+        println!("Console Subscriber listening on http://127.0.0.1:6699");
+        let console_layer = console_subscriber::ConsoleLayer::builder()
+            // オプション
+            .with_default_env()
+            .spawn();
+        subscriber.with(console_layer)
+    };
+
+    // コンソール出力のフォーマットレイヤー
+    let subscriber = {
+        // 環境変数ベースのフィルターレイヤー
+        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             println!("RUST_LOG=debug");
             "debug".into()
-        }))
-        .finish();
+        });
 
-    // グローバルのデフォルトに設定
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
+        // デフォルトのフォーマットレイヤー
+        let fmt_layer = fmt::layer()
+            // オプション
+            .with_ansi(true)
+            .with_file(true)
+            .with_line_number(true)
+            .with_target(false)
+            .with_filter(env_filter);
+
+        subscriber.with(fmt_layer)
+    };
+
+    subscriber.init();
 }
