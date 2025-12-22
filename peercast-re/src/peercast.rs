@@ -3,13 +3,6 @@ use std::{net::SocketAddr, sync::OnceLock};
 use crate::{channel::ReChannel, config::Config, repository::ReChannelRepository};
 use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
 
-#[derive(Debug, Clone, Default)]
-pub struct Store {
-    #[allow(dead_code)]
-    pub config: Config, // #[allow(dead_code)]
-    pub config_path: std::path::PathBuf,
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // application initialize
 //

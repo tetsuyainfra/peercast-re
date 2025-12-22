@@ -1,17 +1,10 @@
+use axum::routing;
 /// src/handler/api/v1.rs
 /// API v1 handler
 ///
-use std::sync::Arc;
-use axum::routing;
-
-use crate::peercast::Store;
 use utoipa::OpenApi;
 
-pub fn router(store: &Arc<Store>) -> axum::Router {
-    axum::Router::new()
-        .route("/", routing::get(root_handler))
-        .with_state(store.clone())
-}
+use crate::AppState;
 
 #[derive(OpenApi)]
 #[openapi(
@@ -21,6 +14,12 @@ pub fn router(store: &Arc<Store>) -> axum::Router {
     )
 )]
 pub(super) struct ApiV2;
+
+pub fn router() -> axum::Router<AppState> {
+    axum::Router::new()
+        //
+        .route("/", routing::get(root_handler))
+}
 
 #[utoipa::path(
     get,

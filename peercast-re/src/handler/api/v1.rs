@@ -1,20 +1,13 @@
-use std::sync::Arc;
-
 use axum::{extract::State, routing};
+use utoipa::OpenApi;
+
+use crate::AppState;
+
+pub mod channels;
 
 ////////////////////////////////////////////////////////////////////////////////
 // API
 //
-use crate::peercast::Store;
-use utoipa::OpenApi;
-
-pub fn router(store: &Arc<Store>) -> axum::Router {
-    axum::Router::new()
-        .route("/users", routing::get(list_users))
-        .route("/config", routing::get(get_config))
-        .with_state(store.clone())
-}
-
 #[derive(OpenApi)]
 #[openapi(
     paths(list_users, get_config),
@@ -24,6 +17,16 @@ pub fn router(store: &Arc<Store>) -> axum::Router {
 )]
 pub(super) struct ApiV1;
 
+pub fn router() -> axum::Router<AppState> {
+    axum::Router::new()
+        .route("/users", routing::get(list_users))
+        .route("/config", routing::get(get_config))
+        .nest("/channels", channels::router())
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Handlers
+//
 #[utoipa::path(
     get,
     path = "/users",
@@ -42,9 +45,7 @@ pub(super) async fn list_users() -> impl axum::response::IntoResponse {
         (status = 200, description = "get config")
     )
 )]
-pub(super) async fn get_config(
-    State(store): State<Arc<Store>>,
-) -> impl axum::response::IntoResponse {
+pub(super) async fn get_config(State(store): State<AppState>) -> impl axum::response::IntoResponse {
     let config_path = store.config_path.clone();
 
     #[derive(Debug, serde::Serialize)]

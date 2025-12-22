@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use axum::{
     Router,
     http::{StatusCode, Uri},
@@ -8,14 +6,14 @@ use axum::{
 use rust_embed::Embed;
 use tracing::debug;
 
-use crate::peercast::Store;
+use crate::AppState;
 
 #[derive(Embed)]
 #[folder = "client/dist/"]
 struct Assets;
 static INDEX_HTML: &str = "index.html";
 
-pub fn build_router(_store: &Arc<Store>) -> axum::Router {
+pub fn build_router() -> axum::Router<AppState> {
     Router::new().fallback(static_handler)
 }
 
@@ -33,11 +31,7 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     match Assets::get(path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
-            (
-                [(axum::http::header::CONTENT_TYPE, mime.as_ref())],
-                content.data,
-            )
-                .into_response()
+            ([(axum::http::header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
             if path.contains('.') {

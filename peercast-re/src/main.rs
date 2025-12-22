@@ -5,7 +5,7 @@ use futures_util::FutureExt;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
 
-use peercast_re::prelude::*;
+use peercast_re::{AppState, prelude::*};
 use peercast_re::{cli, config, handler, peercast};
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -49,11 +49,11 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create Store
-    let store = peercast::Store {
+    let store = peercast_re::Store {
         config: config.clone(),
         config_path,
     };
-    let store = std::sync::Arc::new(store);
+    let store: AppState = std::sync::Arc::new(store);
 
     // Start Server Listeners
     let svr_addr = SocketAddr::from((config.server_address, config.server_port));
@@ -111,7 +111,7 @@ enum ServerThread {
 //
 async fn peercast_server(
     wait_signal: tokio_util::sync::CancellationToken,
-    _store: std::sync::Arc<peercast::Store>,
+    _store: AppState,
     svr_listener: tokio::net::TcpListener,
 ) -> anyhow::Result<ServerThread> {
     let listener = svr_listener;
@@ -213,15 +213,12 @@ async fn spawned_peercast_connection_handler(
 ///////////////////////////////////////////////////////////////////////////////
 // API Server
 //
-async fn api_server(
-    wait_signal: tokio_util::sync::CancellationToken,
-    store: std::sync::Arc<peercast::Store>,
-    api_listener: tokio::net::TcpListener,
-) -> anyhow::Result<ServerThread> {
+async fn api_server(wait_signal: tokio_util::sync::CancellationToken, store: AppState, api_listener: tokio::net::TcpListener) -> anyhow::Result<ServerThread> {
     let router = axum::Router::new()
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
-        .nest("/ui", handler::ui::build_router(&store))
-        .nest("/api", handler::api::build_router(&store));
+        .nest("/ui", handler::ui::build_router())
+        .nest("/api", handler::api::build_router())
+        .with_state(store.clone());
 
     let router = if cfg!(debug_assertions) {
         info!(

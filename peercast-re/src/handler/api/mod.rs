@@ -1,9 +1,7 @@
 // src/handler/api/mod.rs
 // API handler
 //
-use std::sync::Arc;
-
-use crate::{SWAGGER_PATH, peercast::Store};
+use crate::{AppState, SWAGGER_PATH};
 
 pub mod v1;
 pub mod v2;
@@ -34,17 +32,15 @@ pub fn build_swagger() -> utoipa_swagger_ui::SwaggerUi {
             Url::with_primary("API v1", "/api-docs/openapi.json", true),
             ApiSetV1::openapi(), // to suppress unused warning
         ),
-        (
-            Url::new("API v2", "/api-docs/openapi2.json"),
-            ApiSetV2::openapi(),
-        ),
+        (Url::new("API v2", "/api-docs/openapi2.json"), ApiSetV2::openapi()),
     ]);
 
     return swagger_ui;
 }
 
-pub fn build_router(store: &Arc<Store>) -> axum::Router {
+pub fn build_router() -> axum::Router<AppState> {
     axum::Router::new()
-        .nest("/v1", v1::router(&store))
-        .nest("/v2", v2::router(&store))
+        //
+        .nest("/v1", v1::router())
+        .nest("/v2", v2::router())
 }
