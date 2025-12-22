@@ -1,7 +1,13 @@
-use std::sync::{Arc, Mutex, RwLock};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex, RwLock},
+};
 
 use chrono::{DateTime, Utc};
-use libpeercast_re::pcp::GnuId;
+use libpeercast_re::{
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+    util::rwlock_read_poisoned,
+};
 
 use crate::repository::Channel;
 
@@ -9,8 +15,8 @@ use crate::repository::Channel;
 #[derive(Clone, Debug)]
 pub struct ReChannel {
     cid: GnuId,
-    channel_info: Arc<RwLock<libpeercast_re::pcp::ChannelInfo>>,
-    track_info: Arc<RwLock<libpeercast_re::pcp::TrackInfo>>,
+    channel_info: Arc<RwLock<ChannelInfo>>,
+    track_info: Arc<RwLock<TrackInfo>>,
     number_of_listener: Arc<RwLock<i32>>,
     number_of_relay: Arc<RwLock<i32>>,
     last_update: Arc<Mutex<DateTime<Utc>>>,
@@ -52,4 +58,25 @@ impl Channel for ReChannel {
     }
 }
 
-impl ReChannel {}
+impl ReChannel {
+    pub fn id(&self) -> GnuId {
+        self.cid
+    }
+
+    pub fn channel_info(&self) -> ChannelInfo {
+        self.channel_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
+    }
+    pub fn track_info(&self) -> TrackInfo {
+        self.track_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
+    }
+
+    pub fn number_of_listener(&self) -> i32 {
+        self.number_of_listener.read().unwrap_or_else(rwlock_read_poisoned).clone()
+    }
+    pub fn number_of_relay(&self) -> i32 {
+        self.number_of_relay.read().unwrap_or_else(rwlock_read_poisoned).clone()
+    }
+    pub fn created_at(&self) -> DateTime<Utc> {
+        self.created_at.as_ref().clone()
+    }
+}
