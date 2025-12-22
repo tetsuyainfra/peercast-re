@@ -22,8 +22,10 @@ pub struct ChannelInfo {
     /// コンタクトURL
     pub url: String,
     /// MIME
+    /// FLVなら"video/x-flv"
     pub stream_type: String,
-    /// 拡張子
+    /// 拡張子(.含む)
+    /// FLVなら"flv"
     pub stream_ext: String,
     /// ビットレート[kbps]
     pub bitrate: i32,
@@ -64,13 +66,12 @@ impl From<&PcpChannelInfo> for ChannelInfo {
     }
 }
 
-
 #[cfg(test)]
 mod t {
     use crate::pcp::{decode::PcpChannelInfo, ChannelInfo};
 
     #[test]
-    fn test_merge(){
+    fn test_merge() {
         let mut ci = ChannelInfo::new();
         let mut info = PcpChannelInfo::default();
         info.bitrate = Some(1024);
@@ -80,5 +81,4 @@ mod t {
 
         assert_eq!(ci.bitrate, info.bitrate.unwrap());
     }
-
 }
