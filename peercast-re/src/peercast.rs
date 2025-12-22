@@ -1,12 +1,12 @@
 use std::{net::SocketAddr, sync::OnceLock};
 
-use crate::{channel::ReChannel, config::Config, repository::ReChannelRepository};
+use crate::{channel::ReChannel, cli::Args, config::Config, repository::ReChannelRepository};
 use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
 
 ////////////////////////////////////////////////////////////////////////////////
 // application initialize
 //
-pub fn app_init(config: &Config) {
+pub fn app_init(args: &Args, config: &Config) {
     let self_session_id = libpeercast_re::pcp::GnuId::new();
     let self_socket = (config.server_address, config.server_port).into();
 

@@ -93,7 +93,7 @@ pub fn load_config(args: cli::Args) -> anyhow::Result<(Config, PathBuf)> {
     };
 
     info!("Using configuration file: {:?}", config_path);
-    let config = load_toml(&config_path)?.merge_cli_args(args);
+    let config = load_toml(&config_path)?.merge_cli_args(&args);
 
     Ok((config, config_path))
 }
@@ -116,18 +116,29 @@ fn save_toml(path: &PathBuf, config: &Config) -> anyhow::Result<()> {
 }
 
 impl Config {
-    fn merge_cli_args(mut self, args: cli::Args) -> Self {
-        if let Some(addr) = args.server_address {
-            self.server_address = addr;
+    fn merge_cli_args(mut self, args: &cli::Args) -> Self {
+        let cli::Args {
+            config_file: _config_path,
+            ipc_path: _ipc_path,
+            server_address,
+            server_port,
+            api_address,
+            api_port,
+            create_dummy: _create_dummy,
+            command: _command,
+        } = args;
+
+        if let Some(addr) = server_address {
+            self.server_address = addr.clone();
         }
-        if let Some(port) = args.server_port {
-            self.server_port = port;
+        if let Some(port) = server_port {
+            self.server_port = port.clone();
         }
-        if let Some(addr) = args.api_address {
-            self.api_address = addr;
+        if let Some(addr) = api_address {
+            self.api_address = addr.clone();
         }
-        if let Some(port) = args.api_port {
-            self.api_port = port;
+        if let Some(port) = api_port {
+            self.api_port = port.clone();
         }
         self
     }
@@ -150,6 +161,7 @@ mod tests {
             server_port: None,
             api_address: None,
             api_port: Some(18000),
+            create_dummy: false,
             command: None,
         };
 

@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
 
     let (config, config_path) = config::load_config(args.clone()).context("Failed to Load configuration")?;
 
-    peercast::app_init(&config);
+    peercast::app_init(&args, &config);
 
     match args.command {
         Some(cli::Commands::Listen { url }) => {
