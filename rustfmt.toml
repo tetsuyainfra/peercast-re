@@ -1,8 +1,9 @@
 #tab_spaces = 4
 
 # 最大幅、行のコード幅をこの幅以内に収めようとする
-max_width = 160
+max_width = 120
 
 # max_widthの値をもとに他の*_widthの値を算出する
 # https://rust-lang.github.io/rustfmt/?version=v1.8.0&search=width#use_small_heuristics
-use_small_heuristics = "Default"
+#use_small_heuristics = "Default"
+use_small_heuristics = "Max"
