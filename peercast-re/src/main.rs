@@ -6,9 +6,7 @@ use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
 use tracing::{error, info};
 
-use peercast_re::{
-    cli, config, handler, peercast,
-};
+use peercast_re::{cli, config, handler, peercast};
 
 ////////////////////////////////////////////////////////////////////////////////
 // main
@@ -20,8 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     dbg!(&args);
 
-    let (config, config_path) =
-        config::load_config(args.clone()).context("Failed to Load configuration")?;
+    let (config, config_path) = config::load_config(args.clone()).context("Failed to Load configuration")?;
 
     peercast::app_init(&config);
 
@@ -37,14 +34,8 @@ async fn main() -> anyhow::Result<()> {
                 let output = command.output().await;
                 match output {
                     Ok(r) => {
-                        info!(
-                            "LISTEN Request Stdout: \n{}",
-                            String::from_utf8_lossy(&r.stdout)
-                        );
-                        info!(
-                            "LISTEN Request Stderr: \n{}",
-                            String::from_utf8_lossy(&r.stderr)
-                        );
+                        info!("LISTEN Request Stdout: \n{}", String::from_utf8_lossy(&r.stdout));
+                        info!("LISTEN Request Stderr: \n{}", String::from_utf8_lossy(&r.stderr));
                     }
                     Err(e) => {
                         error!("LISTEN Request Failed: {}", e);
@@ -74,46 +65,25 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
 
-    info!(
-        "PeerCast listening on pcp://{}/",
-        svr_listener.local_addr().unwrap()
-    );
-    info!(
-        "      UI listening on http://{}/ui",
-        api_listener.local_addr().unwrap()
-    );
-    info!(
-        "     API listening on http://{}/api",
-        api_listener.local_addr().unwrap()
-    );
+    info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap());
+    info!("      UI listening on http://{}/ui", api_listener.local_addr().unwrap());
+    info!("     API listening on http://{}/api", api_listener.local_addr().unwrap());
 
     // Start Server Tasks
     let shutdown_token = tokio_util::sync::CancellationToken::new();
     let mut set = tokio::task::JoinSet::new();
-    set.spawn(
-        peercast::task_runner(shutdown_token.child_token()).then(|r| async {
-            match r {
-                Ok(_) => Ok(ServerThread::PeerCastTask),
-                Err(e) => Err(e),
-            }
-        }),
-    );
-    set.spawn(peercast_server(
-        shutdown_token.child_token(),
-        store.clone(),
-        svr_listener,
-    ));
-    set.spawn(api_server(
-        shutdown_token.child_token(),
-        store.clone(),
-        api_listener,
-    ));
+    set.spawn(peercast::task_runner(shutdown_token.child_token()).then(|r| async {
+        match r {
+            Ok(_) => Ok(ServerThread::PeerCastTask),
+            Err(e) => Err(e),
+        }
+    }));
+    set.spawn(peercast_server(shutdown_token.child_token(), store.clone(), svr_listener));
+    set.spawn(api_server(shutdown_token.child_token(), store.clone(), api_listener));
 
     // shutdown notifier
     set.spawn(async move {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("Failed to listen for ctrl-c signal");
+        tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c signal");
         shutdown_token.cancel();
         info!("Shutdown signal sent");
         Ok(ServerThread::ShutdownNotifier)
@@ -265,16 +235,13 @@ async fn api_server(
     };
 
     // debug!("API Router: {:#?}", router);
-    axum::serve(
-        api_listener,
-        router.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(async move {
-        wait_signal.cancelled_owned().await;
-        tracing::debug!("received shutdown signal");
-    })
-    .await
-    .context("Serving Application Error")?;
+    axum::serve(api_listener, router.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(async move {
+            wait_signal.cancelled_owned().await;
+            tracing::debug!("received shutdown signal");
+        })
+        .await
+        .context("Serving Application Error")?;
 
     info!("API Server has shut down");
     Ok(ServerThread::Api)
