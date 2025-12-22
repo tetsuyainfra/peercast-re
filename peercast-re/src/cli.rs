@@ -63,7 +63,23 @@ pub struct Args {
     )]
     pub api_port: Option<u16>,
 
+    #[cfg(debug_assertions)]
+    #[clap(
+        long = "create-dummy",
+        value_name = "CREATE_DUMMY",
+        env = "PEERCAST_RE_CREATE_DUMMY",
+        default_value_t = true
+    )]
+    pub create_dummy: bool,
 
+    #[cfg(not(debug_assertions))]
+    #[clap(
+        long = "create-dummy",
+        value_name = "CREATE_DUMMY",
+        env = "PEERCAST_RE_CREATE_DUMMY",
+        default_value_t = false
+    )]
+    pub create_dummy: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
