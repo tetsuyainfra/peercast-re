@@ -12,6 +12,31 @@ pub fn app_init(args: &Args, config: &Config) {
 
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
     _REPOSITORY.get_or_init(|| ReChannelRepository::new(&self_session_id));
+
+    if args.create_dummy {
+        let dummy_channel_id = libpeercast_re::pcp::GnuId::new();
+        let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
+            name: "Dummy Channel".to_string(),
+            url: "http://example.com".to_string(),
+            genre: "Various".to_string(),
+            desc: "This is a dummy channel.".to_string(),
+            comment: "No comments.".to_string(),
+            stream_type: "video/x-flv".to_string(),
+            stream_ext: ".flv".to_string(),
+            bitrate: 128,
+            typ: "FLV".to_string(),
+        };
+        let dummy_track_info = libpeercast_re::pcp::TrackInfo {
+            title: "Dummy Track".to_string(),
+            creator: "Dummy Artist".to_string(),
+            url: "http://example.com/track".to_string(),
+            album: "Dummy Album".to_string(),
+            genre: "Various".to_string(),
+            ..Default::default()
+        };
+
+        Repository().create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
