@@ -13,6 +13,7 @@ use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 struct ShutdownState {
     graceful: CancellationToken,
+    #[allow(unused)]
     force: CancellationToken,
     tracker: TaskTracker,
 }
@@ -31,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let tracker = tokio_util::task::TaskTracker::new();
 
     let graceful_token = CancellationToken::new();
-    let force_token = CancellationToken::new();
+    let _force_token = CancellationToken::new();
 
     let child_graceful_token = graceful_token.child_token(); // for http server
     let child_force_token = CancellationToken::new();
@@ -116,7 +117,7 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
 }
 
-async fn handle_socket(socket: axum::extract::ws::WebSocket, who: SocketAddr, shutdown: Arc<ShutdownState>) {
+async fn handle_socket(socket: axum::extract::ws::WebSocket, _who: SocketAddr, shutdown: Arc<ShutdownState>) {
     let (mut sender, mut receiver) = socket.split();
 
     let graceful_token = shutdown.graceful.clone();

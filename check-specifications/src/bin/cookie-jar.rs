@@ -1,5 +1,8 @@
 use axum::{
-    http::StatusCode, response::{Html, Redirect}, routing::{get, post}, Router
+    Router,
+    http::StatusCode,
+    response::{Html, Redirect},
+    routing::{get, post},
 };
 use axum_extra::{
     TypedHeader,
@@ -23,11 +26,10 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn root_handler(
-    jar: CookieJar,
-) -> (CookieJar, Html<String>) {
+async fn root_handler(jar: CookieJar) -> (CookieJar, Html<String>) {
     let jar = jar.add(Cookie::new("session_id", "123"));
-    let html = format!("
+    let html = format!(
+        "
 <body>
 / <br />
 <a href='/me'>/me</a> <br />
@@ -43,15 +45,13 @@ btn.addEventListener('click', function(e) {{
 }})
 </script>
 </body>
-");
+"
+    );
 
     (jar, Html(html))
 }
 
-async fn create_session(
-    TypedHeader(auth): TypedHeader<Authorization<Bearer>>,
-    jar: CookieJar,
-) -> Result<(CookieJar, Redirect), StatusCode> {
+async fn create_session(TypedHeader(auth): TypedHeader<Authorization<Bearer>>, jar: CookieJar) -> Result<(CookieJar, Redirect), StatusCode> {
     if let Some(session_id) = authorize_and_create_session(auth.token()).await {
         Ok((
             // the updated jar must be returned for the changes
@@ -81,7 +81,7 @@ async fn listing(jar: CookieJar) -> Result<String, StatusCode> {
     Ok(format!("{:#?}", jar))
 }
 
-async fn authorize_and_create_session(token: &str) -> Option<String> {
+async fn authorize_and_create_session(_token: &str) -> Option<String> {
     // authorize the user and create a session...
     todo!()
 }

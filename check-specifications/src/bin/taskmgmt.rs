@@ -9,7 +9,7 @@ async fn main() -> anyhow::Result<()> {
     let graceful_token = CancellationToken::new();
     let child_token = graceful_token.child_token();
 
-    let shutdown_handle = tokio::spawn(async move {
+    let _shutdown_handle = tokio::spawn(async move {
         #[cfg(unix)]
         let terminate = async {
             tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())

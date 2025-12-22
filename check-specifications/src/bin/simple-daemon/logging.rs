@@ -1,4 +1,4 @@
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::cli;
 
@@ -9,14 +9,12 @@ pub fn init(args: &cli::Args) -> anyhow::Result<()> {
 
     // for tokio-console
     // console_subscriber::init();
-    let console_layer = console_subscriber::ConsoleLayer::builder()
-        .with_default_env()
-        .spawn();
+    let console_layer = console_subscriber::ConsoleLayer::builder().with_default_env().spawn();
 
     // STDOUT
     let fmt_filter = if args.verbose.is_present() == false {
         // 通常時 (RUST_LOGの指定があればそれを読み込む)
-        tracing_subscriber::filter::EnvFilter::try_from_default_env().unwrap_or_else(|e| {
+        tracing_subscriber::filter::EnvFilter::try_from_default_env().unwrap_or_else(|_e| {
             // let v = std::env::var("RUST_LOG").unwrap_or_default();
             // eprintln!(
             //     "Faild to initialize logging filter from RUST_LOG=\"{}\", {}",
@@ -34,15 +32,13 @@ pub fn init(args: &cli::Args) -> anyhow::Result<()> {
     let fmt_filter_str = fmt_filter.to_string();
 
     // ACCESS LOG
-    let file =
-        std::fs::File::create(args.access_log.clone()).expect("access_logの作成に失敗しました");
+    let file = std::fs::File::create(args.access_log.clone()).expect("access_logの作成に失敗しました");
     let access_log = tracing_subscriber::fmt::layer()
         // .with_thread_names(true)
         .json()
         // .with_target(true)
         .with_writer(file);
-    let access_log_filter_fn =
-        tracing_subscriber::filter::filter_fn(|metadata| metadata.target() == "http_access");
+    let access_log_filter_fn = tracing_subscriber::filter::filter_fn(|metadata| metadata.target() == "http_access");
 
     // CONSOLE OUTPUT
     let fmt_layer = tracing_subscriber::fmt::layer();

@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 
-
 /// Simple Daemon Program
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_BIN_NAME"))]
@@ -45,6 +44,7 @@ pub enum Commands {
     },
 }
 
+#[allow(dead_code)]
 pub fn version_print(output_as_json: bool) -> anyhow::Result<()> {
     use std::collections::BTreeMap;
 
