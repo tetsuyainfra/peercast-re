@@ -13,16 +13,12 @@ use clap::{Parser, command};
     )]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 pub struct Args {
-    #[clap(
-        short = 'C',
-        long = "config",
-        value_name = "CONFIG_FILE",
-        env = "PEERCAST_RE_CONFIG"
-    )]
+    #[clap(short = 'C', long = "config", value_name = "CONFIG_FILE", env = "PEERCAST_RE_CONFIG")]
     pub config_file: Option<PathBuf>,
 
     #[clap(
-        short = 'I', long = "ipc-bind",
+        short = 'I',
+        long = "ipc-bind",
         value_name = "IPC_PATH",
         env = "PEERCAST_RE_IPC_PATH",
         default_value = "/tmp/peercast-re.sock"
@@ -94,9 +90,7 @@ pub enum Commands {
     },
 }
 
-
-
-#[ cfg(test)]
+#[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
@@ -106,28 +100,20 @@ mod tests {
 
     #[test]
     fn test_args_parse() {
-        let args = Args::parse_from(&[
-            "peercast-re",
-            "-C", "config.toml",
-            "-B", "10.10.10.10"
-        ]);
+        let args = Args::parse_from(&["peercast-re", "-C", "config.toml", "-B", "10.10.10.10"]);
         assert_eq!(args.config_file.unwrap(), PathBuf::from("config.toml"));
-        assert_eq!(args.server_address.unwrap(), IpAddr::V4(Ipv4Addr::new(10,10,10,10)));
+        assert_eq!(args.server_address.unwrap(), IpAddr::V4(Ipv4Addr::new(10, 10, 10, 10)));
         assert_eq!(args.server_port, None);
     }
 
     #[test]
     fn test_args_commands() {
-        let args = Args::parse_from(&[
-            "peercast-re",
-            "listen",
-            "http://example.com/stream",
-        ]);
+        let args = Args::parse_from(&["peercast-re", "listen", "http://example.com/stream"]);
         match args.command.unwrap() {
             Commands::Listen { url } => {
                 assert_eq!(url, Url::parse("http://example.com/stream").unwrap());
             }
-            _ => unreachable!("")
+            _ => unreachable!(""),
         }
     }
 }

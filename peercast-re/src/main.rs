@@ -49,10 +49,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create Store
-    let store = peercast_re::Store {
-        config: config.clone(),
-        config_path,
-    };
+    let store = peercast_re::Store { config: config.clone(), config_path };
     let store: AppState = std::sync::Arc::new(store);
 
     // Start Server Listeners
@@ -213,7 +210,11 @@ async fn spawned_peercast_connection_handler(
 ///////////////////////////////////////////////////////////////////////////////
 // API Server
 //
-async fn api_server(wait_signal: tokio_util::sync::CancellationToken, store: AppState, api_listener: tokio::net::TcpListener) -> anyhow::Result<ServerThread> {
+async fn api_server(
+    wait_signal: tokio_util::sync::CancellationToken,
+    store: AppState,
+    api_listener: tokio::net::TcpListener,
+) -> anyhow::Result<ServerThread> {
     let router = axum::Router::new()
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
         .nest("/ui", handler::ui::build_router())
@@ -221,11 +222,7 @@ async fn api_server(wait_signal: tokio_util::sync::CancellationToken, store: App
         .with_state(store.clone());
 
     let router = if cfg!(debug_assertions) {
-        info!(
-            "Swagger listening on http://{}{}",
-            api_listener.local_addr().unwrap(),
-            peercast_re::SWAGGER_PATH
-        );
+        info!("Swagger listening on http://{}{}", api_listener.local_addr().unwrap(), peercast_re::SWAGGER_PATH);
         router.merge(handler::api::build_swagger())
     } else {
         router

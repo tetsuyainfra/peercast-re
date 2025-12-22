@@ -1,5 +1,8 @@
 #![allow(dead_code)]
-use std::{net::{IpAddr, Ipv4Addr}, path::PathBuf};
+use std::{
+    net::{IpAddr, Ipv4Addr},
+    path::PathBuf,
+};
 
 use anyhow::{Context, Ok};
 use serde::{Deserialize, Serialize};
@@ -8,10 +11,10 @@ use tracing::{debug, info};
 use crate::cli;
 
 const DEFAULT_IPC_PATH: &str = "/tmp/peercast-re.sock";
-const DEFAULT_SERVER_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(0,0,0,0));
-const DEFAULT_SERVER_PORT : u16 = 17144;
-const DEFAULT_API_BIND : IpAddr = IpAddr::V4(Ipv4Addr::new(127,0,0,1));
-const DEFAULT_API_PORT : u16 = 17145;
+const DEFAULT_SERVER_BIND: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
+const DEFAULT_SERVER_PORT: u16 = 17144;
+const DEFAULT_API_BIND: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const DEFAULT_API_PORT: u16 = 17145;
 const CONFIG_NAME: &str = "Settings.toml";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,9 +52,7 @@ pub fn load_config(args: cli::Args) -> anyhow::Result<(Config, PathBuf)> {
         .to_path_buf();
     let bin_config_path = exe_dir.join(CONFIG_NAME);
 
-    let config_dir = dirs::config_dir()
-        .context("Failed to get config dir")?
-        .join("peercast-re");
+    let config_dir = dirs::config_dir().context("Failed to get config dir")?.join("peercast-re");
     let default_config_path = config_dir.join(CONFIG_NAME);
 
     // 次の順番で設定ファイルを読み込む
@@ -61,10 +62,7 @@ pub fn load_config(args: cli::Args) -> anyhow::Result<(Config, PathBuf)> {
     // 4. デフォルト設定(~/.config/peercast-re/Settings.toml)
     let config_path = if let Some(path) = std::env::var("PEERCAST_RE_CONFIG_FILE").ok() {
         // 1.
-        debug!(
-            "Loading configuration from env var PEERCAST_RE_CONFIG_FILE: {}",
-            path
-        );
+        debug!("Loading configuration from env var PEERCAST_RE_CONFIG_FILE: {}", path);
         PathBuf::from(path)
     } else if let Some(path) = &args.config_file {
         // 2
@@ -72,17 +70,11 @@ pub fn load_config(args: cli::Args) -> anyhow::Result<(Config, PathBuf)> {
         path.clone()
     } else if bin_config_path.exists() {
         // 3
-        debug!(
-            "Loading configuration from binary path: {:?}",
-            bin_config_path
-        );
+        debug!("Loading configuration from binary path: {:?}", bin_config_path);
         bin_config_path
     } else {
         // 4
-        debug!(
-            "Loading configuration from default config path: {:?}",
-            default_config_path
-        );
+        debug!("Loading configuration from default config path: {:?}", default_config_path);
         if !default_config_path.exists() {
             debug!("Default config file does not exist, using default settings.");
             std::fs::create_dir_all(config_dir).context("Failed to craete config directory")?;
@@ -107,8 +99,7 @@ fn load_toml(path: &PathBuf) -> anyhow::Result<Config> {
 }
 
 fn save_toml(path: &PathBuf, config: &Config) -> anyhow::Result<()> {
-    let toml_str =
-        toml::to_string_pretty(config).context("Failed to serialize settings to TOML")?;
+    let toml_str = toml::to_string_pretty(config).context("Failed to serialize settings to TOML")?;
     std::fs::write(path, toml_str).context("Failed to write settings to file")?;
     debug!("Saved config to {:?}", path);
     debug!("Saved config : {:?}", &config);
@@ -171,11 +162,8 @@ mod tests {
         assert_eq!(config.api_address, DEFAULT_API_BIND);
         assert_eq!(config.api_port, DEFAULT_API_PORT);
 
-        let config = config.merge_cli_args(args);
-        assert_eq!(
-            config.server_address,
-            "127.0.0.127".parse::<IpAddr>().unwrap()
-        );
+        let config = config.merge_cli_args(&args);
+        assert_eq!(config.server_address, "127.0.0.127".parse::<IpAddr>().unwrap());
         assert_eq!(config.server_port, DEFAULT_SERVER_PORT);
         assert_eq!(config.api_address, DEFAULT_API_BIND);
         assert_eq!(config.api_port, 18000);
