@@ -251,7 +251,7 @@ async fn api_server(
 // Initialization Logging
 //
 fn logging_init() {
-    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+    use tracing_subscriber::{EnvFilter, fmt};
 
     // `log` クレートを `tracing` に統合
     tracing_log::LogTracer::init().expect("failed to initialize tracing");

@@ -5,6 +5,7 @@ use libpeercast_re::pcp::GnuId;
 
 use crate::repository::Channel;
 
+#[allow(unused)]
 #[derive(Clone, Debug)]
 pub struct ReChannel {
     cid: GnuId,
@@ -14,10 +15,12 @@ pub struct ReChannel {
     number_of_relay: Arc<RwLock<i32>>,
     last_update: Arc<Mutex<DateTime<Utc>>>,
     created_at: Arc<DateTime<Utc>>,
+    config: Option<ReConfig>,
+    self_session_id: GnuId,
 }
 
-pub struct ReConfig {
-}
+#[derive(Clone, Debug)]
+pub struct ReConfig {}
 
 impl Channel for ReChannel {
     type Config = ReConfig;
@@ -39,6 +42,8 @@ impl Channel for ReChannel {
             number_of_relay: RwLock::new(0).into(),
             last_update: Arc::new(Mutex::new(now_.clone())),
             created_at: Arc::new(now_),
+            config,
+            self_session_id,
         }
     }
 
@@ -47,5 +52,4 @@ impl Channel for ReChannel {
     }
 }
 
-impl ReChannel {
-}
+impl ReChannel {}

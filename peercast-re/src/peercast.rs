@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::OnceLock};
 
-use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
 use crate::{channel::ReChannel, config::Config, repository::ReChannelRepository};
+use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
 
 #[derive(Debug, Clone, Default)]
 pub struct Store {
@@ -13,7 +13,7 @@ pub struct Store {
 ////////////////////////////////////////////////////////////////////////////////
 // application initialize
 //
-pub fn app_init(config: &Config){
+pub fn app_init(config: &Config) {
     let self_session_id = libpeercast_re::pcp::GnuId::new();
     let self_socket = (config.server_address, config.server_port).into();
 
@@ -38,7 +38,7 @@ pub fn Repository() -> &'static ReChannelRepository<ReChannel> {
     _REPOSITORY.get().unwrap()
 }
 
-pub async fn task_runner(shutdown_token: tokio_util::sync::CancellationToken) -> anyhow::Result<()>{
+pub async fn task_runner(shutdown_token: tokio_util::sync::CancellationToken) -> anyhow::Result<()> {
     'accept: loop {
         tokio::select! {
             _ = shutdown_token.cancelled() => {
@@ -57,11 +57,10 @@ pub async fn serve_pcphttp(
     remote: SocketAddr,
     _graceful_shutdown: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
-    
-    let read_buf = bytes::BytesMut::new();
+    let _read_buf = bytes::BytesMut::new();
 
     // HandshakeFutureにすればよさそう
-    let handshake = PcpConnectionFactory().accept(cid, conn, remote);
+    let _handshake = PcpConnectionFactory().accept(cid, conn, remote);
 
     // let mut conn = match handshake.incoming(root_atom.into()).await {
     //     Err(e) => {
