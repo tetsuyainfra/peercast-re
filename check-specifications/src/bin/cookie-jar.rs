@@ -1,12 +1,11 @@
 use axum::{
-    http::StatusCode, response::{Html, IntoResponse, Redirect}, routing::{get, post}, Router
+    http::StatusCode, response::{Html, Redirect}, routing::{get, post}, Router
 };
 use axum_extra::{
     TypedHeader,
     extract::cookie::{Cookie, CookieJar},
     headers::authorization::{Authorization, Bearer},
 };
-use tracing_subscriber::fmt::format;
 
 #[tokio::main]
 async fn main() {

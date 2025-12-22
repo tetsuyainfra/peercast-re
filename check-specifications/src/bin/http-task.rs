@@ -1,12 +1,10 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
-use anyhow::anyhow;
 use axum::{Router, extract::ws::Message, routing};
 use futures_util::{SinkExt, StreamExt};
-use tokio::{net::TcpListener, signal, sync::watch};
+use tokio::signal;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tower_http::{
-    add_extension::AddExtensionLayer,
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
@@ -118,7 +116,7 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
 }
 
-async fn handle_socket(mut socket: axum::extract::ws::WebSocket, who: SocketAddr, shutdown: Arc<ShutdownState>) {
+async fn handle_socket(socket: axum::extract::ws::WebSocket, who: SocketAddr, shutdown: Arc<ShutdownState>) {
     let (mut sender, mut receiver) = socket.split();
 
     let graceful_token = shutdown.graceful.clone();

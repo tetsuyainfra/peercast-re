@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
 
-use clap_verbosity_flag::{ErrorLevel, Verbosity};
 
 /// Simple Daemon Program
 #[derive(Parser, Debug)]
