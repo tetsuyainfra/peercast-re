@@ -11,6 +11,9 @@ pub mod channels;
 #[derive(OpenApi)]
 #[openapi(
     paths(list_users, get_config),
+    nest(
+        (path = "/channels", api = channels::ApiChannels),
+    ),
     tags(
         (name = "v1", description = "API v1")
     )
