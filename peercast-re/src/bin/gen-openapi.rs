@@ -1,7 +1,6 @@
 use clap::Parser;
-use peercast_re::{handler::api};
+use peercast_re::handler;
 use utoipa::OpenApi;
-
 
 #[derive(Clone, Debug, Parser)]
 #[clap(
@@ -21,16 +20,15 @@ pub enum Commands {
 }
 
 fn main() {
-
     let args = Args::parse();
-    let api =     match args.command {
+    let api = match args.command {
         None => {
             // eprintln!("Please specify a command: v1 or v2");
             // std::process::exit(1);
-            api::ApiSetV1::openapi()
+            handler::ApiSetV1::openapi()
         }
-        Some(Commands::V1) => api::ApiSetV1::openapi(),
-        Some(Commands::V2) => api::ApiSetV2::openapi(),
+        Some(Commands::V1) => handler::ApiSetV1::openapi(),
+        Some(Commands::V2) => handler::ApiSetV2::openapi(),
     };
 
     // let api =api::ApiRoot::openapi();

@@ -223,7 +223,7 @@ async fn api_server(
 
     let router = if cfg!(debug_assertions) {
         info!("Swagger listening on http://{}{}", api_listener.local_addr().unwrap(), peercast_re::SWAGGER_PATH);
-        router.merge(handler::api::build_swagger())
+        router.merge(handler::build_swagger())
     } else {
         router
     };

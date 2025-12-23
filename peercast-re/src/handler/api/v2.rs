@@ -13,7 +13,7 @@ use crate::AppState;
         (name = "v2", description = "API v2")
     )
 )]
-pub(super) struct ApiV2;
+pub struct ApiV2;
 
 pub fn router() -> axum::Router<AppState> {
     axum::Router::new()
