@@ -215,11 +215,29 @@ async fn api_server(
     store: AppState,
     api_listener: tokio::net::TcpListener,
 ) -> anyhow::Result<ServerThread> {
+    use axum::extract::MatchedPath;
+    use axum::http::{HeaderMap, Request};
+    use axum::response::Response;
+    use bytes::Bytes;
+    use std::time::Duration;
+    use tower_http::{
+        classify::ServerErrorsFailureClass,
+        trace::TraceLayer,
+        trace::{DefaultMakeSpan, DefaultOnResponse},
+    };
+
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(DefaultMakeSpan::new().level(Level::INFO).include_headers(true))
+        .on_failure(DefaultOnFailure::new().level(Level::ERROR))
+        .on_response(DefaultOnResponse::new().level(Level::INFO).latency_unit(tower_http::LatencyUnit::Millis));
+
     let router = axum::Router::new()
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
         .nest("/ui", handler::ui::build_router())
         .nest("/api", handler::api::build_router())
         .merge(handler::peercast::router())
+        .fallback(async || http::StatusCode::NOT_FOUND) // ← これが重要
+        .layer(trace_layer)
         .with_state(store.clone());
 
     let router = if cfg!(debug_assertions) {
