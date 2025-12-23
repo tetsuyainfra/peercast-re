@@ -53,6 +53,7 @@ tower-http = { version = "*", features = [
 ] }
 hyper = { version = "*", features = ["full"] }
 hyper-util = { version = "*", features = ["full"] }
+http = { version = "*" }
 
 # API
 utoipa = { version = "5.4.0", features = ["axum_extras"] }
