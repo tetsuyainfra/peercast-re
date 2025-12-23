@@ -219,6 +219,7 @@ async fn api_server(
         .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
         .nest("/ui", handler::ui::build_router())
         .nest("/api", handler::api::build_router())
+        .merge(handler::peercast::router())
         .with_state(store.clone());
 
     let router = if cfg!(debug_assertions) {

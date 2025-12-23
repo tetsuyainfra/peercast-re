@@ -26,7 +26,9 @@ pub struct ReChannel {
 }
 
 #[derive(Clone, Debug)]
-pub struct ReConfig {}
+pub struct ReConfig {
+    pub tracker_ip: Option<SocketAddr>,
+}
 
 impl Channel for ReChannel {
     type Config = ReConfig;
