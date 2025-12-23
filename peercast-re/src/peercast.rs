@@ -1,7 +1,10 @@
 use std::{net::SocketAddr, sync::OnceLock};
 
 use crate::{channel::ReChannel, cli::Args, config::Config, repository::ReChannelRepository};
-use libpeercast_re::{ConnectionId, pcp::PcpConnectionFactory};
+use libpeercast_re::{
+    ConnectionId,
+    pcp::{GnuId, PcpConnectionFactory},
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // application initialize
@@ -14,7 +17,7 @@ pub fn app_init(args: &Args, config: &Config) {
     _REPOSITORY.get_or_init(|| ReChannelRepository::new(&self_session_id));
 
     if args.create_dummy {
-        let dummy_channel_id = libpeercast_re::pcp::GnuId::new();
+        let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
         let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
             name: "Dummy Channel".to_string(),
             url: "http://example.com".to_string(),
