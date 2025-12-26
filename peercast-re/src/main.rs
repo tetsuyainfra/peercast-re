@@ -222,13 +222,7 @@ async fn api_server(
     store: AppState,
     api_listener: tokio::net::TcpListener,
 ) -> anyhow::Result<ServerThread> {
-    use axum::extract::MatchedPath;
-    use axum::http::{HeaderMap, Request};
-    use axum::response::Response;
-    use bytes::Bytes;
-    use std::time::Duration;
     use tower_http::{
-        classify::ServerErrorsFailureClass,
         trace::TraceLayer,
         trace::{DefaultMakeSpan, DefaultOnResponse},
     };
