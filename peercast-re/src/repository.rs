@@ -83,23 +83,15 @@ where
             Ok(c) => c,
             Err(_) => todo!(),
         };
-        match channels.get(&id) {
-            Some(ch) => ch.clone(),
-            None => {
-                // channelが無かった場合
-                let channel = Channel::new(self.session_id, id, channel_info, track_info, config);
-                match channels.insert(id, channel) {
-                    Some(_old_ch) => panic!("ChannelManager have same GnuID. {:?}", &self.channels),
-                    None => {
-                        let ch = channels.get(&id).unwrap().clone();
-                        tracing::info!("created channels. {:?}", &ch);
-                        ch
-                    }
-                }
-            }
-        }
+        channels
+            .entry(id.clone())
+            .or_insert_with(|| {
+                let ch = C::new(self.session_id.clone(), id, channel_info, track_info, config);
+                tracing::info!("Created new channel: {:?}", ch);
+                ch
+            })
+            .clone()
     }
-
 
     pub fn get(&self, id: &GnuId) -> Option<C> {
         let channels = match self.channels.lock() {
@@ -270,4 +262,3 @@ where
     }
 }
 */
-
