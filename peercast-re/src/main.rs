@@ -227,6 +227,7 @@ async fn api_server(
         trace::{DefaultMakeSpan, DefaultOnResponse},
     };
 
+    // LOGの制御はtower_http::traceで行う
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(DefaultMakeSpan::new().level(Level::INFO).include_headers(true))
         .on_failure(DefaultOnFailure::new().level(Level::ERROR))
@@ -270,7 +271,6 @@ fn logging_init() {
     // use tracing_subscriber::layer::SubscriberExt;
 
     // subscriberの構築
-    /*
     let subscriber = tracing_subscriber::registry();
 
     // tokio-conosole を有効化
@@ -309,7 +309,8 @@ fn logging_init() {
     };
 
     subscriber.init();
-    */
 
-    tracing_subscriber::fmt::init();
+    /* どうやってもログが出ないときに試す
+    // tracing_subscriber::fmt::init();
+     */
 }
