@@ -2,8 +2,10 @@ use anyhow::Context;
 use axum::response::Redirect;
 use clap::Parser;
 use futures_util::FutureExt;
+use http::request;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
+use tower_http::trace::{DefaultOnEos, DefaultOnFailure};
 
 use peercast_re::{AppState, prelude::*};
 use peercast_re::{cli, config, handler, peercast};
@@ -23,7 +25,9 @@ async fn main() -> anyhow::Result<()> {
     peercast::app_init(&args, &config);
 
     match args.command {
-        Some(cli::Commands::Listen { url }) => {
+        Some(cli::Commands::Listen {
+            url,
+        }) => {
             // TODO: DELETE ME after implement internal API client
             info!("Starting LISTEN Request {}", url);
             tokio::spawn(async move {
@@ -49,7 +53,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create Store
-    let store = peercast_re::Store { config: config.clone(), config_path };
+    let store = peercast_re::Store {
+        config: config.clone(),
+        config_path,
+    };
     let store: AppState = std::sync::Arc::new(store);
 
     // Start Server Listeners
@@ -269,6 +276,7 @@ fn logging_init() {
     // use tracing_subscriber::layer::SubscriberExt;
 
     // subscriberの構築
+    /*
     let subscriber = tracing_subscriber::registry();
 
     // tokio-conosole を有効化
@@ -286,8 +294,12 @@ fn logging_init() {
     let subscriber = {
         // 環境変数ベースのフィルターレイヤー
         let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            println!("RUST_LOG=debug");
-            "debug".into()
+            // axum logs rejections from built-in extractors with the `axum::rejection`
+            // target, at `TRACE` level. `axum::rejection=trace` enables showing those events
+            // let logfilter = "debug";
+            let logfilter = format!("{}=debug,tower_http=debug,axum::rejection=trace", env!("CARGO_CRATE_NAME")).into();
+            println!("Default Log Filter: RUST_LOG={}", logfilter);
+            logfilter
         });
 
         // デフォルトのフォーマットレイヤー
@@ -303,4 +315,7 @@ fn logging_init() {
     };
 
     subscriber.init();
+    */
+
+    tracing_subscriber::fmt::init();
 }
