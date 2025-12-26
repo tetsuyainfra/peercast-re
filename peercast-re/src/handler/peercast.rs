@@ -76,9 +76,15 @@ async fn pls_handler(
     )
 }
 
-async fn stream_handler() -> &'static str {
-    // Placeholder implementation for PeerCast stream handling
-    "PeerCast Stream Handler"
+async fn stream_handler(Host(host): Host, Path(channel_id): Path<GnuId>) -> impl axum::response::IntoResponse {
+    let ch = Repository().get(&channel_id);
+    if ch.is_none() {
+        return (StatusCode::NOT_FOUND, [(http::header::CONTENT_TYPE, "text/plain")], "Channel not found");
+    }
+    let ch = ch.unwrap();
+
+    info!("Stream requested for channel {} from host {}", ch.id(), host);
+    (StatusCode::OK, [(http::header::CONTENT_TYPE, "video/x-flv")], "FLV stream would be here")
 }
 
 /*
