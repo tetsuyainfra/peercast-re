@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     net::SocketAddr,
     sync::{Arc, Mutex, RwLock},
 };
@@ -10,6 +11,9 @@ use libpeercast_re::{
 };
 
 use crate::repository::Channel;
+
+pub mod controller;
+pub mod stream;
 
 #[allow(unused)]
 #[derive(Clone, Debug)]
@@ -41,6 +45,10 @@ impl Channel for ReChannel {
         config: Option<Self::Config>,
     ) -> Self {
         let now_ = Utc::now();
+
+        // let (sender, reciever) = tokio::sync::mpsc::unbounded_channel();
+        // let controller = controller::ChannelController::new(channel_id);
+        // tokio::spawn(controller.run(reciever));
 
         Self {
             cid: channel_id,
@@ -80,5 +88,19 @@ impl ReChannel {
     }
     pub fn created_at(&self) -> DateTime<Utc> {
         self.created_at.as_ref().clone()
+    }
+}
+
+// 操作関係
+impl ReChannel {
+    // チャンネルにTrackerIPを通知する
+}
+
+// 視聴関係
+impl ReChannel {
+    pub fn channel_stream(&self) -> Result<stream::ReStream, std::io::Error> {
+        let stream = stream::ReStream::new(self.cid);
+
+        Ok(stream)
     }
 }

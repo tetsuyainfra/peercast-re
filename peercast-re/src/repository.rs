@@ -16,6 +16,7 @@ use libpeercast_re::{
 //
 pub trait Channel {
     type Config;
+
     fn new(
         self_session_id: GnuId,
         channel_id: GnuId,
@@ -23,6 +24,11 @@ pub trait Channel {
         track_info: Option<TrackInfo>,
         config: Option<Self::Config>,
     ) -> Self;
+
+    // fn before_new(&mut self) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+    fn before_new(&mut self) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> {
+        Box::pin(async {})
+    }
 
     fn last_update(&self) -> DateTime<Utc>;
 
@@ -46,7 +52,7 @@ enum DeleterMessage<C> {
 //
 impl<C> ReChannelRepository<C>
 where
-    C: Channel + Clone + Send + 'static + std::fmt::Debug,
+    C: Channel + Clone + Send + Sync + 'static + std::fmt::Debug,
 {
     /// 削除期限
     const DELETE_PERIOD_SEC: u64 = 300;
@@ -72,32 +78,35 @@ where
         self.session_id.clone()
     }
 
-    pub fn create_or_get(
+    // HACKME: async 取り除きたい
+    pub async fn create_or_get(
         &self,
         id: GnuId,
         channel_info: Option<ChannelInfo>,
         track_info: Option<TrackInfo>,
         config: Option<C::Config>,
     ) -> C {
-        let mut channels = match self.channels.lock() {
-            Ok(c) => c,
-            Err(_) => todo!(),
+        let (mut ch, is_init) = {
+            // MutexGuardはSendを持っていないので、このブロック内でDropさせる
+            let mut channels = self.channels.lock().unwrap_or_else(mutex_poisoned);
+            match channels.get(&id) {
+                Some(ch) => (ch.clone(), false),
+                None => {
+                    let ch = C::new(self.session_id.clone(), id.clone(), channel_info, track_info, config);
+                    tracing::info!("Created new channel: {:?}", ch);
+                    channels.insert(id.clone(), ch.clone());
+                    (ch, true)
+                }
+            }
         };
-        channels
-            .entry(id.clone())
-            .or_insert_with(|| {
-                let ch = C::new(self.session_id.clone(), id, channel_info, track_info, config);
-                tracing::info!("Created new channel: {:?}", ch);
-                ch
-            })
-            .clone()
+        if is_init {
+            ch.before_new().await;
+        }
+        ch
     }
 
     pub fn get(&self, id: &GnuId) -> Option<C> {
-        let channels = match self.channels.lock() {
-            Ok(c) => c,
-            Err(_) => todo!(),
-        };
+        let mut channels = self.channels.lock().unwrap_or_else(mutex_poisoned);
         match channels.get(id).clone() {
             Some(ch) => Some(ch.clone()),
             None => None,
@@ -120,6 +129,7 @@ where
             None => false,
         }
     }
+
     // ------------------------------------------------------------------------------
     // Misc functions
     //

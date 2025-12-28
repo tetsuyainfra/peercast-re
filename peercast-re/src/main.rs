@@ -1,7 +1,7 @@
 use anyhow::Context;
 use axum::response::Redirect;
 use clap::Parser;
-use futures_util::FutureExt;
+use futures::future::FutureExt;
 use http::request;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;

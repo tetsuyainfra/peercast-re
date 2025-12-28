@@ -1,8 +1,9 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use axum::{
+    body::Body,
     extract::{Path, Query, Request},
-    response::IntoResponse,
+    response::{self, IntoResponse},
     routing,
 };
 use axum_extra::extract::Host;
@@ -59,14 +60,16 @@ async fn pls_handler(
 ) -> impl axum::response::IntoResponse {
     info!("Request Host: {}", host);
     // requestからhostをとりだす
-    let ch = Repository().create_or_get(
-        channel_id,
-        None,
-        None,
-        Some(ReConfig {
-            tracker_ip: params.tip,
-        }),
-    );
+    let ch = Repository()
+        .create_or_get(
+            channel_id,
+            None,
+            None,
+            Some(ReConfig {
+                tracker_ip: params.tip,
+            }),
+        )
+        .await;
 
     (
         //
@@ -76,15 +79,32 @@ async fn pls_handler(
     )
 }
 
-async fn stream_handler(Host(host): Host, Path(channel_id): Path<GnuId>) -> impl axum::response::IntoResponse {
+async fn stream_handler(
+    Host(_host): Host,
+    Path(channel_id): Path<GnuId>,
+) -> Result<axum::response::Response, StatusCode> {
+    info!("Stream requested for channel {}", channel_id);
     let ch = Repository().get(&channel_id);
-    if ch.is_none() {
-        return (StatusCode::NOT_FOUND, [(http::header::CONTENT_TYPE, "text/plain")], "Channel not found");
-    }
-    let ch = ch.unwrap();
+    let ch = ch.ok_or_else(|| StatusCode::NOT_FOUND)?;
 
-    info!("Stream requested for channel {} from host {}", ch.id(), host);
-    (StatusCode::OK, [(http::header::CONTENT_TYPE, "video/x-flv")], "FLV stream would be here")
+    //
+    let stream = ch.channel_stream().map_err(|e| {
+        error!("Failed to get channel stream for channel {}, {:?}", channel_id, e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // ストリームをHTTPのボディにラップ
+    let body = Body::from_stream(stream);
+
+    let response = response::Response::builder()
+        .status(StatusCode::OK)
+        // TODO: チャンネルの種類に応じてContent-Typeを変える
+        .header(http::header::CONTENT_TYPE, "video/x-flv")
+        .body(body)
+        .unwrap();
+
+    debug!("Stream response create success for channel {}", channel_id);
+    Ok(response)
 }
 
 /*
