@@ -27,9 +27,7 @@ tracing-test = "*"
 log = "*"
 
 # Async Thread
-futures-util = { version = "*", default-features = false, features = [
-    "alloc",
-] }
+futures = "0.3"
 # tokio -> [target.'cfg(target_os = XXX)'.dependencies]
 tokio = { version = "*", features = ["full", "tracing", "net"] }
 tokio-stream = { version = "*" }
