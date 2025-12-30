@@ -111,3 +111,9 @@ embed-resource = "3.0.1"
 [dev-dependencies]
 # 主にテストで使う
 assert_cmd = { version = "2.1.1" }
+# benchmark
+criterion  = { version = "0.8.1" }
+
+[[bench]]
+name = "channel_struct_clone"
+harness = false
