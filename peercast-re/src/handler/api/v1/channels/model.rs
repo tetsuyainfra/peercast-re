@@ -4,7 +4,7 @@ use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
 use serde::Serialize;
 use utoipa::OpenApi;
 
-use crate::{AppState, channel::ReChannel, peercast::Repository, prelude::*};
+use crate::{AppState, channel::ReChannel, prelude::*, repository::Channel};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Response structs
@@ -46,7 +46,17 @@ pub struct JsonTrack {
 
 impl From<&ReChannel> for JsonChannel {
     fn from(ch: &ReChannel) -> Self {
-        let ChannelInfo { typ, name, genre, desc, comment, url, stream_type, stream_ext, bitrate } = ch.channel_info();
+        let ChannelInfo {
+            typ,
+            name,
+            genre,
+            desc,
+            comment,
+            url,
+            stream_type,
+            stream_ext,
+            bitrate,
+        } = ch.channel_info();
 
         JsonChannel {
             id: ch.id(),
@@ -70,6 +80,12 @@ impl From<&ReChannel> for JsonChannel {
 
 impl From<TrackInfo> for JsonTrack {
     fn from(t: TrackInfo) -> Self {
-        JsonTrack { title: t.title, creator: t.creator, url: t.url, album: t.album, genre: t.genre }
+        JsonTrack {
+            title: t.title,
+            creator: t.creator,
+            url: t.url,
+            album: t.album,
+            genre: t.genre,
+        }
     }
 }

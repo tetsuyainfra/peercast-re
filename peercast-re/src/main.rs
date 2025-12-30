@@ -2,10 +2,9 @@ use anyhow::Context;
 use axum::response::Redirect;
 use clap::Parser;
 use futures::future::FutureExt;
-use http::request;
 use libpeercast_re::ConnectionId;
 use std::net::SocketAddr;
-use tower_http::trace::{DefaultOnEos, DefaultOnFailure};
+use tower_http::trace::DefaultOnFailure;
 
 use peercast_re::{AppState, prelude::*};
 use peercast_re::{cli, config, handler, peercast};
@@ -22,7 +21,7 @@ async fn main() -> anyhow::Result<()> {
 
     let (config, config_path) = config::load_config(args.clone()).context("Failed to Load configuration")?;
 
-    peercast::app_init(&args, &config);
+    // peercast::app_init(&args, &config);
 
     match args.command {
         Some(cli::Commands::Listen {
@@ -52,13 +51,6 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    // Create Store
-    let store = peercast_re::Store {
-        config: config.clone(),
-        config_path,
-    };
-    let store: AppState = std::sync::Arc::new(store);
-
     // Start Server Listeners
     let svr_addr = SocketAddr::from((config.server_address, config.server_port));
     let svr_listener = tokio::net::TcpListener::bind(svr_addr)
@@ -75,8 +67,18 @@ async fn main() -> anyhow::Result<()> {
 
     // Start Server Tasks
     let shutdown_token = tokio_util::sync::CancellationToken::new();
+
+    // Create Store
+    let (peercast, peercast_api) = peercast::PeCaServer::new(config.clone());
+    let store = peercast_re::State {
+        config: config.clone(),
+        config_path,
+        peercast: peercast_api,
+    };
+    let store: AppState = std::sync::Arc::new(store);
+
     let mut set = tokio::task::JoinSet::new();
-    set.spawn(peercast::task_runner(shutdown_token.child_token()).then(|r| async {
+    set.spawn(peercast.start(shutdown_token.child_token()).then(|r| async {
         match r {
             Ok(_) => Ok(ServerThread::PeerCastTask),
             Err(e) => Err(e),
@@ -91,6 +93,10 @@ async fn main() -> anyhow::Result<()> {
         shutdown_token.cancel();
         info!("Shutdown signal sent");
         Ok(ServerThread::ShutdownNotifier)
+    });
+
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     });
 
     while let Some(res) = set.join_next().await {

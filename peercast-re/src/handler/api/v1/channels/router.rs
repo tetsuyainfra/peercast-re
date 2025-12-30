@@ -9,7 +9,6 @@ use utoipa::OpenApi;
 
 use super::{JsonChannel, JsonTrack};
 use crate::AppState;
-use crate::peercast::Repository;
 use crate::prelude::*; // for instrument
 
 #[derive(OpenApi)]
@@ -39,10 +38,11 @@ pub fn router() -> axum::Router<AppState> {
 )]
 #[instrument(skip(_store))]
 async fn list_channels(State(_store): State<AppState>) -> impl axum::response::IntoResponse {
-    let channels = Repository().get_channels();
+    // let channels = Repository().get_channels();
 
-    let json_channels: Vec<JsonChannel> = channels.iter().map(|ch| JsonChannel::from(ch)).collect();
-    axum::Json(json_channels)
+    // let json_channels: Vec<JsonChannel> = channels.iter().map(|ch| JsonChannel::from(ch)).collect();
+    // axum::Json(json_channels)
+    ""
 }
 
 #[utoipa::path(
@@ -76,13 +76,14 @@ async fn show_channel(State(_store): State<AppState>, Path(path): Path<String>) 
         Err(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid channel id"}))),
     };
 
-    match Repository().get(&channel_id) {
-        Some(ch) => {
-            let json_channel: JsonChannel = JsonChannel::from(&ch);
-            return (StatusCode::OK, Json(json!(json_channel)));
-        }
-        None => return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"}))),
-    };
+    // match Repository().get(&channel_id) {
+    //     Some(ch) => {
+    //         let json_channel: JsonChannel = JsonChannel::from(&ch);
+    //         return (StatusCode::OK, Json(json!(json_channel)));
+    //     }
+    //     None => return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"}))),
+    // };
+    (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"})))
 }
 
 #[utoipa::path(

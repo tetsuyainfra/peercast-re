@@ -20,6 +20,7 @@ const CONFIG_NAME: &str = "Settings.toml";
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
+    pub create_dummy: bool,
     pub ipc_path: String,
     pub server_address: IpAddr,
     pub server_port: u16,
@@ -29,6 +30,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            create_dummy: false,
             ipc_path: DEFAULT_IPC_PATH.into(),
             server_address: DEFAULT_SERVER_BIND,
             server_port: DEFAULT_SERVER_PORT,
@@ -115,7 +117,7 @@ impl Config {
             server_port,
             api_address,
             api_port,
-            create_dummy: _create_dummy,
+            create_dummy,
             command: _command,
         } = args;
 
@@ -131,6 +133,7 @@ impl Config {
         if let Some(port) = api_port {
             self.api_port = port.clone();
         }
+        self.create_dummy = *create_dummy;
         self
     }
 }

@@ -11,12 +11,12 @@ use http::StatusCode;
 use libpeercast_re::pcp::GnuId;
 use serde::Deserialize;
 
-use crate::{AppState, channel::ReConfig, peercast::Repository, prelude::*};
+use crate::{AppState, channel::ReConfig, prelude::*};
 
 pub fn router() -> axum::Router<AppState> {
     axum::Router::new()
-        .route("/pls/{channel_id}", routing::get(pls_handler))
-        .route("/stream/{channel_id}", routing::get(stream_handler))
+    // .route("/pls/{channel_id}", routing::get(pls_handler))
+    // .route("/stream/{channel_id}", routing::get(stream_handler))
     // TODO: /admin?cmd=viewxmlの実装
     // .route("/admin", routing::get(admin_handler))
     // ほかにもありそう
@@ -50,6 +50,7 @@ where
     }
 }
 
+/*
 ////////////////////////////////////////////////////////////////////
 // Handlers for PeerCast requests
 //
@@ -78,7 +79,6 @@ async fn pls_handler(
         create_m3u_playlist(&host, ch.id()),
     )
 }
-
 async fn stream_handler(
     Host(_host): Host,
     Path(channel_id): Path<GnuId>,
@@ -105,7 +105,7 @@ async fn stream_handler(
 
     debug!("Stream response create success for channel {}", channel_id);
     Ok(response)
-}
+} */
 
 /*
 async fn admin_handler(Query(_params): Query<AdminParams>) -> impl axum::response::IntoResponse {

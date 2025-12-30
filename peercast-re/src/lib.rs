@@ -1,3 +1,5 @@
+use crate::channel::ReChannel;
+
 pub mod channel;
 pub mod cli;
 pub mod config;
@@ -9,11 +11,12 @@ pub mod prelude;
 
 pub const SWAGGER_PATH: &str = "/swagger-ui";
 
-#[derive(Debug, Clone, Default)]
-pub struct Store {
+#[derive(Debug, Clone)]
+pub struct State {
     #[allow(dead_code)]
     pub config: crate::config::Config, // #[allow(dead_code)]
     pub config_path: std::path::PathBuf,
+    pub peercast: peercast::PeCaServerAPI<ReChannel>,
 }
 
-pub type AppState = std::sync::Arc<Store>;
+pub type AppState = std::sync::Arc<State>;
