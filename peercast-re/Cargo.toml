@@ -117,3 +117,7 @@ criterion  = { version = "0.8.1" }
 [[bench]]
 name = "channel_struct_clone"
 harness = false
+
+[[bench]]
+name = "mutex_or_channel"
+harness = false
