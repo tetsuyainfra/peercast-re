@@ -16,7 +16,7 @@ pub struct State {
     #[allow(dead_code)]
     pub config: crate::config::Config, // #[allow(dead_code)]
     pub config_path: std::path::PathBuf,
-    pub peercast: peercast::PeCaServerAPI<ReChannel>,
+    pub repository: repository::ReChannelRepository<ReChannel>,
 }
 
 pub type AppState = std::sync::Arc<State>;

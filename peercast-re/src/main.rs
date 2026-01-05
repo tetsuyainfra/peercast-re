@@ -3,7 +3,9 @@ use axum::response::Redirect;
 use clap::Parser;
 use futures::future::FutureExt;
 use libpeercast_re::ConnectionId;
+use libpeercast_re::pcp::GnuId;
 use std::net::SocketAddr;
+use std::str::FromStr;
 use tower_http::trace::DefaultOnFailure;
 
 use peercast_re::{AppState, prelude::*};
@@ -74,36 +76,57 @@ async fn main() -> anyhow::Result<()> {
     let shutdown_token = tokio_util::sync::CancellationToken::new();
 
     // Create Store
-    let (peercast, peercast_api) = peercast::PeCaServer::new(config.clone());
+    let repository = peercast::init(config.clone()).await;
     let store = peercast_re::State {
         config: config.clone(),
         config_path,
-        peercast: peercast_api,
+        repository: repository,
     };
     let store: AppState = std::sync::Arc::new(store);
 
-    let mut set = tokio::task::JoinSet::new();
-    set.spawn(peercast.start(shutdown_token.child_token()).then(|r| async {
-        match r {
-            Ok(_) => Ok(ServerThread::PeerCastTask),
-            Err(e) => Err(e),
-        }
-    }));
-    set.spawn(peercast_server(shutdown_token.child_token(), store.clone(), svr_listener));
-    set.spawn(api_server(shutdown_token.child_token(), store.clone(), api_listener));
+    // let tb = tokio::task::Builder::new();
+    // let tt = tokio_util::task::TaskTracker::new();
+    // tt.spawn(peercast_server(shutdown_token.child_token(), store.clone(), svr_listener));
+    // tt.spawn(api_server(shutdown_token.child_token(), store.clone(), api_listener));
+    // tt.spawn(async move {
+    //     tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c signal");
+    //     shutdown_token.cancel();
+    //     info!("Shutdown signal sent");
+    //     Ok::<_, anyhow::Error>(ServerThread::ShutdownNotifier)
+    // });
 
+    // tt.close();
+    // tt.wait().await;
+
+    let mut set = tokio::task::JoinSet::new();
+    // set.spawn(peercast.start(shutdown_token.child_token()).then(|r| async {
+    //     match r {
+    //         Ok(_) => Ok(ServerThread::PeerCastTask),
+    //         Err(e) => Err(e),
+    //     }
+    // }));
+    set.build_task().name("PCP Listen").spawn(peercast_server(
+        shutdown_token.child_token(),
+        store.clone(),
+        svr_listener,
+    ))?;
+    set.build_task().name("API Listen").spawn(api_server(shutdown_token.child_token(), store.clone(), api_listener))?;
     // shutdown notifier
-    set.spawn(async move {
+    set.build_task().name("Shutdown Notifier").spawn(async move {
         tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c signal");
         shutdown_token.cancel();
         info!("Shutdown signal sent");
         Ok(ServerThread::ShutdownNotifier)
-    });
-
-    tokio::spawn(async {
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    });
-
+    })?;
+    set.build_task().name("Init time Temporary Task").spawn(async move {
+        let ch = store.repository.get(&GnuId::from_str("00000000000000000123456789ABCDEF").unwrap());
+        if let Some(ch) = ch {
+            println!("Adding dummy source stream to dummy channel");
+            let _ = ch.add_source_stream("rtmp://example.com/live/stream").await;
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        Ok(ServerThread::Temporary)
+    })?;
     while let Some(res) = set.join_next().await {
         let r = res.context("A server thread has panicked")?;
         info!("A server thread has shut down : {:?}", r);
@@ -119,6 +142,7 @@ enum ServerThread {
     PeerCastTask,
     Api,
     ShutdownNotifier,
+    Temporary,
 }
 
 ////////////////////////////////////////////////////////////////////////////////

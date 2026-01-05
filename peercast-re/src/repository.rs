@@ -25,7 +25,7 @@ pub trait Channel {
         config: Option<Self::Config>,
     ) -> Self;
 
-    // 本来ならこれ後悔したくないよねぇ
+    // 本来ならこれ公開したくないよねぇ
     fn _start_channel_manager(&mut self) -> impl std::future::Future<Output = ()> + Send + '_ {
         async move {
             unimplemented!("you should implement start method in your Channel Procdureure");
@@ -39,13 +39,22 @@ pub trait Channel {
     fn id(&self) -> GnuId;
 }
 
+#[derive(Debug)]
 pub struct ReChannelRepository<C> {
-    impl_: Arc<ImplRepository<C>>,
+    impl_: Arc<Mutex<ImplRepository<C>>>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // ReChannelRepository
 //
+impl<C> Clone for ReChannelRepository<C> {
+    fn clone(&self) -> Self {
+        Self {
+            impl_: Arc::clone(&self.impl_),
+        }
+    }
+}
+
 impl<C> ReChannelRepository<C>
 where
     C: Channel + Clone + Send + Sync + 'static + std::fmt::Debug,
@@ -56,18 +65,36 @@ where
     const DELETE_CHECK_INTERVAL_SEC: u64 = 60;
 
     pub fn new(session_id: &GnuId) -> Self {
-        let impl_ = Arc::new(ImplRepository::new(session_id, Self::DELETE_PERIOD_SEC, Self::DELETE_CHECK_INTERVAL_SEC));
+        let impl_ = Arc::new(Mutex::new(ImplRepository::new(
+            session_id,
+            Self::DELETE_PERIOD_SEC,
+            Self::DELETE_CHECK_INTERVAL_SEC,
+        )));
 
         Self {
             impl_,
         }
     }
 
-    pub fn session_id(&self) -> GnuId {
-        self.impl_.session_id.clone()
+    #[inline]
+    fn lock_impl(&self) -> std::sync::MutexGuard<'_, ImplRepository<C>> {
+        self.impl_.lock().unwrap_or_else(mutex_poisoned)
     }
 
-    // HACKME: async 取り除きたい
+    #[inline]
+    fn with_impl<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut ImplRepository<C>) -> R,
+    {
+        let mut guard = self.impl_.lock().unwrap_or_else(mutex_poisoned);
+        f(&mut *guard)
+    }
+
+    pub fn session_id(&self) -> GnuId {
+        self.lock_impl().session_id()
+    }
+
+    // HACKME: async 取り除きたいが・・・
     pub async fn create_or_get(
         &self,
         id: GnuId,
@@ -75,7 +102,13 @@ where
         track_info: Option<TrackInfo>,
         config: Option<C::Config>,
     ) -> C {
-        let (mut ch, is_init) = self.impl_.create_or_get(id, channel_info, track_info, config);
+        let (mut ch, is_init) = self.with_impl(|s| s.create_or_get(id, channel_info, track_info, config));
+        // HACKME: ここで呼び出し順序の問題が発生する可能性あり
+        // 二つのスレッドから同時にこれを呼び出してChannelを利用した場合、ChannelManagerがstartされてない可能性が残る
+        // -> 完全に防ぐにはChannelRepository側でChannelの生成とstartを管理する必要があるが、
+        //    tokio::sync::Mutexはコスト高いらしいので避けたい
+        // -> 現状はChannelが持つChannelManagerへのSenderがUnboundedChannelなので、
+        //    startされてなくてもメッセージ送信自体は可能なのでOKとする
         if is_init {
             ch._start_channel_manager().await;
         }
@@ -83,36 +116,22 @@ where
     }
 
     pub fn get(&self, id: &GnuId) -> Option<C> {
-        self.impl_.get(id)
+        self.with_impl(|s| s.get(id))
     }
 
     pub fn get_channels(&self) -> Vec<C> {
-        self.impl_.get_channels()
+        self.with_impl(|s| s.get_channels())
     }
 
     pub fn delete(&mut self, id: &GnuId) -> bool {
-        self.impl_.delete(id)
-    }
-
-    // ------------------------------------------------------------------------------
-    // Misc functions
-    //
-    // pub fn channels_map(&self, func: fn(channels: &HashMap<GnuId, C>)) {
-    //     // let mut lock = self.channels.lock().unwrap();
-    //     func(&(self.channels));
-    // }
-
-    pub fn map_collect<F, R>(&self, func: F) -> Vec<R>
-    where
-        F: FnMut((&GnuId, &C)) -> R,
-    {
-        self.impl_.map_collect(func)
+        self.with_impl(|s| s.delete(id))
     }
 }
 
+#[derive(Debug)]
 struct ImplRepository<C> {
     session_id: GnuId,
-    channels: Mutex<HashMap<GnuId, C>>,
+    channels: HashMap<GnuId, C>,
     delete_period_secs: u64,
     delete_check_interval_secs: u64,
 }
@@ -129,38 +148,42 @@ where
             delete_check_interval_secs,
         }
     }
+
+    fn session_id(&self) -> GnuId {
+        self.session_id.clone()
+    }
+
     fn create_or_get(
-        &self,
+        &mut self,
         id: GnuId,
         channel_info: Option<ChannelInfo>,
         track_info: Option<TrackInfo>,
         config: Option<C::Config>,
     ) -> (C, bool) {
-        let mut channels = self.channels.lock().unwrap_or_else(mutex_poisoned);
-        match channels.get(&id) {
+        match self.channels.get(&id) {
             Some(ch) => (ch.clone(), false),
             None => {
                 let ch = C::new(self.session_id.clone(), id.clone(), channel_info, track_info, config);
                 tracing::info!("Created new channel: {:?}", ch);
-                channels.insert(id.clone(), ch.clone());
+                self.channels.insert(id.clone(), ch.clone());
                 (ch, true)
             }
         }
     }
 
     fn get(&self, id: &GnuId) -> Option<C> {
-        match self.channels.lock().unwrap_or_else(mutex_poisoned).get(&id) {
+        match self.channels.get(&id) {
             Some(ch) => Some(ch.clone()),
             None => None,
         }
     }
 
     fn get_channels(&self) -> Vec<C> {
-        self.channels.lock().unwrap_or_else(mutex_poisoned).iter().map(|(_id, ch)| ch.clone()).collect()
+        self.channels.iter().map(|(_id, ch)| ch.clone()).collect()
     }
 
-    fn delete(&self, id: &GnuId) -> bool {
-        match self.channels.lock().unwrap_or_else(mutex_poisoned).remove(&id) {
+    fn delete(&mut self, id: &GnuId) -> bool {
+        match self.channels.remove(&id) {
             Some(mut ch) => {
                 ch.before_delete();
                 drop(ch);
@@ -168,14 +191,6 @@ where
             }
             None => false,
         }
-    }
-
-    fn map_collect<F, R>(&self, func: F) -> Vec<R>
-    where
-        F: FnMut((&GnuId, &C)) -> R,
-    {
-        // let channels = self.channels.lock().unwrap_or_else(mutex_poisoned);
-        self.channels.lock().unwrap_or_else(mutex_poisoned).iter().map(func).collect()
     }
 }
 

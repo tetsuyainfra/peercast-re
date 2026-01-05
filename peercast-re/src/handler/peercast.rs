@@ -2,7 +2,7 @@ use std::{net::SocketAddr, str::FromStr};
 
 use axum::{
     body::Body,
-    extract::{Path, Query, Request},
+    extract::{Path, Query, Request, State},
     response::{self, IntoResponse},
     routing,
 };
@@ -11,12 +11,12 @@ use http::StatusCode;
 use libpeercast_re::pcp::GnuId;
 use serde::Deserialize;
 
-use crate::{AppState, channel::ReConfig, prelude::*};
+use crate::{AppState, channel::ReConfig, prelude::*, repository::Channel};
 
 pub fn router() -> axum::Router<AppState> {
     axum::Router::new()
-    // .route("/pls/{channel_id}", routing::get(pls_handler))
-    // .route("/stream/{channel_id}", routing::get(stream_handler))
+        .route("/pls/{channel_id}", routing::get(pls_handler))
+        .route("/stream/{channel_id}", routing::get(stream_handler))
     // TODO: /admin?cmd=viewxmlの実装
     // .route("/admin", routing::get(admin_handler))
     // ほかにもありそう
@@ -50,7 +50,6 @@ where
     }
 }
 
-/*
 ////////////////////////////////////////////////////////////////////
 // Handlers for PeerCast requests
 //
@@ -58,10 +57,12 @@ async fn pls_handler(
     Host(host): Host,
     Path(channel_id): Path<GnuId>,
     Query(params): Query<PlsParams>,
+    State(state): State<AppState>,
 ) -> impl axum::response::IntoResponse {
     info!("Request Host: {}", host);
     // requestからhostをとりだす
-    let ch = Repository()
+    let ch = state
+        .repository
         .create_or_get(
             channel_id,
             None,
@@ -82,13 +83,14 @@ async fn pls_handler(
 async fn stream_handler(
     Host(_host): Host,
     Path(channel_id): Path<GnuId>,
+    State(state): State<AppState>,
 ) -> Result<axum::response::Response, StatusCode> {
     info!("Stream requested for channel {}", channel_id);
-    let ch = Repository().get(&channel_id);
+    let ch = state.repository.get(&channel_id);
     let ch = ch.ok_or_else(|| StatusCode::NOT_FOUND)?;
 
     //
-    let stream = ch.channel_stream().map_err(|e| {
+    let stream = ch.channel_stream().await.map_err(|e| {
         error!("Failed to get channel stream for channel {}, {:?}", channel_id, e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
@@ -105,7 +107,7 @@ async fn stream_handler(
 
     debug!("Stream response create success for channel {}", channel_id);
     Ok(response)
-} */
+}
 
 /*
 async fn admin_handler(Query(_params): Query<AdminParams>) -> impl axum::response::IntoResponse {

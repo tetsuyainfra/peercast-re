@@ -1,26 +1,39 @@
 use std::{
     net::SocketAddr,
-    sync::{Arc, Mutex, RwLock},
+    pin::Pin,
+    sync::{Arc, Mutex},
 };
 
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo},
-    util::{mutex_poisoned, rwlock_read_poisoned},
+    util::mutex_poisoned,
 };
 
 use crate::prelude::*;
 use crate::repository::Channel;
 
+mod manager;
+mod stream;
+
 #[allow(unused)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ReChannel {
-    impl_: Arc<ImplRechannel>,
+    impl_: Arc<Mutex<ImplRechannel>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ReConfig {
     pub tracker_ip: Option<SocketAddr>,
+}
+
+impl Clone for ReChannel {
+    fn clone(&self) -> Self {
+        Self {
+            impl_: Arc::clone(&self.impl_),
+        }
+    }
 }
 
 impl Channel for ReChannel {
@@ -35,21 +48,24 @@ impl Channel for ReChannel {
     ) -> Self {
         let impl_ = ImplRechannel::new(self_session_id, channel_id, channel_info, track_info, config);
         Self {
-            impl_: Arc::new(impl_),
+            impl_: Arc::new(Mutex::new(impl_)),
         }
     }
 
     fn _start_channel_manager(&mut self) -> impl std::future::Future<Output = ()> + Send + '_ {
-        let cid = self.impl_.cid.clone();
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        self.impl_.sender.lock().unwrap_or_else(mutex_poisoned).replace(tx);
+        {
+            let re_channel = Clone::clone(self);
+            let old_manager_status = self.with_impl(|s| std::mem::replace(&mut s.manager_status, ChMgrStatus::Running));
 
-        async move {
-            let _ = tokio::spawn(async move {
-                info!("Starting Channel Manager: {:?}", cid);
-                let r = rx.recv().await;
-                info!("Stopping Channel Manager: {:?} {:?}", cid, r);
-            });
+            if let ChMgrStatus::Standby(rx) = old_manager_status {
+                let channel_manager = manager::ChannelManager::new(rx);
+                return async {
+                    let name = format!("ChManager-{}", re_channel.id());
+                    let _ = tokio::task::Builder::new().name(&name).spawn(channel_manager.start(re_channel));
+                };
+            } else {
+                unreachable!("Channel Manager status corrupted");
+            }
         }
     }
 
@@ -58,52 +74,81 @@ impl Channel for ReChannel {
     }
 
     fn id(&self) -> GnuId {
-        self.impl_.cid.clone()
+        self.with_impl(|s| s.cid)
     }
 }
 
 impl ReChannel {
+    #[inline]
+    fn with_impl<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut ImplRechannel) -> R,
+    {
+        let mut guard = self.impl_.lock().unwrap_or_else(mutex_poisoned);
+        f(&mut *guard)
+    }
+
     pub fn channel_info(&self) -> ChannelInfo {
-        self.impl_.channel_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
+        self.with_impl(|s| s.channel_info.clone())
     }
     pub fn track_info(&self) -> TrackInfo {
-        self.impl_.track_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
+        self.with_impl(|s| s.track_info.clone())
     }
 
     pub fn number_of_listener(&self) -> i32 {
-        self.impl_.number_of_listener.read().unwrap_or_else(rwlock_read_poisoned).clone()
+        self.with_impl(|s| s.number_of_listener.clone())
     }
     pub fn number_of_relay(&self) -> i32 {
-        self.impl_.number_of_relay.read().unwrap_or_else(rwlock_read_poisoned).clone()
+        self.with_impl(|s| s.number_of_relay.clone())
     }
     pub fn created_at(&self) -> DateTime<Utc> {
-        self.impl_.created_at.as_ref().clone()
+        self.with_impl(|s| s.created_at.clone())
     }
 
     // 操作関係
     // チャンネルにTrackerIPを通知する
+    pub async fn notify_tracker_ip(&self, tracker_ip: SocketAddr) -> anyhow::Result<()> {
+        unimplemented!()
+    }
+
+    // ソースストリームを追加する
+    pub async fn add_source_stream(&self, src_addr: &str) -> anyhow::Result<()> {
+        let _ = self
+            .with_impl(|s| s.add_source_stream(src_addr))
+            .with_context(|| format!("Failed to add source stream cid: {}", self.id()))?;
+        Ok(())
+    }
 
     // 視聴関係
-    // pub fn channel_stream(&self) -> Result<stream::ReStream, std::io::Error> {
-    //     let stream = stream::ReStream::new(self.cid);
+    pub async fn channel_stream(&self) -> anyhow::Result<stream::ReStream> {
+        let r = self.with_impl(|s| s.create_stream())?;
+        let x = r.await;
 
-    //     Ok(stream)
-    // }
+        Ok(x)
+    }
 }
 
 #[derive(Debug)]
 struct ImplRechannel {
     cid: GnuId,
-    channel_info: Arc<RwLock<ChannelInfo>>,
-    track_info: Arc<RwLock<TrackInfo>>,
-    number_of_listener: Arc<RwLock<i32>>,
-    number_of_relay: Arc<RwLock<i32>>,
-    last_update: Arc<Mutex<DateTime<Utc>>>,
-    created_at: Arc<DateTime<Utc>>,
+    channel_info: ChannelInfo,
+    track_info: TrackInfo,
+    number_of_listener: i32,
+    number_of_relay: i32,
+    last_update: DateTime<Utc>,
+    created_at: DateTime<Utc>,
     config: Option<ReConfig>,
     self_session_id: GnuId,
 
-    sender: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<()>>>>,
+    // Channel Manager関連
+    sender: manager::ChannelManagerSender,
+    manager_status: ChMgrStatus,
+}
+
+#[derive(Debug)]
+enum ChMgrStatus {
+    Standby(tokio::sync::mpsc::UnboundedReceiver<manager::Message>),
+    Running,
 }
 
 impl ImplRechannel {
@@ -114,19 +159,48 @@ impl ImplRechannel {
         track_info: Option<TrackInfo>,
         config: Option<ReConfig>,
     ) -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+
         Self {
             cid: channel_id,
-            channel_info: RwLock::new(channel_info.unwrap_or_default()).into(),
-            track_info: RwLock::new(track_info.unwrap_or_default()).into(),
-            number_of_listener: RwLock::new(0).into(),
-            number_of_relay: RwLock::new(0).into(),
-            last_update: Arc::new(Mutex::new(Utc::now())),
-            created_at: Arc::new(Utc::now()),
+            channel_info: channel_info.unwrap_or_default(),
+            track_info: track_info.unwrap_or_default(),
+            number_of_listener: 0,
+            number_of_relay: 0,
+            last_update: Utc::now(),
+            created_at: Utc::now(),
             config,
             self_session_id,
-            sender: Arc::new(Mutex::new(None)),
+            // Channel Manager関連
+            sender: tx,
+            manager_status: ChMgrStatus::Standby(rx),
         }
     }
-}
 
-struct ChannelManager {}
+    fn add_source_stream(&self, src_addr: &str) -> anyhow::Result<()> {
+        let _ = self
+            .sender
+            .send(manager::Message::AddSourceStream(src_addr.to_string()))
+            .with_context(|| format!("Failed send AddSourceStream message cid: {}", self.cid))?;
+        Ok(())
+    }
+
+    fn create_stream(
+        &self,
+    ) -> anyhow::Result<Pin<Box<dyn std::future::Future<Output = stream::ReStream> + Send + 'static>>> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let _ = self
+            .sender
+            .send(manager::Message::AddSubscriber(tx))
+            .with_context(|| format!("Failed send AddSubscriber message cid: {}", self.cid))?;
+
+        let cid = self.cid;
+        Ok(Box::pin(async move {
+            let watcher = rx.await;
+            debug!("Watcher received for cid: {}", cid);
+
+            let stream = stream::ReStream::new(cid).await;
+            stream
+        }))
+    }
+}

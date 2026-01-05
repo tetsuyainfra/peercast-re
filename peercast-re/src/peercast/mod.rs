@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::OnceLock};
 
 use libpeercast_re::{ConnectionId, pcp::GnuId};
 use tokio::sync::{
@@ -6,172 +6,40 @@ use tokio::sync::{
     oneshot,
 };
 
-use crate::config::Config;
 use crate::repository::{Channel, ReChannelRepository};
+use crate::{channel::ReChannel, config::Config};
 
-pub enum ConnectionMessage<C: Channel> {
-    NewConnection(ConnectionId, tokio::net::TcpStream, SocketAddr, GnuId),
-    GetChannels(oneshot::Sender<Vec<C>>),
-    GetOrCreateChannel {
-        channel_id: GnuId,
-        channel_info: Option<libpeercast_re::pcp::ChannelInfo>,
-        track_info: Option<libpeercast_re::pcp::TrackInfo>,
-        config: Option<C::Config>,
-        responder: oneshot::Sender<C>,
-    },
-    GetStream {
-        channel_id: GnuId,
-        responder: GnuId,
-    },
-}
+static REPOSITORY: OnceLock<ReChannelRepository<ReChannel>> = OnceLock::new();
+pub async fn init(config: Config) -> ReChannelRepository<ReChannel> {
+    let self_session_id = GnuId::new();
+    let repo = REPOSITORY.get_or_init(|| ReChannelRepository::new(&self_session_id)).clone();
 
-#[derive(Debug, Clone)]
-pub struct PeCaServerAPI<C: Channel> {
-    sender: mpsc::UnboundedSender<ConnectionMessage<C>>,
-}
-
-impl<C: Channel> PeCaServerAPI<C> {
-    pub async fn get_channels(&self) -> anyhow::Result<Vec<C>> {
-        let (tx, rx) = oneshot::channel();
-        self.sender
-            .send(ConnectionMessage::GetChannels(tx))
-            .map_err(|e| anyhow::anyhow!("Failed to send GetChannels message: {}", e))?;
-        let r = rx.await.map_err(|e| anyhow::anyhow!("Failed to receive channels: {}", e))?;
-        Ok(r)
-    }
-
-    pub async fn get_or_create_channel(
-        &self,
-        channel_id: GnuId,
-        channel_info: Option<libpeercast_re::pcp::ChannelInfo>,
-        track_info: Option<libpeercast_re::pcp::TrackInfo>,
-        config: Option<C::Config>,
-    ) -> anyhow::Result<C> {
-        let (tx, rx) = oneshot::channel();
-        self.sender
-            .send(ConnectionMessage::GetOrCreateChannel {
-                channel_id,
-                channel_info,
-                track_info,
-                config,
-                responder: tx,
-            })
-            .map_err(|e| anyhow::anyhow!("Failed to send GetChannels message: {}", e))?;
-
-        let r = rx.await.map_err(|e| anyhow::anyhow!("Failed to receive channels: {}", e))?;
-        Ok(r)
-    }
-}
-
-pub struct PeCaServer<C: Channel> {
-    config: Config,
-    self_session_id: GnuId,
-    receiver: UnboundedReceiver<ConnectionMessage<C>>,
-    repo: ReChannelRepository<C>,
-}
-
-impl<C> PeCaServer<C>
-where
-    C: Channel + Clone + Send + Sync + std::fmt::Debug + 'static,
-{
-    pub fn new(config: Config) -> (Self, PeCaServerAPI<C>) {
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel();
-        let self_session_id = GnuId::new();
-        let svr = Self {
-            config,
-            self_session_id,
-            receiver,
-            repo: ReChannelRepository::new(&self_session_id),
+    if config.create_dummy {
+        let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
+        let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
+            name: "Dummy Channel".to_string(),
+            url: "http://example.com".to_string(),
+            genre: "Various".to_string(),
+            desc: "This is a dummy channel.".to_string(),
+            comment: "No comments.".to_string(),
+            stream_type: "video/x-flv".to_string(),
+            stream_ext: ".flv".to_string(),
+            bitrate: 128,
+            typ: "FLV".to_string(),
         };
-        let api = PeCaServerAPI {
-            sender,
+        let dummy_track_info = libpeercast_re::pcp::TrackInfo {
+            title: "Dummy Track".to_string(),
+            creator: "Dummy Artist".to_string(),
+            url: "http://example.com/track".to_string(),
+            album: "Dummy Album".to_string(),
+            genre: "Various".to_string(),
+            ..Default::default()
         };
-        (svr, api)
+
+        repo.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
     }
 
-    pub async fn start(self, shutdown_token: tokio_util::sync::CancellationToken) -> anyhow::Result<()> {
-        let Self {
-            self_session_id,
-            mut receiver,
-            mut repo,
-            config,
-        } = self;
-
-        if config.create_dummy {
-            let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
-            let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
-                name: "Dummy Channel".to_string(),
-                url: "http://example.com".to_string(),
-                genre: "Various".to_string(),
-                desc: "This is a dummy channel.".to_string(),
-                comment: "No comments.".to_string(),
-                stream_type: "video/x-flv".to_string(),
-                stream_ext: ".flv".to_string(),
-                bitrate: 128,
-                typ: "FLV".to_string(),
-            };
-            let dummy_track_info = libpeercast_re::pcp::TrackInfo {
-                title: "Dummy Track".to_string(),
-                creator: "Dummy Artist".to_string(),
-                url: "http://example.com/track".to_string(),
-                album: "Dummy Album".to_string(),
-                genre: "Various".to_string(),
-                ..Default::default()
-            };
-
-            let _ = repo.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
-        }
-
-        'accept: loop {
-            tokio::select! {
-                    _ = shutdown_token.cancelled() => {
-                        tracing::debug!("received shutdown signal");
-                        break 'accept;
-                    }
-                    msg = receiver.recv() => {
-                        match msg {
-                            Some(msg) => {
-                                Self::handle_message(&config, &self_session_id, &mut repo, msg).await;
-                            },
-                            None => {
-                                tracing::debug!("ConnectionMessage channel closed");
-                                break 'accept;
-                            },
-                        }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn handle_message(
-        _config: &Config,
-        _self_session_id: &GnuId,
-        repo: &mut ReChannelRepository<C>,
-        msg: ConnectionMessage<C>,
-    ) {
-        match msg {
-            ConnectionMessage::NewConnection(_, _, _, _) => {}
-            ConnectionMessage::GetChannels(sender) => {
-                let channels = repo.get_channels();
-                let _ = sender.send(channels);
-            }
-            ConnectionMessage::GetOrCreateChannel {
-                channel_id,
-                channel_info,
-                track_info,
-                config,
-                responder,
-            } => {
-                let ch = repo.create_or_get(channel_id, channel_info, track_info, config).await;
-                let _ = responder.send(ch);
-            }
-            ConnectionMessage::GetStream {
-                ..
-            } => {}
-        }
-    }
+    repo
 }
 
 pub async fn serve_pcphttp(
