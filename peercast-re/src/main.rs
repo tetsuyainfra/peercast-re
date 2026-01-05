@@ -56,12 +56,17 @@ async fn main() -> anyhow::Result<()> {
     let svr_listener = tokio::net::TcpListener::bind(svr_addr)
         .await
         .with_context(|| format!("Failed to bind Server Address: {}", svr_addr))?;
+    let rtmp_addr = SocketAddr::from((config.rtmp_address, config.rtmp_port));
+    let rtmp_listener = tokio::net::TcpListener::bind(rtmp_addr)
+        .await
+        .with_context(|| format!("Failed to bind Rtmp Address: {}", svr_addr))?;
     let api_addr = SocketAddr::from((config.api_address, config.api_port));
     let api_listener = tokio::net::TcpListener::bind(api_addr)
         .await
         .with_context(|| format!("Failed to bind API Address: {}", api_addr))?;
 
     info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap());
+    info!("RTMP(FLV)listening on rtmp://{}/", rtmp_listener.local_addr().unwrap());
     info!("      UI listening on http://{}/ui", api_listener.local_addr().unwrap());
     info!("     API listening on http://{}/api", api_listener.local_addr().unwrap());
 

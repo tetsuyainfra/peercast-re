@@ -13,6 +13,8 @@ use crate::cli;
 const DEFAULT_IPC_PATH: &str = "/tmp/peercast-re.sock";
 const DEFAULT_SERVER_BIND: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
 const DEFAULT_SERVER_PORT: u16 = 17144;
+const DEFAULT_RTMP_BIND: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+const DEFAULT_RTMP_PORT: u16 = 11935;
 const DEFAULT_API_BIND: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
 const DEFAULT_API_PORT: u16 = 17145;
 const CONFIG_NAME: &str = "Settings.toml";
@@ -24,6 +26,8 @@ pub struct Config {
     pub ipc_path: String,
     pub server_address: IpAddr,
     pub server_port: u16,
+    pub rtmp_address: IpAddr,
+    pub rtmp_port: u16,
     pub api_address: IpAddr,
     pub api_port: u16,
 }
@@ -34,6 +38,8 @@ impl Default for Config {
             ipc_path: DEFAULT_IPC_PATH.into(),
             server_address: DEFAULT_SERVER_BIND,
             server_port: DEFAULT_SERVER_PORT,
+            rtmp_address: DEFAULT_RTMP_BIND,
+            rtmp_port: DEFAULT_RTMP_PORT,
             api_address: DEFAULT_API_BIND,
             api_port: DEFAULT_API_PORT,
         }
@@ -115,6 +121,8 @@ impl Config {
             ipc_path: _ipc_path,
             server_address,
             server_port,
+            rtmp_address,
+            rtmp_port,
             api_address,
             api_port,
             create_dummy,
@@ -126,6 +134,12 @@ impl Config {
         }
         if let Some(port) = server_port {
             self.server_port = port.clone();
+        }
+        if let Some(addr) = rtmp_address {
+            self.rtmp_address = addr.clone();
+        }
+        if let Some(port) = rtmp_port {
+            self.rtmp_port = port.clone();
         }
         if let Some(addr) = api_address {
             self.api_address = addr.clone();
@@ -157,17 +171,23 @@ mod tests {
             api_port: Some(18000),
             create_dummy: false,
             command: None,
+            rtmp_address: None,
+            rtmp_port: None,
         };
 
         let config = Config::default();
         assert_eq!(config.server_address, DEFAULT_SERVER_BIND);
         assert_eq!(config.server_port, DEFAULT_SERVER_PORT);
+        assert_eq!(config.rtmp_address, DEFAULT_RTMP_BIND);
+        assert_eq!(config.rtmp_port, DEFAULT_RTMP_PORT);
         assert_eq!(config.api_address, DEFAULT_API_BIND);
         assert_eq!(config.api_port, DEFAULT_API_PORT);
 
         let config = config.merge_cli_args(&args);
         assert_eq!(config.server_address, "127.0.0.127".parse::<IpAddr>().unwrap());
         assert_eq!(config.server_port, DEFAULT_SERVER_PORT);
+        assert_eq!(config.rtmp_address, DEFAULT_RTMP_BIND);
+        assert_eq!(config.rtmp_port, DEFAULT_RTMP_PORT);
         assert_eq!(config.api_address, DEFAULT_API_BIND);
         assert_eq!(config.api_port, 18000);
     }

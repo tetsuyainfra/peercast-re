@@ -43,10 +43,27 @@ pub struct Args {
     pub server_port: Option<u16>,
 
     #[clap(
+        long = "rtmp-bind",
+        value_name = "RTMP_IP_ADDRESS",
+        env = "PEERCAST_RE_RTMP_BIND",
+        // default_value = "127.0.0.1"
+    )]
+    pub rtmp_address: Option<std::net::IpAddr>,
+
+    #[clap(
+        long="rtmp-port",
+        value_name = "RTMP_PORT",
+        env = "PEERCAST_RE_RTMP_PORT",
+        //  default_value = "11935",
+        value_parser = clap::value_parser!(u16).range(5000..)
+    )]
+    pub rtmp_port: Option<u16>,
+
+    #[clap(
         long = "api-bind",
         value_name = "API_IP_ADDRESS",
         env = "PEERCAST_RE_API_BIND",
-        // default_value = "0.0.0.0"
+        // default_value = "127.0.0.1"
     )]
     pub api_address: Option<std::net::IpAddr>,
 
@@ -110,7 +127,9 @@ mod tests {
     fn test_args_commands() {
         let args = Args::parse_from(&["peercast-re", "listen", "http://example.com/stream"]);
         match args.command.unwrap() {
-            Commands::Listen { url } => {
+            Commands::Listen {
+                url,
+            } => {
                 assert_eq!(url, Url::parse("http://example.com/stream").unwrap());
             }
             _ => unreachable!(""),
