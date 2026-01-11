@@ -8,7 +8,7 @@ use tokio::{
 
 use crate::{
     pcp::{atom, Atom, GnuId},
-    ConnectionId,
+    ConnectionNo,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -16,7 +16,7 @@ use crate::{
 ///
 #[derive(Debug)]
 pub(super) struct Inner {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     self_session_id: GnuId,
     stream: TcpStream,
     remote: SocketAddr,
@@ -28,7 +28,7 @@ pub(super) struct Inner {
 
 impl Inner {
     pub(super) fn new(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         self_session_id: GnuId,
         stream: TcpStream,
         remote: SocketAddr,
@@ -46,7 +46,7 @@ impl Inner {
     }
 
     #[inline]
-    pub(super) fn connection_id(&self) -> ConnectionId {
+    pub(super) fn connection_id(&self) -> ConnectionNo {
         self.connection_id
     }
 
@@ -81,10 +81,7 @@ impl Inner {
     }
 
     #[inline]
-    pub(super) async fn write_atoms(
-        &mut self,
-        atoms: &mut VecDeque<Atom>,
-    ) -> Result<(), std::io::Error> {
+    pub(super) async fn write_atoms(&mut self, atoms: &mut VecDeque<Atom>) -> Result<(), std::io::Error> {
         while let Some(atom) = atoms.pop_front() {
             atom.write_stream(&mut self.stream).await?
         }
@@ -115,7 +112,7 @@ impl Inner {
 //
 
 pub struct ReadHalfInner {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     stream: ReadHalf<TcpStream>,
     read_buf: BytesMut,
     //
@@ -124,7 +121,7 @@ pub struct ReadHalfInner {
 
 impl ReadHalfInner {
     pub fn new(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         stream: ReadHalf<TcpStream>,
         read_buf: BytesMut,
         read_counts: VecDeque<(Instant, u64)>,
@@ -138,7 +135,7 @@ impl ReadHalfInner {
     }
 
     #[inline]
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.connection_id
     }
 
@@ -154,7 +151,7 @@ impl ReadHalfInner {
 //
 
 pub struct WriteHalfInner {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     stream: WriteHalf<TcpStream>,
     //
     write_counts: VecDeque<(Instant, u64)>,
@@ -162,7 +159,7 @@ pub struct WriteHalfInner {
 
 impl WriteHalfInner {
     pub fn new(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         stream: WriteHalf<TcpStream>,
         write_counts: VecDeque<(Instant, u64)>,
     ) -> Self {
@@ -174,7 +171,7 @@ impl WriteHalfInner {
     }
 
     #[inline]
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.connection_id
     }
 
@@ -184,10 +181,7 @@ impl WriteHalfInner {
     }
 
     #[inline]
-    pub(super) async fn write_atoms(
-        &mut self,
-        atoms: &mut VecDeque<Atom>,
-    ) -> Result<(), std::io::Error> {
+    pub(super) async fn write_atoms(&mut self, atoms: &mut VecDeque<Atom>) -> Result<(), std::io::Error> {
         while let Some(atom) = atoms.pop_front() {
             atom.write_stream(&mut self.stream).await?
         }

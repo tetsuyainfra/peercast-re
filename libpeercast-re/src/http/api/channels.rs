@@ -13,7 +13,7 @@ use tracing::debug;
 
 use crate::{
     pcp::{Channel, ChannelInfo, ChannelType, GnuId, RelayTaskConfig, TaskStatus, TrackInfo},
-    ConnectionId,
+    ConnectionNo,
 };
 // use peercast_re_api::models::{
 //     channel_info,
@@ -37,21 +37,20 @@ impl ChannelsSvc {
 
     async fn list(
         State(AppState {
-            channel_manager, ..
+            channel_manager,
+            ..
         }): State<AppState>,
     ) -> impl IntoResponse {
-        let channels: Vec<RespChannel> = channel_manager
-            .map_collect(|(id, ch)| ch.clone())
-            .iter()
-            .map(|ch| RespChannel::from(ch))
-            .collect();
+        let channels: Vec<RespChannel> =
+            channel_manager.map_collect(|(id, ch)| ch.clone()).iter().map(|ch| RespChannel::from(ch)).collect();
 
         (StatusCode::OK, Json(channels))
     }
 
     async fn create(
         State(AppState {
-            channel_manager, ..
+            channel_manager,
+            ..
         }): State<AppState>,
         extract::Json(info): extract::Json<ReqCreateChannel>,
     ) -> impl IntoResponse {
@@ -59,12 +58,8 @@ impl ChannelsSvc {
         let ch_type = ChannelType::Broadcast;
         let channel_info = ChannelInfo::from(info);
 
-        let Some(ch) = channel_manager.create(
-            GnuId::new(),
-            ch_type,
-            channel_info.into(),
-            TrackInfo::default().into(),
-        ) else {
+        let Some(ch) = channel_manager.create(GnuId::new(), ch_type, channel_info.into(), TrackInfo::default().into())
+        else {
             return (StatusCode::BAD_REQUEST).into_response();
         };
 
@@ -73,7 +68,8 @@ impl ChannelsSvc {
 
     async fn create_relay(
         State(AppState {
-            channel_manager, ..
+            channel_manager,
+            ..
         }): State<AppState>,
         extract::Json(info): extract::Json<ReqCreateRelayChannel>,
     ) -> impl IntoResponse {
@@ -91,7 +87,7 @@ impl ChannelsSvc {
         };
         let session_id = GnuId::new();
         let r = ch.connect(
-            ConnectionId::new(),
+            ConnectionNo::new(),
             crate::pcp::SourceTaskConfig::Relay(RelayTaskConfig {
                 addr,
                 self_addr: todo!(),
@@ -104,7 +100,8 @@ impl ChannelsSvc {
     async fn patch(
         Path(channel_id): Path<String>,
         State(AppState {
-            channel_manager, ..
+            channel_manager,
+            ..
         }): State<AppState>,
         // extract::Json(req_ch): extract::Json<ReqPatchChannel>,
         extract::Json(req_ch): extract::Json<ReqPatchChannel>,
@@ -116,7 +113,9 @@ impl ChannelsSvc {
             return (StatusCode::NOT_FOUND).into_response();
         };
         match channel.channel_type() {
-            ChannelType::Broadcast { .. } => {}
+            ChannelType::Broadcast {
+                ..
+            } => {}
             _ => return (StatusCode::INTERNAL_SERVER_ERROR).into_response(),
         }
 
@@ -142,7 +141,8 @@ impl ChannelsSvc {
     async fn delete(
         Path(channel_id): Path<String>,
         State(AppState {
-            channel_manager, ..
+            channel_manager,
+            ..
         }): State<AppState>,
     ) -> impl IntoResponse {
         let Ok(channel_id) = GnuId::from_str(&channel_id) else {
@@ -236,7 +236,10 @@ impl From<&TaskStatus> for ChannelStatus {
     fn from(value: &TaskStatus) -> Self {
         match value {
             TaskStatus::Init => ChannelStatus::Init,
-            TaskStatus::Searching { searched, all } => ChannelStatus::Searching,
+            TaskStatus::Searching {
+                searched,
+                all,
+            } => ChannelStatus::Searching,
             TaskStatus::Receiving => ChannelStatus::Receiving,
             TaskStatus::Idle => ChannelStatus::Idle,
             TaskStatus::Finish => ChannelStatus::Finish,

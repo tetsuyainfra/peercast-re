@@ -10,8 +10,8 @@ use crate::error::{self, HandshakeError};
 static GLOBAL_CONNECTION_COUNT: AtomicI32 = AtomicI32::new(1);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConnectionId(pub i32);
-impl ConnectionId {
+pub struct ConnectionNo(pub i32);
+impl ConnectionNo {
     pub fn new() -> Self {
         let count = GLOBAL_CONNECTION_COUNT.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if count < 0 {
@@ -21,13 +21,13 @@ impl ConnectionId {
     }
 }
 
-impl fmt::Display for ConnectionId {
+impl fmt::Display for ConnectionNo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!("Connection({})", self.0))
     }
 }
 
-impl From<i32> for ConnectionId {
+impl From<i32> for ConnectionNo {
     fn from(value: i32) -> Self {
         Self(value)
     }
@@ -41,9 +41,9 @@ mod t {
 
     #[test]
     fn test_connection_id() {
-        let id = ConnectionId::new();
+        let id = ConnectionNo::new();
         assert_eq!(id.0, 1);
-        let id = ConnectionId::new();
+        let id = ConnectionNo::new();
         assert_eq!(id.0, 2);
 
         let x_max = AtomicI32::new(i32::MAX);
@@ -58,6 +58,6 @@ mod t {
     #[test]
     fn test_size() {
         show_size!(i32);
-        show_size!(ConnectionId);
+        show_size!(ConnectionNo);
     }
 }

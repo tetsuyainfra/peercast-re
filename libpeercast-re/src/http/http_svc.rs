@@ -1,6 +1,6 @@
 use std::{
-    collections::HashMap, convert::Infallible, future, net::SocketAddr, path::PathBuf,
-    str::FromStr, sync::Arc, task::Poll, time::Duration,
+    collections::HashMap, convert::Infallible, future, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc,
+    task::Poll, time::Duration,
 };
 
 use askama::filters::format;
@@ -37,13 +37,12 @@ use tracing::{debug, error, info, trace, Span};
 use crate::{
     codec::FlvWriter,
     config::Config,
-    http::{middleware::RestrictIpLayer },
+    http::middleware::RestrictIpLayer,
     pcp::{
-        ChannelInfo, ChannelManager, ChannelMessage, ChannelType, GnuId, RelayTaskConfig,
-        SourceTaskConfig, TaskStatus,
+        ChannelInfo, ChannelManager, ChannelMessage, ChannelType, GnuId, RelayTaskConfig, SourceTaskConfig, TaskStatus,
     },
     rtmp::{connection::Connection, stream_manager::StreamManagerMessage},
-    ConnectionId,
+    ConnectionNo,
 };
 
 #[cfg(debug_assertions)]
@@ -77,25 +76,11 @@ impl HttpSvc {
         };
 
         let port = config.server_port;
-        let mut origins = vec![format!("http://localhost:{port}")
-            .parse::<HeaderValue>()
-            .unwrap()];
+        let mut origins = vec![format!("http://localhost:{port}").parse::<HeaderValue>().unwrap()];
         if cfg!(debug_assertions) {
-            origins.push(
-                format!("http://localhost:{VITE_UI_PORT}")
-                    .parse::<HeaderValue>()
-                    .unwrap(),
-            );
-            origins.push(
-                format!("http://localhost:{SWAGGER_UI_PORT}")
-                    .parse::<HeaderValue>()
-                    .unwrap(),
-            );
-            origins.push(
-                format!("http://localhost:{SWAGGER_EDITOR_PORT}")
-                    .parse::<HeaderValue>()
-                    .unwrap(),
-            );
+            origins.push(format!("http://localhost:{VITE_UI_PORT}").parse::<HeaderValue>().unwrap());
+            origins.push(format!("http://localhost:{SWAGGER_UI_PORT}").parse::<HeaderValue>().unwrap());
+            origins.push(format!("http://localhost:{SWAGGER_EDITOR_PORT}").parse::<HeaderValue>().unwrap());
         }
         let headers = [hyper::header::CONTENT_TYPE];
 
@@ -115,20 +100,13 @@ impl HttpSvc {
             // .nest("/ui/", Ui::new())
             .nest("/api", Api::new())
             .fallback(Self::not_found)
-            .layer(TraceLayer::new_for_http().on_body_chunk(
-                |chunk: &Bytes, _latency: Duration, _span: &Span| {
-                    tracing::debug!("streaming {} bytes", chunk.len());
-                },
-            ))
+            .layer(TraceLayer::new_for_http().on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| {
+                tracing::debug!("streaming {} bytes", chunk.len());
+            }))
             .layer(RestrictIpLayer {
                 white_nets: allow_ips,
             })
-            .layer(
-                CorsLayer::new()
-                    .allow_origin(origins)
-                    .allow_methods(cors::Any)
-                    .allow_headers(headers),
-            )
+            .layer(CorsLayer::new().allow_origin(origins).allow_methods(cors::Any).allow_headers(headers))
             .with_state(AppState {
                 channel_manager,
                 manager_sender,
@@ -197,7 +175,7 @@ impl HttpSvc {
             TaskStatus::Receiving => { /* pass */ }
             // FIXME: session_idをどこかで管理すること
             _ => {
-                // let _ = ch.connect(ConnectionId::new(), session_id, connect_to);
+                // let _ = ch.connect(ConnectionNo::new(), session_id, connect_to);
                 let connect_to = "192.168.10.230:61744".parse().unwrap();
                 let task_config = SourceTaskConfig::Relay(RelayTaskConfig {
                     addr: connect_to,
@@ -216,10 +194,7 @@ impl HttpSvc {
             Ok(host_url) => {
                 //
                 let host = host_url.host().unwrap_or_else(|| "localhost").to_string();
-                let port = host_url
-                    .port()
-                    .map(|port| port.as_u16())
-                    .unwrap_or_else(|| config.server_port);
+                let port = host_url.port().map(|port| port.as_u16()).unwrap_or_else(|| config.server_port);
                 (host, port)
             }
             Err(e) => {
@@ -240,11 +215,7 @@ impl HttpSvc {
 
         // trace!(?connection_id, ?m3u_str);
 
-        Ok((
-            StatusCode::OK,
-            [(hyper::header::CONTENT_TYPE, "audio/x-mpegurl")],
-            m3u_str,
-        ))
+        Ok((StatusCode::OK, [(hyper::header::CONTENT_TYPE, "audio/x-mpegurl")], m3u_str))
     }
 
     // http://192.168.1.10:17144/stream/85B32473FE39A93B60276926BB966CEA.flv

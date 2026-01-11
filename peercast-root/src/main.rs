@@ -1,11 +1,20 @@
 #![allow(unused)]
 use std::{
-    net::{IpAddr, SocketAddr}, path::PathBuf, process::exit, sync::{Arc, Mutex, OnceLock, RwLock}, time::{Duration, Instant}
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    process::exit,
+    sync::{Arc, Mutex, OnceLock, RwLock},
+    time::{Duration, Instant},
 };
 
 use anyhow::Context;
 use axum::{
-    extract::Query, http::{HeaderValue, Method}, response::IntoResponse, routing, serve::Listener, Json, Router
+    Json, Router,
+    extract::Query,
+    http::{HeaderValue, Method},
+    response::IntoResponse,
+    routing,
+    serve::Listener,
 };
 use axum_extra::headers::Header;
 use bytes::BytesMut;
@@ -14,7 +23,7 @@ use clap::Parser;
 use futures_util::{FutureExt, SinkExt, StreamExt, future::BoxFuture};
 use itertools::concat;
 use libpeercast_re::{
-    ConnectionId, config,
+    ConnectionNo, config,
     pcp::{
         ChannelInfo, GnuId, Id4, ParentAtom, PcpConnectionFactory, TrackInfo,
         builder::{QuitBuilder, QuitReason, RootBuilder},
@@ -22,19 +31,20 @@ use libpeercast_re::{
         decode::{PcpBroadcast, PcpChannel, PcpHost},
         procedure::PcpHandshake,
     },
-    util::{
-        ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned,
-        rwlock_write_poisoned,
-    },
+    util::{ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
 };
 use peercast_root::{ExitCode, FooterToml, IndexInfo};
 // use peercast_re_api::models::channel_info;
 use repository::{Channel, ChannelRepository};
 use serde::{Deserialize, Serialize};
 use serde_json::value::Index;
-use serde_with::{serde_as, NoneAsEmptyString};
+use serde_with::{NoneAsEmptyString, serde_as};
 use tokio::{
-    fs::read, io::AsyncWriteExt, net::{TcpListener, TcpStream}, sync::watch, time::Interval
+    fs::read,
+    io::AsyncWriteExt,
+    net::{TcpListener, TcpStream},
+    sync::watch,
+    time::Interval,
 };
 use tokio_util::sync::CancellationToken;
 use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
@@ -43,16 +53,16 @@ use url::Url;
 
 // use crate::channel::{tracker_channel::TrackerChannel, ChannelStore};
 
+mod api;
 mod cli;
 mod db;
+mod filter;
 mod logging;
+mod portcheck;
 mod repository;
 mod shutdown;
 mod shutdown2;
 mod shutdown3;
-mod filter;
-mod api;
-mod portcheck;
 
 #[cfg(test)]
 mod test_helper;
@@ -95,7 +105,6 @@ pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
 }
 
-
 fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
     _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
@@ -124,8 +133,8 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
             peercast_root::RestrictPortLevel::BroadcastSpeed => "@@",
             peercast_root::RestrictPortLevel::RestrictSpeed => "@@@",
             v => {
-                        error!("Invalid port check level: {:?}", v);
-                        exit(ExitCode::Failure as i32);
+                error!("Invalid port check level: {:?}", v);
+                exit(ExitCode::Failure as i32);
             }
         };
         chinfo.name = "ダミーチャンネル".into();
@@ -155,34 +164,22 @@ async fn main() -> anyhow::Result<()> {
 
     // Init socket
     let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
-    info!(
-        "PCP listening on pcp://{}",
-        listener_pcp.local_addr().unwrap(),
-    );
+    info!("PCP listening on pcp://{}", listener_pcp.local_addr().unwrap(),);
 
-    let listener_http: TcpListener =
-        tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
-    info!(
-        "HTTP listening on http://{}",
-        listener_http.local_addr().unwrap(),
-    );
+    let listener_http: TcpListener = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
+    info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
 
     // let (shutdown_task, graceful, force) = shutdown::create_task_anyhow();
     let (shutdown_task, graceful) = shutdown3::create_task_anyhow();
 
     let shutdown_task = tokio::spawn(shutdown_task);
-    let peercast_server_task = tokio::spawn(server_peercast(
-        args.clone(),
-        listener_pcp,
-        graceful.clone(),
-    ));
+    let peercast_server_task = tokio::spawn(server_peercast(args.clone(), listener_pcp, graceful.clone()));
     let http_server_task = tokio::spawn(api::server_http(args, listener_http, graceful));
 
     // futures_util::future::join_all(vec![http_server_task])
     // futures_util::future::join_all(vec![shutdown_task, http_server_task])
     // futures_util::future::join_all(vec![peercast_server_task, http_server_task])
-    futures_util::future::join_all(vec![shutdown_task, peercast_server_task, http_server_task])
-        .await;
+    futures_util::future::join_all(vec![shutdown_task, peercast_server_task, http_server_task]).await;
 
     Ok(())
 }
@@ -199,7 +196,7 @@ async fn server_peercast(
 
     'accept: loop {
         println!("loop start");
-        let cid = ConnectionId::new();
+        let cid = ConnectionNo::new();
         let name = format!("tcp({})", cid);
         let spawner = tokio::task::Builder::new().name(&name);
         let child_graceful_shutdown = graceful_shutdown.child_token();
@@ -243,7 +240,7 @@ async fn server_peercast(
 
 #[inline]
 async fn serve_peercast(
-    cid: ConnectionId,
+    cid: ConnectionNo,
     mut stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
@@ -251,9 +248,7 @@ async fn serve_peercast(
 ) {
     info!(?cid, ?remote, "SPAWN SERVE");
     match identify_protocol(&stream).await {
-        Ok(ConnectionProtocol::PeerCast) => {
-            serve_root(cid, stream, remote, graceful_shutdown, closed_send).await
-        }
+        Ok(ConnectionProtocol::PeerCast) => serve_root(cid, stream, remote, graceful_shutdown, closed_send).await,
         Ok(ConnectionProtocol::PeerCastHttp) => {
             error!("PeerCastHttp is not allowed");
             let _ = stream.shutdown().await;
@@ -279,7 +274,7 @@ async fn serve_peercast(
 //-------------------------------------------------------------------------------
 
 async fn serve_root(
-    cid: ConnectionId,
+    cid: ConnectionNo,
     mut stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
@@ -292,10 +287,7 @@ async fn serve_root(
     let handshake = CONN_FACTORY().accept(cid, stream, remote);
 
     // Handshake時に送ってもらうAtomを作成する
-    let root_atom = RootBuilder::default()
-        .set_update_interval(10)
-        .set_next_update_interval(10)
-        .build();
+    let root_atom = RootBuilder::default().set_update_interval(10).set_next_update_interval(10).build();
 
     let mut conn = match handshake.incoming(root_atom.into()).await {
         Err(e) => {
@@ -337,9 +329,7 @@ async fn serve_root(
     // TODO: HostのIPチェックを行う？
 
     // Hostの接続先を確定
-    let tracker_host = host
-        .as_ref()
-        .and_then(|pcp_host| get_tracker_addr(&remote, &pcp_host.addresses));
+    let tracker_host = host.as_ref().and_then(|pcp_host| get_tracker_addr(&remote, &pcp_host.addresses));
 
     let PcpChannel {
         channel_id,
@@ -363,7 +353,9 @@ async fn serve_root(
     let channel_info = channel_info.as_ref().map(|i| i.into());
     let track_info = track_info.as_ref().map(|t| t.into());
     //
-    let config = RootConfig { tracker_host };
+    let config = RootConfig {
+        tracker_host,
+    };
 
     // 対象チャンネルを取得
     let repo = REPOSITORY();
@@ -415,14 +407,10 @@ impl Channel for RootChannel {
     }
 
     fn last_update(&self) -> DateTime<Utc> {
-        self.last_update
-            .lock()
-            .unwrap_or_else(mutex_poisoned)
-            .clone()
+        self.last_update.lock().unwrap_or_else(mutex_poisoned).clone()
     }
 }
 impl RootChannel {
-
     fn arrived_broadcast(&self, bcst: PcpBroadcast, remote_addr: &SocketAddr) {
         info!(cid = ?self.cid, "ArrivedBroadcast");
         debug!(?bcst);
@@ -447,34 +435,24 @@ impl RootChannel {
             } = pcp_host;
             // TrackerのIPアドレスを更新
             {
-               let tracker_addr = get_tracker_addr(&remote_addr, &addresses);
-               // MEMO: tracker_addr=Noneが帰ってきたらどする？
-               let mut tracker_host_locked = self
-                       .tracker_addr
-                       .write()
-                       .unwrap_or_else(rwlock_write_poisoned);
-                   *tracker_host_locked = tracker_addr;
+                let tracker_addr = get_tracker_addr(&remote_addr, &addresses);
+                // MEMO: tracker_addr=Noneが帰ってきたらどする？
+                let mut tracker_host_locked = self.tracker_addr.write().unwrap_or_else(rwlock_write_poisoned);
+                *tracker_host_locked = tracker_addr;
             }
             // listener数を更新
             {
-               let mut listner_locked = self
-                       .number_of_listener
-                       .write()
-                       .unwrap_or_else(rwlock_write_poisoned);
-                if let Some(listner) = number_listener{
+                let mut listner_locked = self.number_of_listener.write().unwrap_or_else(rwlock_write_poisoned);
+                if let Some(listner) = number_listener {
                     *listner_locked = listner;
                 }
             }
             // relay数を更新
             {
-               let mut relay_locked = self
-                       .number_of_relay
-                       .write()
-                       .unwrap_or_else(rwlock_write_poisoned);
+                let mut relay_locked = self.number_of_relay.write().unwrap_or_else(rwlock_write_poisoned);
                 if let Some(relay) = number_relay {
                     *relay_locked = relay;
                 }
-
             }
         }
 
@@ -485,14 +463,8 @@ impl RootChannel {
             ..
         } = channel_packet.unwrap();
         {
-            let mut channel_info_unlocked = self
-                .channel_info
-                .write()
-                .unwrap_or_else(rwlock_write_poisoned);
-            let mut track_info_unlocked = self
-                .track_info
-                .write()
-                .unwrap_or_else(rwlock_write_poisoned);
+            let mut channel_info_unlocked = self.channel_info.write().unwrap_or_else(rwlock_write_poisoned);
+            let mut track_info_unlocked = self.track_info.write().unwrap_or_else(rwlock_write_poisoned);
             let mut last_update_locked = self.last_update.lock().unwrap_or_else(mutex_poisoned);
 
             match channel_info {
@@ -518,35 +490,20 @@ impl RootChannel {
     }
 
     fn channel_info(&self) -> ChannelInfo {
-        self.channel_info
-            .read()
-            .unwrap_or_else(rwlock_read_poisoned)
-            .clone()
+        self.channel_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
     }
     fn track_info(&self) -> TrackInfo {
-        self.track_info
-            .read()
-            .unwrap_or_else(rwlock_read_poisoned)
-            .clone()
+        self.track_info.read().unwrap_or_else(rwlock_read_poisoned).clone()
     }
 
     fn tracker_addr(&self) -> Option<SocketAddr> {
-        self.tracker_addr
-            .read()
-            .unwrap_or_else(rwlock_read_poisoned)
-            .clone()
+        self.tracker_addr.read().unwrap_or_else(rwlock_read_poisoned).clone()
     }
     fn number_of_listener(&self) -> i32 {
-        self.number_of_listener
-            .read()
-            .unwrap_or_else(rwlock_read_poisoned)
-            .clone()
+        self.number_of_listener.read().unwrap_or_else(rwlock_read_poisoned).clone()
     }
     fn number_of_relay(&self) -> i32 {
-        self.number_of_relay
-        .read()
-        .unwrap_or_else(rwlock_read_poisoned)
-        .clone()
+        self.number_of_relay.read().unwrap_or_else(rwlock_read_poisoned).clone()
     }
     fn created_at(&self) -> DateTime<Utc> {
         self.created_at.as_ref().clone()
@@ -554,7 +511,12 @@ impl RootChannel {
 }
 
 impl RootChannel {
-    fn attach_connection(self, mut pcp_connection: PcpConnection, graceful_shutdown: CancellationToken, closed_send: watch::Receiver<()>) -> AttachTaskFuture {
+    fn attach_connection(
+        self,
+        mut pcp_connection: PcpConnection,
+        graceful_shutdown: CancellationToken,
+        closed_send: watch::Receiver<()>,
+    ) -> AttachTaskFuture {
         info!("ATTACH CONNECTION TO CHANNEL ");
         async move {
             info!("START");
@@ -604,9 +566,7 @@ type AttachTaskFuture = BoxFuture<'static, ()>;
 fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Option<SocketAddr> {
     // Hostの接続先を確定
     // TODO: firewall checkが必要
-    let host = addresses
-        .iter()
-        .find(|addr| addr.ip() == remote_addr.ip());
+    let host = addresses.iter().find(|addr| addr.ip() == remote_addr.ip());
     let tracker_host = host.map(|h| h.clone());
 
     tracker_host

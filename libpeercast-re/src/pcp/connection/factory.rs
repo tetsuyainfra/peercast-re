@@ -18,7 +18,7 @@ use crate::{
         GnuId,
     },
     util::{mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::ConnectionInfo;
@@ -29,7 +29,7 @@ use super::ConnectionInfo;
 
 #[derive(Debug)]
 pub struct ConnectionManager {
-    connections: HashMap<ConnectionId, ConnectionInfo>,
+    connections: HashMap<ConnectionNo, ConnectionInfo>,
 }
 
 impl ConnectionManager {
@@ -45,8 +45,7 @@ impl ConnectionManager {
             connection_type: handshake.connection_type(),
         };
 
-        self.connections
-            .insert(handshake.connection_id(), connection_info);
+        self.connections.insert(handshake.connection_id(), connection_info);
     }
 }
 //--------------------------------------------------------------------------------
@@ -73,23 +72,11 @@ impl FactoryImpl {
         remote_addr: SocketAddr,
         factory: &PcpConnectionFactory,
     ) -> Result<PcpHandshake, std::io::Error> {
-        let stream =
-            tokio::time::timeout(self.config.connect_timeout, TcpStream::connect(remote_addr))
-                .await??;
+        let stream = tokio::time::timeout(self.config.connect_timeout, TcpStream::connect(remote_addr)).await??;
 
-        let cid = ConnectionId::new();
-        let handshake = PcpHandshake::new(
-            cid,
-            self.self_session_id,
-            stream,
-            remote_addr,
-            ConnectionType::Client,
-            None,
-        );
-        self.manager
-            .lock()
-            .unwrap_or_else(mutex_poisoned)
-            .register_handshake(&handshake);
+        let cid = ConnectionNo::new();
+        let handshake = PcpHandshake::new(cid, self.self_session_id, stream, remote_addr, ConnectionType::Client, None);
+        self.manager.lock().unwrap_or_else(mutex_poisoned).register_handshake(&handshake);
 
         info!("PCP OUTGOING ACCEPT({})", cid);
         Ok(handshake)
@@ -97,23 +84,13 @@ impl FactoryImpl {
 
     pub fn accept(
         &self,
-        cid: ConnectionId,
+        cid: ConnectionNo,
         stream: TcpStream,
         remote_addr: SocketAddr,
         factory: &PcpConnectionFactory,
     ) -> PcpHandshake {
-        let handshake = PcpHandshake::new(
-            cid,
-            self.self_session_id,
-            stream,
-            remote_addr,
-            ConnectionType::Server,
-            None,
-        );
-        self.manager
-            .lock()
-            .unwrap_or_else(mutex_poisoned)
-            .register_handshake(&handshake);
+        let handshake = PcpHandshake::new(cid, self.self_session_id, stream, remote_addr, ConnectionType::Server, None);
+        self.manager.lock().unwrap_or_else(mutex_poisoned).register_handshake(&handshake);
 
         info!("PCP INCMOING ACCEPT({})", cid);
         handshake
@@ -148,7 +125,7 @@ impl PcpConnectionFactory {
     pub async fn connect(&self, remote_addr: SocketAddr) -> Result<PcpHandshake, std::io::Error> {
         self.impl_.connect(remote_addr, &self).await
     }
-    pub fn accept(&self, cid: ConnectionId, stream: TcpStream, remote: SocketAddr) -> PcpHandshake {
+    pub fn accept(&self, cid: ConnectionNo, stream: TcpStream, remote: SocketAddr) -> PcpHandshake {
         self.impl_.accept(cid, stream, remote, &self)
     }
 }

@@ -22,7 +22,7 @@ pub const PKG_SERVANT_VERSION_EX_NUMBER: Lazy<u16> = Lazy::new(|| {
 pub mod config;
 
 mod conn;
-pub use conn::ConnectionId;
+pub use conn::ConnectionNo;
 
 pub mod error;
 

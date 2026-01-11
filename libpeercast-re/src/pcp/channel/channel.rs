@@ -19,7 +19,7 @@ use tracing::{debug, info, trace};
 
 use crate::{
     pcp::{connection, GnuId},
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::{
@@ -130,7 +130,7 @@ impl Channel {
         // TOOD: send info to task
     }
 
-    pub fn connect(&self, connection_id: ConnectionId, config: SourceTaskConfig) -> bool {
+    pub fn connect(&self, connection_id: ConnectionNo, config: SourceTaskConfig) -> bool {
         let mut opt_task = self.source_task.write().unwrap();
         let mut broker_sender = self.broker_task.sender();
         match opt_task.as_ref() {
@@ -181,11 +181,11 @@ impl Channel {
         }
     }
 
-    pub fn channel_reciever(&self, connection_id: ConnectionId) -> ChannelReciever {
+    pub fn channel_reciever(&self, connection_id: ConnectionNo) -> ChannelReciever {
         self.broker_task.channel_reciever(connection_id)
     }
 
-    pub fn channel_stream(&self, connection_id: ConnectionId) -> ChannelStream {
+    pub fn channel_stream(&self, connection_id: ConnectionNo) -> ChannelStream {
         let reciever = self.broker_task.channel_reciever(connection_id);
         ChannelStream::new(self.id.clone(), reciever)
     }
@@ -227,20 +227,26 @@ mod struct_future {
         }
         enum TaskState {
             Idle,
-            Running { handle: JoinHandle<()> },
+            Running {
+                handle: JoinHandle<()>,
+            },
             Error,
             Finish,
         }
         impl TaskState {
             async fn start(&mut self) -> bool {
                 let handle = tokio::spawn(async {});
-                *self = TaskState::Running { handle };
+                *self = TaskState::Running {
+                    handle,
+                };
                 true
             }
             fn status(&self) -> Status {
                 match self {
                     TaskState::Idle => Status::Idle,
-                    TaskState::Running { .. } => Status::Running,
+                    TaskState::Running {
+                        ..
+                    } => Status::Running,
                     TaskState::Error => Status::Error,
                     TaskState::Finish => Status::Finish,
                 }
@@ -285,7 +291,9 @@ mod struct_future {
             fn status(&self) -> Status {
                 match self {
                     InStatus::Init => Status::Init,
-                    InStatus::Running { .. } => Status::Running,
+                    InStatus::Running {
+                        ..
+                    } => Status::Running,
                     InStatus::Pause => Status::Pause,
                 }
             }
