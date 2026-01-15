@@ -8,7 +8,7 @@ use axum::{
 };
 use axum_extra::extract::Host;
 use http::StatusCode;
-use libpeercast_re::pcp::GnuId;
+use libpeercast_re::{ConnectionNo, pcp::GnuId};
 use serde::Deserialize;
 
 use crate::{AppState, channel::ReConfig, prelude::*, repository::Channel};
@@ -51,8 +51,7 @@ where
 }
 
 ////////////////////////////////////////////////////////////////////
-// Handlers for PeerCast requests
-//
+/// /pls/{channel_id} handler
 async fn pls_handler(
     Host(host): Host,
     Path(channel_id): Path<GnuId>,
@@ -67,6 +66,7 @@ async fn pls_handler(
             channel_id,
             None,
             None,
+            state.rtmp_manager_sender.clone(),
             Some(ReConfig {
                 tracker_ip: params.tip,
             }),
@@ -80,6 +80,9 @@ async fn pls_handler(
         create_m3u_playlist(&host, ch.id()),
     )
 }
+
+////////////////////////////////////////////////////////////////////
+/// /streams/{channel_id} handler
 async fn stream_handler(
     Host(_host): Host,
     Path(channel_id): Path<GnuId>,
@@ -90,7 +93,7 @@ async fn stream_handler(
     let ch = ch.ok_or_else(|| StatusCode::NOT_FOUND)?;
 
     //
-    let stream = ch.channel_stream().await.map_err(|e| {
+    let stream = ch.channel_stream(ConnectionNo::new()).await.map_err(|e| {
         error!("Failed to get channel stream for channel {}, {:?}", channel_id, e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;

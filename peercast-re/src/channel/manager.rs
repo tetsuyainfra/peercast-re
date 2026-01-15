@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+use http::Uri;
+
 use libpeercast_re::pcp::Atom;
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot, watch};
 
@@ -10,7 +12,7 @@ pub(super) enum Message {
     // 上流への接続
     AddUpStream,
     // Rtmpなどのソースストリーム接続
-    AddSourceStream(String),
+    AddSourceStream(Uri),
     // 下流への接続
     AddDownStream,
     // 視聴用の接続
@@ -30,6 +32,7 @@ pub(super) type ChannelManagerSender = tokio::sync::mpsc::UnboundedSender<Messag
 #[derive(Debug)]
 pub(super) struct ChannelManager {
     reciever: UnboundedReceiver<Message>,
+    channel: super::ReChannel,
     //
     upstreams: Vec<()>,
     //
@@ -43,10 +46,12 @@ pub(super) struct ChannelManager {
 }
 
 impl ChannelManager {
-    pub(super) fn new(reciever: UnboundedReceiver<Message>) -> Self {
+    pub(super) fn new(reciever: UnboundedReceiver<Message>, channel: super::ReChannel) -> Self {
         let (tx, rx) = watch::channel(SubscriberMessage::Connection());
         Self {
             reciever,
+            channel,
+
             upstreams: Default::default(),
             srcstream: Default::default(),
             downstreams: Default::default(),
@@ -57,26 +62,26 @@ impl ChannelManager {
         }
     }
 
-    pub(super) async fn start(mut self, channel: super::ReChannel) {
+    pub(super) async fn start(mut self) {
         loop {
             tokio::select! {
                 Some(msg) = self.reciever.recv() => {
-                    self.handle_message(msg, &channel);
+                    self.handle_message(msg);
                 }
                 // 他の非同期イベントもここで処理可能
             }
         }
     }
 
-    fn handle_message(&mut self, msg: Message, channel: &super::ReChannel) {
+    fn handle_message(&mut self, msg: Message) {
         match msg {
             Message::AddUpStream => {
                 // 上流への接続を追加するロジックをここに実装
-                println!("Adding upstream connection to channel: {:?}", channel.id());
+                println!("Adding upstream connection to channel: {:?}", self.channel.id());
             }
-            Message::AddSourceStream(src_addr) => {
+            Message::AddSourceStream(src_uri) => {
                 // ソースストリームへの接続を追加するロジックをここに実装
-                println!("Adding source stream connection to channel: {:?}, src_addr: {}", channel.id(), src_addr);
+                self.add_source_stream(src_uri);
             }
             Message::AddDownStream => todo!(),
             Message::AddSubscriber(tx) => {
@@ -93,6 +98,12 @@ impl ChannelManager {
                 self.send_upstream(&atom);
             }
         }
+    }
+
+    fn add_source_stream(&mut self, src_uri: Uri) {
+        // ソースストリームを追加するロジックをここに実装
+        println!("Adding source stream connection to channel: {:?}, src_uri: {}", self.channel.id(), src_uri);
+        self.srcstream.push(());
     }
 
     fn add_subscriber(&mut self) {

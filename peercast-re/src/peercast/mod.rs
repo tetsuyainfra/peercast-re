@@ -1,8 +1,8 @@
 use std::{net::SocketAddr, sync::OnceLock};
 
-use libpeercast_re::{ConnectionId, pcp::GnuId};
+use libpeercast_re::{ConnectionNo, codec::rtmp, pcp::GnuId, rtmp::rtmp_connection};
 use tokio::sync::{
-    mpsc::{self, UnboundedReceiver},
+    mpsc::{self, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
 
@@ -10,7 +10,10 @@ use crate::repository::{Channel, ReChannelRepository};
 use crate::{channel::ReChannel, config::Config};
 
 static REPOSITORY: OnceLock<ReChannelRepository<ReChannel>> = OnceLock::new();
-pub async fn init(config: Config) -> ReChannelRepository<ReChannel> {
+pub async fn init(
+    config: Config,
+    rtmp_manager_sender: &UnboundedSender<libpeercast_re::rtmp::stream_manager::StreamManagerMessage>,
+) -> ReChannelRepository<ReChannel> {
     let self_session_id = GnuId::new();
     let repo = REPOSITORY.get_or_init(|| ReChannelRepository::new(&self_session_id)).clone();
 
@@ -36,14 +39,21 @@ pub async fn init(config: Config) -> ReChannelRepository<ReChannel> {
             ..Default::default()
         };
 
-        repo.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
+        repo.create_or_get(
+            dummy_channel_id,
+            Some(dummy_channel_info),
+            Some(dummy_track_info),
+            rtmp_manager_sender.clone(),
+            None,
+        )
+        .await;
     }
 
     repo
 }
 
 pub async fn serve_pcphttp(
-    cid: ConnectionId,
+    cno: ConnectionNo,
     conn: tokio::net::TcpStream,
     remote: SocketAddr,
     _graceful_shutdown: tokio_util::sync::CancellationToken,

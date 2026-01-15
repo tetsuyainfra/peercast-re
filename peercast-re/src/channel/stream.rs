@@ -1,6 +1,6 @@
 use std::task::Waker;
 
-use futures::Stream;
+use futures_core::Stream;
 use libpeercast_re::pcp::GnuId;
 
 use crate::prelude::*;

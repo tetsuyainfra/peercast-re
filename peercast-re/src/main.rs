@@ -1,11 +1,14 @@
 use anyhow::Context;
 use axum::response::Redirect;
 use clap::Parser;
-use futures::future::FutureExt;
-use libpeercast_re::ConnectionId;
+use futures_util::future::FutureExt;
+use http::Uri;
+use libpeercast_re::ConnectionNo;
 use libpeercast_re::pcp::GnuId;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration;
+use tokio::time::timeout;
 use tower_http::trace::DefaultOnFailure;
 
 use peercast_re::{AppState, prelude::*};
@@ -74,13 +77,16 @@ async fn main() -> anyhow::Result<()> {
 
     // Start Server Tasks
     let shutdown_token = tokio_util::sync::CancellationToken::new();
+    // start Rtmp StreamManager
+    let manager_sender = libpeercast_re::rtmp::stream_manager::start();
 
     // Create Store
-    let repository = peercast::init(config.clone()).await;
+    let repository = peercast::init(config.clone(), &manager_sender).await;
     let store = peercast_re::State {
         config: config.clone(),
         config_path,
         repository: repository,
+        rtmp_manager_sender: manager_sender,
     };
     let store: AppState = std::sync::Arc::new(store);
 
@@ -94,23 +100,34 @@ async fn main() -> anyhow::Result<()> {
     //     info!("Shutdown signal sent");
     //     Ok::<_, anyhow::Error>(ServerThread::ShutdownNotifier)
     // });
-
     // tt.close();
     // tt.wait().await;
 
     let mut set = tokio::task::JoinSet::new();
-    // set.spawn(peercast.start(shutdown_token.child_token()).then(|r| async {
-    //     match r {
-    //         Ok(_) => Ok(ServerThread::PeerCastTask),
-    //         Err(e) => Err(e),
-    //     }
-    // }));
     set.build_task().name("PCP Listen").spawn(peercast_server(
         shutdown_token.child_token(),
         store.clone(),
         svr_listener,
     ))?;
     set.build_task().name("API Listen").spawn(api_server(shutdown_token.child_token(), store.clone(), api_listener))?;
+    set.build_task().name("RTMP Listen").spawn(rtmp_server(
+        shutdown_token.child_token(),
+        store.clone(),
+        rtmp_listener,
+    ))?;
+
+    // temporary task for test
+    let shutdown_token_child = shutdown_token.child_token();
+    set.build_task().name("Init time Temporary Task").spawn(async move {
+        let ch = store.repository.get(&GnuId::from_str("00000000000000000123456789ABCDEF").unwrap());
+        if let Some(ch) = ch {
+            println!("Adding dummy source stream to dummy channel");
+            let _ = ch.add_source_stream(Uri::from_static("rtmp://example.com/live/stream")).await;
+        }
+        // tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        let _ = timeout(Duration::from_secs(5), shutdown_token_child.cancelled()).await;
+        Ok(ServerThread::Temporary)
+    })?;
     // shutdown notifier
     set.build_task().name("Shutdown Notifier").spawn(async move {
         tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c signal");
@@ -118,15 +135,7 @@ async fn main() -> anyhow::Result<()> {
         info!("Shutdown signal sent");
         Ok(ServerThread::ShutdownNotifier)
     })?;
-    set.build_task().name("Init time Temporary Task").spawn(async move {
-        let ch = store.repository.get(&GnuId::from_str("00000000000000000123456789ABCDEF").unwrap());
-        if let Some(ch) = ch {
-            println!("Adding dummy source stream to dummy channel");
-            let _ = ch.add_source_stream("rtmp://example.com/live/stream").await;
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-        Ok(ServerThread::Temporary)
-    })?;
+
     while let Some(res) = set.join_next().await {
         let r = res.context("A server thread has panicked")?;
         info!("A server thread has shut down : {:?}", r);
@@ -138,9 +147,9 @@ async fn main() -> anyhow::Result<()> {
 
 #[derive(Debug)]
 enum ServerThread {
-    PeerCast,
-    PeerCastTask,
-    Api,
+    PeerCastServer,
+    RtmpServer,
+    ApiServer,
     ShutdownNotifier,
     Temporary,
 }
@@ -159,15 +168,16 @@ async fn peercast_server(
     let token = tokio_util::sync::CancellationToken::new();
 
     'accept: loop {
-        let cid: ConnectionId = ConnectionId::new();
         let child_token = token.child_token();
 
         tokio::select! {
             _ = wait_signal.cancelled() => {
-                tracing::debug!("received shutdown signal");
+                tracing::debug!("received shutdown signal on PeerCast server");
                 break 'accept;
             }
             r = listener.accept() => {
+                let cid: ConnectionNo = ConnectionNo::new();
+
                 match r {
                     Err(e) => {
                         tracing::error!("Failed to accept connection: {}", e);
@@ -190,11 +200,11 @@ async fn peercast_server(
     tracker.wait().await;
 
     info!("PeerCast Server has shut down");
-    Ok::<_, anyhow::Error>(ServerThread::PeerCast)
+    Ok::<_, anyhow::Error>(ServerThread::PeerCastServer)
 }
 
 async fn spawned_peercast_connection_handler(
-    cid: ConnectionId,
+    cid: ConnectionNo,
     mut conn: tokio::net::TcpStream,
     remote: SocketAddr,
     shutdown_token: tokio_util::sync::CancellationToken,
@@ -288,13 +298,65 @@ async fn api_server(
     axum::serve(api_listener, router.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(async move {
             wait_signal.cancelled_owned().await;
-            tracing::debug!("received shutdown signal");
+            tracing::debug!("received shutdown signal on API Server");
         })
         .await
         .context("Serving Application Error")?;
 
     info!("API Server has shut down");
-    Ok(ServerThread::Api)
+    Ok(ServerThread::ApiServer)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// RTMP Server
+//
+async fn rtmp_server(
+    wait_signal: tokio_util::sync::CancellationToken,
+    store: AppState,
+    rtmp_listener: tokio::net::TcpListener,
+) -> anyhow::Result<ServerThread> {
+    use libpeercast_re::rtmp;
+    let manager_sender = store.rtmp_manager_sender.clone();
+    let listener = rtmp_listener;
+
+    let tracker = tokio_util::task::TaskTracker::new();
+    let token = tokio_util::sync::CancellationToken::new();
+
+    'accept: loop {
+        let child_token = token.child_token();
+
+        tokio::select! {
+            _ = wait_signal.cancelled() => {
+                tracing::debug!("received shutdown signal on RTMP server");
+                break 'accept;
+            }
+            r = listener.accept() => {
+                let cno: ConnectionNo = ConnectionNo::new();
+
+                match r {
+                    Err(e) => {
+                        tracing::error!("Failed to accept connection: {}", e);
+                        break 'accept;
+                    }
+                    Ok((conn, addr)) => {
+                        let connection = rtmp::connection::Connection::new(cno.0 as i32, manager_sender.clone());
+                        tracker.spawn(connection.start_handshake(conn));
+                    }
+                }
+            }
+        }
+    }
+
+    // Shutdown処理
+    {
+        tracker.close();
+        token.cancel();
+    }
+
+    tracker.wait().await;
+
+    info!("RTMP Server has shut down");
+    Ok::<_, anyhow::Error>(ServerThread::RtmpServer)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
