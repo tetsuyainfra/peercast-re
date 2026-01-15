@@ -5,14 +5,14 @@ use libpeercast_re::pcp::GnuId;
 
 use crate::prelude::*;
 
-pub struct ReStream {
+pub struct PcpStream {
     cid: GnuId,
     count: usize,
     last_update: std::time::Instant,
     tx: tokio::sync::mpsc::UnboundedSender<(Waker, std::time::Duration)>,
 }
 
-impl ReStream {
+impl PcpStream {
     const DATA_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
     pub async fn new(cid: GnuId) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(Waker, std::time::Duration)>();
@@ -40,7 +40,7 @@ impl ReStream {
     }
 }
 
-impl Stream for ReStream {
+impl Stream for PcpStream {
     type Item = Result<bytes::Bytes, std::io::Error>;
 
     fn poll_next(

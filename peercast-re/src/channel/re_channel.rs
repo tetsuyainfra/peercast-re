@@ -129,7 +129,7 @@ impl ReChannel {
     }
 
     // 視聴関係
-    pub async fn channel_stream(&self, cno: ConnectionNo) -> anyhow::Result<stream::ReStream> {
+    pub async fn channel_stream(&self, cno: ConnectionNo) -> anyhow::Result<stream::PcpStream> {
         let r = self.with_impl(|s| s.create_stream(cno))?;
         let x = r.await;
 
@@ -201,7 +201,7 @@ impl ImplRechannel {
     fn create_stream(
         &self,
         cno: ConnectionNo,
-    ) -> anyhow::Result<Pin<Box<dyn std::future::Future<Output = stream::ReStream> + Send + 'static>>> {
+    ) -> anyhow::Result<Pin<Box<dyn std::future::Future<Output = stream::PcpStream> + Send + 'static>>> {
         let (tx, rx) = mpsc::unbounded_channel();
         let (disconn_tx, disconn_rx) = mpsc::unbounded_channel();
         let msg = libpeercast_re::rtmp::stream_manager::StreamManagerMessage::NewConnection {
@@ -209,6 +209,7 @@ impl ImplRechannel {
             sender: tx,
             disconnection: disconn_rx,
         };
+
         let (tx, rx) = tokio::sync::oneshot::channel();
         let _ = self
             .sender
@@ -220,7 +221,7 @@ impl ImplRechannel {
             let watcher = rx.await;
             debug!("Watcher received for cid: {}", cid);
 
-            let stream = stream::ReStream::new(cid).await;
+            let stream = stream::PcpStream::new(cid).await;
             stream
         }))
     }
