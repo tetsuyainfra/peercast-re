@@ -23,3 +23,6 @@ pub struct State {
 }
 
 pub type AppState = std::sync::Arc<State>;
+
+#[cfg(test)]
+mod test_helper;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[macro_export]
 macro_rules! show_size {
     ($Type:ty) => {
@@ -20,7 +22,7 @@ pub fn assert_unpin<T: Unpin>() {}
 pub fn init_logger(env_format: &str) {
     use std::sync::OnceLock;
     use tracing_subscriber::prelude::*;
-    use tracing_subscriber::{fmt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt};
 
     static INIT_LOGGER: OnceLock<bool> = OnceLock::new();
     let _v = INIT_LOGGER.get_or_init(|| {
