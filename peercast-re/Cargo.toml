@@ -96,6 +96,8 @@ exitcode = "1"
 bitflags = "2.9.0"
 rust-embed = { version = "8.9.0", features = ["axum", "axum-ex"] }
 
+# RTMP
+rml_rtmp = { version = "*" }
 
 #[target.'cfg(target_os = "windows")'.dependencies]
 #tokio = { version = "*", features = ["full", "tracing"] }
