@@ -6,11 +6,12 @@ use std::{
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use futures_core::Stream;
 use http::Uri;
 use libpeercast_re::{
     ConnectionNo,
     pcp::{ChannelInfo, GnuId, TrackInfo},
-    util::mutex_poisoned,
+    util::{mutex_poisoned, util_mpsc::mpsc_send},
 };
 use tokio::sync::mpsc::{self, UnboundedSender};
 
@@ -22,7 +23,7 @@ use crate::repository::Channel;
 #[allow(unused)]
 #[derive(Debug)]
 pub struct ReChannel {
-    impl_: Arc<Mutex<ImplRechannel>>,
+    impl_: Arc<Mutex<ImplReChannel>>,
 }
 
 #[derive(Clone, Debug)]
@@ -38,13 +39,6 @@ impl Clone for ReChannel {
     }
 }
 
-impl Drop for ReChannel {
-    fn drop(&mut self) {
-        // チャンネルマネージャの停止処理など
-        debug!("ReChannel dropped: {}", self.id());
-    }
-}
-
 impl Channel for ReChannel {
     type Config = ReConfig;
 
@@ -57,7 +51,7 @@ impl Channel for ReChannel {
         config: Option<Self::Config>,
     ) -> Self {
         let impl_ =
-            ImplRechannel::new(self_session_id, channel_id, rtmp_stream_manager, channel_info, track_info, config);
+            ImplReChannel::new(self_session_id, channel_id, rtmp_stream_manager, channel_info, track_info, config);
         Self {
             impl_: Arc::new(Mutex::new(impl_)),
         }
@@ -93,7 +87,7 @@ impl ReChannel {
     #[inline]
     fn with_impl<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&mut ImplRechannel) -> R,
+        F: FnOnce(&mut ImplReChannel) -> R,
     {
         let mut guard = self.impl_.lock().unwrap_or_else(mutex_poisoned);
         f(&mut *guard)
@@ -129,16 +123,19 @@ impl ReChannel {
     }
 
     // 視聴関係
-    pub async fn channel_stream(&self, cno: ConnectionNo) -> anyhow::Result<stream::PcpStream> {
+    pub async fn channel_stream(
+        &self,
+        cno: ConnectionNo,
+    ) -> anyhow::Result<Box<dyn futures_util::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send + Unpin>> {
         let r = self.with_impl(|s| s.create_stream(cno))?;
         let x = r.await;
 
-        Ok(x)
+        Ok(Box::new(x))
     }
 }
 
 #[derive(Debug)]
-struct ImplRechannel {
+struct ImplReChannel {
     cid: GnuId,
     rtmp_stream_manager: UnboundedSender<libpeercast_re::rtmp::stream_manager::StreamManagerMessage>,
 
@@ -156,13 +153,20 @@ struct ImplRechannel {
     manager_status: ChMgrStatus,
 }
 
+impl Drop for ImplReChannel {
+    fn drop(&mut self) {
+        // チャンネルマネージャの停止処理など
+        debug!("ImplReChannel dropped: {}", self.cid);
+    }
+}
+
 #[derive(Debug)]
 enum ChMgrStatus {
     Standby(tokio::sync::mpsc::UnboundedReceiver<manager::Message>),
     Running,
 }
 
-impl ImplRechannel {
+impl ImplReChannel {
     fn new(
         self_session_id: GnuId,
         channel_id: GnuId,
@@ -201,28 +205,28 @@ impl ImplRechannel {
     fn create_stream(
         &self,
         cno: ConnectionNo,
-    ) -> anyhow::Result<Pin<Box<dyn std::future::Future<Output = stream::PcpStream> + Send + 'static>>> {
-        let (tx, rx) = mpsc::unbounded_channel();
-        let (disconn_tx, disconn_rx) = mpsc::unbounded_channel();
-        let msg = libpeercast_re::rtmp::stream_manager::StreamManagerMessage::NewConnection {
-            connection_id: cno.0,
-            sender: tx,
-            disconnection: disconn_rx,
-        };
+    ) -> anyhow::Result<Pin<Box<dyn std::future::Future<Output = stream::RtmpStream> + Send>>> {
+        let rtmp_stream_manager = self.rtmp_stream_manager.clone();
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let _ = self
-            .sender
-            .send(manager::Message::AddSubscriber(tx))
-            .with_context(|| format!("Failed send AddSubscriber message cid: {}", self.cid))?;
-
-        let cid = self.cid;
         Ok(Box::pin(async move {
-            let watcher = rx.await;
-            debug!("Watcher received for cid: {}", cid);
-
-            let stream = stream::PcpStream::new(cid).await;
+            let stream = stream::RtmpStream::new(cno, rtmp_stream_manager);
             stream
         }))
+
+        // let (tx, rx) = tokio::sync::oneshot::channel();
+        // let _ = self
+        //     .sender
+        //     .send(manager::Message::AddSubscriber(tx))
+        //     .with_context(|| format!("Failed send AddSubscriber message cid: {}", self.cid))?;
+
+        // let cid = self.cid;
+        // Ok(Box::pin(async move {
+        //     let watcher = rx.await;
+        //     debug!("Watcher received for cid: {}", cid);
+
+        //     // let stream = stream::PcpStream::new(cid).await;
+        //     let stream = stream::RtmpStream::new();
+        //     stream
+        // }))
     }
 }

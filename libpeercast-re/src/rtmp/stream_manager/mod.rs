@@ -29,6 +29,14 @@ pub fn start() -> mpsc::UnboundedSender<StreamManagerMessage> {
 
     sender
 }
+pub fn start_with_handle() -> (mpsc::UnboundedSender<StreamManagerMessage>, tokio::task::JoinHandle<()>) {
+    let (sender, receiver) = mpsc::unbounded_channel();
+
+    let manager = StreamManager::new();
+    let handle = tokio::spawn(manager.run(receiver));
+
+    (sender, handle)
+}
 
 enum FutureResult {
     Disconnection {
@@ -82,9 +90,7 @@ impl StreamManager {
     }
 
     async fn run(mut self, receiver: UnboundedReceiver<StreamManagerMessage>) {
-        async fn new_receiver_future(
-            mut receiver: UnboundedReceiver<StreamManagerMessage>,
-        ) -> FutureResult {
+        async fn new_receiver_future(mut receiver: UnboundedReceiver<StreamManagerMessage>) -> FutureResult {
             let result = receiver.recv().await;
             FutureResult::MessageReceived {
                 receiver,
@@ -101,7 +107,10 @@ impl StreamManager {
             let mut new_futures = Vec::from(remaining_futures);
 
             match result {
-                FutureResult::MessageReceived { receiver, message } => {
+                FutureResult::MessageReceived {
+                    receiver,
+                    message,
+                } => {
                     match message {
                         Some(message) => self.handle_message(message),
                         None => return, // receiver has no more senders
@@ -110,7 +119,9 @@ impl StreamManager {
                     new_futures.push(new_receiver_future(receiver).boxed());
                 }
 
-                FutureResult::Disconnection { connection_id } => {
+                FutureResult::Disconnection {
+                    connection_id,
+                } => {
                     self.cleanup_connection(connection_id);
                 }
             }
@@ -151,11 +162,15 @@ impl StreamManager {
                 self.handle_playback_request(connection_id, request_id, rtmp_app, stream_key);
             }
 
-            StreamManagerMessage::PlaybackFinished { connection_id } => {
+            StreamManagerMessage::PlaybackFinished {
+                connection_id,
+            } => {
                 self.handle_playback_finished(connection_id);
             }
 
-            StreamManagerMessage::PublishFinished { connection_id } => {
+            StreamManagerMessage::PublishFinished {
+                connection_id,
+            } => {
                 self.handle_publish_finished(connection_id);
             }
 
@@ -191,20 +206,16 @@ impl StreamManager {
         disconnection: UnboundedReceiver<()>,
     ) {
         self.sender_by_connection_id.insert(connection_id, sender);
-        self.new_disconnect_futures
-            .push(wait_for_client_disconnection(connection_id, disconnection).boxed());
+        self.new_disconnect_futures.push(wait_for_client_disconnection(connection_id, disconnection).boxed());
     }
 
-    fn handle_publish_request(
-        &mut self,
-        connection_id: i32,
-        request_id: u32,
-        rtmp_app: String,
-        stream_key: String,
-    ) {
+    fn handle_publish_request(&mut self, connection_id: i32, request_id: u32, rtmp_app: String, stream_key: String) {
         let sender = match self.sender_by_connection_id.get(&connection_id) {
             None => {
-                println!("Publish request received by connection {} but that connection hasn't registered", connection_id);
+                println!(
+                    "Publish request received by connection {} but that connection hasn't registered",
+                    connection_id
+                );
                 return;
             }
 
@@ -212,11 +223,13 @@ impl StreamManager {
         };
 
         if self.key_by_connection_id.contains_key(&connection_id) {
-            println!(
-                "Connection {} is requesting to publish, but its already being tracked",
-                connection_id
-            );
-            if !send(&sender, ConnectionMessage::RequestDenied { request_id }) {
+            println!("Connection {} is requesting to publish, but its already being tracked", connection_id);
+            if !send(
+                &sender,
+                ConnectionMessage::RequestDenied {
+                    request_id,
+                },
+            ) {
                 self.cleanup_connection(connection_id);
             }
 
@@ -230,7 +243,12 @@ impl StreamManager {
                 println!("Publish request by connection {} for stream '{}' rejected as it's already being published by connection {}",
                          connection_id, key, details.connection_id);
 
-                if !send(&sender, ConnectionMessage::RequestDenied { request_id }) {
+                if !send(
+                    &sender,
+                    ConnectionMessage::RequestDenied {
+                        request_id,
+                    },
+                ) {
                     self.cleanup_connection(connection_id);
                 }
 
@@ -249,21 +267,23 @@ impl StreamManager {
             },
         );
 
-        if !send(&sender, ConnectionMessage::RequestAccepted { request_id }) {
+        if !send(
+            &sender,
+            ConnectionMessage::RequestAccepted {
+                request_id,
+            },
+        ) {
             self.cleanup_connection(connection_id);
         }
     }
 
-    fn handle_playback_request(
-        &mut self,
-        connection_id: i32,
-        request_id: u32,
-        rtmp_app: String,
-        stream_key: String,
-    ) {
+    fn handle_playback_request(&mut self, connection_id: i32, request_id: u32, rtmp_app: String, stream_key: String) {
         let sender = match self.sender_by_connection_id.get(&connection_id) {
             None => {
-                println!("Playback request received by connection {} but that connection hasn't registered", connection_id);
+                println!(
+                    "Playback request received by connection {} but that connection hasn't registered",
+                    connection_id
+                );
                 return;
             }
 
@@ -271,11 +291,13 @@ impl StreamManager {
         };
 
         if self.key_by_connection_id.contains_key(&connection_id) {
-            println!(
-                "Playback requested by connection {} but its already being tracked",
-                connection_id
-            );
-            if !send(&sender, ConnectionMessage::RequestDenied { request_id }) {
+            println!("Playback requested by connection {} but its already being tracked", connection_id);
+            if !send(
+                &sender,
+                ConnectionMessage::RequestDenied {
+                    request_id,
+                },
+            ) {
                 self.cleanup_connection(connection_id);
             }
 
@@ -283,14 +305,16 @@ impl StreamManager {
         }
 
         let key = format!("{}/{}", rtmp_app, stream_key);
-        let connection_ids = self
-            .players_by_key
-            .entry(key.clone())
-            .or_insert(HashMap::new());
+        let connection_ids = self.players_by_key.entry(key.clone()).or_insert(HashMap::new());
         connection_ids.insert(connection_id, PlayerDetails::new(connection_id));
         self.key_by_connection_id.insert(connection_id, key.clone());
 
-        if !send(&sender, ConnectionMessage::RequestAccepted { request_id }) {
+        if !send(
+            &sender,
+            ConnectionMessage::RequestAccepted {
+                request_id,
+            },
+        ) {
             self.cleanup_connection(connection_id);
 
             return;
@@ -350,12 +374,7 @@ impl StreamManager {
         self.cleanup_connection(connection_id);
     }
 
-    fn handle_new_audio_data(
-        &mut self,
-        sending_connection_id: i32,
-        timestamp: RtmpTimestamp,
-        data: Bytes,
-    ) {
+    fn handle_new_audio_data(&mut self, sending_connection_id: i32, timestamp: RtmpTimestamp, data: Bytes) {
         let key = match self.key_by_connection_id.get(&sending_connection_id) {
             Some(x) => x,
             None => return,
@@ -388,12 +407,7 @@ impl StreamManager {
         }
     }
 
-    fn handle_new_video_data(
-        &mut self,
-        sending_connection_id: i32,
-        timestamp: RtmpTimestamp,
-        data: Bytes,
-    ) {
+    fn handle_new_video_data(&mut self, sending_connection_id: i32, timestamp: RtmpTimestamp, data: Bytes) {
         let key = match self.key_by_connection_id.get(&sending_connection_id) {
             Some(x) => x,
             None => return,
@@ -487,12 +501,11 @@ fn is_video_keyframe(data: &Bytes) -> bool {
     return data.len() >= 2 && data[0] == 0x17 && data[1] != 0x00; // 0x00 is the sequence header, don't count that for now
 }
 
-async fn wait_for_client_disconnection(
-    connection_id: i32,
-    mut receiver: UnboundedReceiver<()>,
-) -> FutureResult {
+async fn wait_for_client_disconnection(connection_id: i32, mut receiver: UnboundedReceiver<()>) -> FutureResult {
     // The channel should only be closed when the client has disconnected
     while let Some(()) = receiver.recv().await {}
 
-    FutureResult::Disconnection { connection_id }
+    FutureResult::Disconnection {
+        connection_id,
+    }
 }
