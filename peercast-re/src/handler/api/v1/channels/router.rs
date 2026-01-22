@@ -22,7 +22,7 @@ pub fn router() -> axum::Router<AppState> {
     axum::Router::new()
         //
         .route("/", routing::get(list_channels).post(create_channel))
-        .route("/{id}", routing::get(show_channel))
+        .route("/{id}", routing::get(show_channel).post(update_channel).delete(delete_channel))
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -54,9 +54,9 @@ async fn list_channels(State(store): State<AppState>) -> impl axum::response::In
 #[instrument(skip(store))]
 async fn create_channel(State(store): State<AppState>) -> impl axum::response::IntoResponse {
     let channels = store.repository.get_channels();
-    "create channel"
     // Repository()
     //     .create_or_get(id, channel_info, track_info, config)
+    "create channel"
 }
 
 #[utoipa::path(
@@ -86,6 +86,27 @@ async fn show_channel(State(store): State<AppState>, Path(path): Path<String>) -
 }
 
 #[utoipa::path(
+    post,
+    path = "/{id}",
+    params(
+        ("id" = String, Path, description = "Channel ID", example = "00000000000000000123456789ABCDEF"),
+    ),
+    responses(
+        (status = 200, description = "update channel")
+    )
+)]
+#[instrument(skip(store))]
+async fn update_channel(State(store): State<AppState>, Path(path): Path<String>) -> impl axum::response::IntoResponse {
+    let channel_id = match GnuId::from_str(&path) {
+        Ok(id) => id,
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid channel id"}))),
+    };
+
+    // TODO: inplement update logic here
+    return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"})));
+}
+
+#[utoipa::path(
     delete,
     path = "",
     responses(
@@ -94,5 +115,6 @@ async fn show_channel(State(store): State<AppState>, Path(path): Path<String>) -
 )]
 #[instrument(skip(_store))]
 async fn delete_channel(State(_store): State<AppState>) -> impl axum::response::IntoResponse {
+    // TODO: implement delete logic here
     "delete channel"
 }
