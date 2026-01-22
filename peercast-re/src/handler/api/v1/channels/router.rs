@@ -14,7 +14,7 @@ use crate::prelude::*; // for instrument
 #[derive(OpenApi)]
 #[openapi(
     //
-    paths(list_channels, create_channel, show_channel),
+    paths(list_channels, create_channel, show_channel, update_channel, delete_channel),
 )]
 pub struct ApiChannels;
 

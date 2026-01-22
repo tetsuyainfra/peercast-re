@@ -9,24 +9,108 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/channels": {
+    "/api/v1/channels": {
       "get": {
+        "tags": [
+          "channels"
+        ],
         "operationId": "list_channels",
-        "responses": {}
+        "responses": {
+          "200": {
+            "description": "get channels list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "create_channel",
+        "responses": {
+          "200": {
+            "description": "create channel"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "delete_channel",
+        "responses": {
+          "200": {
+            "description": "delete channel"
+          }
+        }
       }
     },
-    "/api/channels/create": {
+    "/api/v1/channels/{id}": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "show_channel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Channel ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000000000000123456789ABCDEF"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "show channel"
+          }
+        }
+      },
       "post": {
-        "operationId": "create_channel",
-        "responses": {}
+        "tags": [
+          "channels"
+        ],
+        "operationId": "update_channel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Channel ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000000000000123456789ABCDEF"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "update channel"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "api::v1"
+        ],
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "description": "list users"
+          }
+        }
       }
     }
   },
   "components": {},
   "tags": [
     {
-      "name": "peercast-re",
-      "description": "PeerCast Re: API"
+      "name": "v1",
+      "description": "API v1"
     }
   ]
 }
