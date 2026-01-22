@@ -36,13 +36,12 @@ pub fn router() -> axum::Router<AppState> {
         (status = 200, description = "get channels list")
     )
 )]
-#[instrument(skip(_store))]
-async fn list_channels(State(_store): State<AppState>) -> impl axum::response::IntoResponse {
-    // let channels = Repository().get_channels();
+#[instrument(skip(store))]
+async fn list_channels(State(store): State<AppState>) -> impl axum::response::IntoResponse {
+    let channels = store.repository.get_channels();
 
-    // let json_channels: Vec<JsonChannel> = channels.iter().map(|ch| JsonChannel::from(ch)).collect();
-    // axum::Json(json_channels)
-    ""
+    let json_channels: Vec<JsonChannel> = channels.iter().map(|ch| JsonChannel::from(ch)).collect();
+    axum::Json(json_channels)
 }
 
 #[utoipa::path(
@@ -52,9 +51,10 @@ async fn list_channels(State(_store): State<AppState>) -> impl axum::response::I
         (status = 200, description = "create channel")
     )
 )]
-#[instrument(skip(_store))]
-async fn create_channel(State(_store): State<AppState>) -> impl axum::response::IntoResponse {
-    "list channels"
+#[instrument(skip(store))]
+async fn create_channel(State(store): State<AppState>) -> impl axum::response::IntoResponse {
+    let channels = store.repository.get_channels();
+    "create channel"
     // Repository()
     //     .create_or_get(id, channel_info, track_info, config)
 }
@@ -69,21 +69,20 @@ async fn create_channel(State(_store): State<AppState>) -> impl axum::response::
         (status = 200, description = "show channel")
     )
 )]
-#[instrument(skip(_store))]
-async fn show_channel(State(_store): State<AppState>, Path(path): Path<String>) -> impl axum::response::IntoResponse {
+#[instrument(skip(store))]
+async fn show_channel(State(store): State<AppState>, Path(path): Path<String>) -> impl axum::response::IntoResponse {
     let channel_id = match GnuId::from_str(&path) {
         Ok(id) => id,
         Err(_) => return (StatusCode::BAD_REQUEST, Json(json!({"error": "invalid channel id"}))),
     };
 
-    // match Repository().get(&channel_id) {
-    //     Some(ch) => {
-    //         let json_channel: JsonChannel = JsonChannel::from(&ch);
-    //         return (StatusCode::OK, Json(json!(json_channel)));
-    //     }
-    //     None => return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"}))),
-    // };
-    (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"})))
+    match store.repository.get(&channel_id) {
+        Some(ch) => {
+            let json_channel: JsonChannel = JsonChannel::from(&ch);
+            return (StatusCode::OK, Json(json!(json_channel)));
+        }
+        None => return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"}))),
+    };
 }
 
 #[utoipa::path(

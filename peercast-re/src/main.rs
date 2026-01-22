@@ -73,7 +73,8 @@ async fn main() -> anyhow::Result<()> {
     info!("PeerCast listening on pcp://{}/", svr_listener.local_addr().unwrap());
     info!("RTMP(FLV)listening on rtmp://{}/", rtmp_listener.local_addr().unwrap());
     info!("      UI listening on http://{}/ui", api_listener.local_addr().unwrap());
-    info!("     API listening on http://{}/api", api_listener.local_addr().unwrap());
+    info!(" SWAGGER listening on http://{}/swagger-ui", api_listener.local_addr().unwrap());
+    info!("     API listening on http://{}/api/v1", api_listener.local_addr().unwrap());
 
     // Start Server Tasks
     let shutdown_token = tokio_util::sync::CancellationToken::new();
