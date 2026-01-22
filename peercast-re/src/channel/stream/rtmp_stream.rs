@@ -24,7 +24,7 @@ pub struct RtmpStream {
     cno: ConnectionNo,
     rtmp_stream_manager: UnboundedSender<StreamManagerMessage>,
     message_reciever: UnboundedReceiver<ConnectionMessage>,
-    disconnect_tx: UnboundedSender<()>,
+    _disconnect_tx: UnboundedSender<()>,
     state: State,
     request_id_counter: u32,
     caller_sender: UnboundedSender<RtmpCallerMessage>,
@@ -54,7 +54,7 @@ impl RtmpStream {
     ) -> Self {
         let (caller_tx, caller_reciever) = mpsc::unbounded_channel();
         let (messaeg_tx, message_reciever) = mpsc::unbounded_channel();
-        let (disconnect_tx, disconnect_rx) = mpsc::unbounded_channel();
+        let (_disconnect_tx, disconnect_rx) = mpsc::unbounded_channel();
         let msg = libpeercast_re::rtmp::stream_manager::StreamManagerMessage::NewConnection {
             connection_id: cno.0,
             sender: messaeg_tx,
@@ -71,7 +71,7 @@ impl RtmpStream {
             cno,
             rtmp_stream_manager,
             message_reciever,
-            disconnect_tx,
+            _disconnect_tx,
             state,
             request_id_counter: 1,
             caller_sender: caller_tx,
