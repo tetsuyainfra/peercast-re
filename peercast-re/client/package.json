@@ -5,6 +5,12 @@
   "engines": {
     "node": "22.x"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild"
+    ]
+  },
   "type": "module",
   "scripts": {
     "clean": "rimraf ./dist",
