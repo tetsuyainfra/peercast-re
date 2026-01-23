@@ -10,7 +10,7 @@
     "test-build": "tsc && vite build --minify false --debug",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "gen-api": "openapi-ts -i ../openapi.json -o libapi",
+    "gen-api": "openapi-ts",
     "gen-api2": "openapi-typescript  ../openapi.json -o re-api.ts"
   },
   "dependencies": {
@@ -47,7 +47,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.88.1",
+    "@hey-api/openapi-ts": "^0.89.2",
     "@tailwindcss/vite": "^4.1.17",
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",

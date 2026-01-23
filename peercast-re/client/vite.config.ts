@@ -6,7 +6,7 @@ import { env } from "process"
 import { visualizer } from 'rollup-plugin-visualizer'
 
 const PEERCAST_HOST = env.PEERCAST_RE_HOST || "localhost"
-const PEERCAST_PORT = env.PEERCAST_RE_PORT || 17144
+const PEERCAST_PORT = env.PEERCAST_RE_PORT || 17145
 
 console.log(PEERCAST_HOST, PEERCAST_PORT)
 

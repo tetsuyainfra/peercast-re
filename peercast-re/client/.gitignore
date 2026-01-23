@@ -1,5 +1,5 @@
 stats.html
-libapi
+src/api
 re-api.ts
 
 dist

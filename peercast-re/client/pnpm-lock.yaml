@@ -103,8 +103,8 @@ importers:
         version: 4.1.13
     devDependencies:
       '@hey-api/openapi-ts':
-        specifier: ^0.88.1
-        version: 0.88.1(typescript@5.9.3)
+        specifier: ^0.89.2
+        version: 0.89.2(typescript@5.9.3)
       '@tailwindcss/vite':
         specifier: ^4.1.17
         version: 4.1.17(vite@7.2.7(@types/node@22.19.1)(jiti@2.6.1)(lightningcss@1.30.2))
@@ -470,8 +470,8 @@ packages:
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
 
-  '@hey-api/codegen-core@0.3.3':
-    resolution: {integrity: sha512-vArVDtrvdzFewu1hnjUm4jX1NBITlSCeO81EdWq676MxQbyxsGcDPAgohaSA+Wvr4HjPSvsg2/1s2zYxUtXebg==}
+  '@hey-api/codegen-core@0.4.0':
+    resolution: {integrity: sha512-o8rBbEXEUhEPzrHbqImYjwIHm4Oj0r1RPS+5cp8Z66kPO7SEN7PYUgK7XpmSxoy9LPMNK1M5qmCO4cGGwT+ELQ==}
     engines: {node: '>=20.19.0'}
     peerDependencies:
       typescript: '>=5.5.3'
@@ -480,8 +480,8 @@ packages:
     resolution: {integrity: sha512-oS+5yAdwnK20lSeFO1d53Ku+yaGCsY8PcrmSq2GtSs3bsBfRnHAbpPKSVzQcaxAOrzj5NB+f34WhZglVrNayBA==}
     engines: {node: '>= 16'}
 
-  '@hey-api/openapi-ts@0.88.1':
-    resolution: {integrity: sha512-x/nDTupOnV9VuSeNIiJpgIpc915GHduhyseJeMTnI0JMsXaObmpa0rgPr3ASVEYMLgpvqozIEG1RTOOnal6zLQ==}
+  '@hey-api/openapi-ts@0.89.2':
+    resolution: {integrity: sha512-iEhWfvPbzfcS7BMqHzh2FbMG1ouZVAHwHoYhq/61Rmq/r1Q1NgCZ3xy6QuXZgbTdHe9enMjWXjINLnTj57kWwA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
     peerDependencies:
@@ -2339,11 +2339,6 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  semver@7.7.2:
-    resolution: {integrity: sha512-RF0Fw+rO5AMf9MAyaRXI4AV0Ulj5lMHqVxxdSgiVbixSCXoEmmX/jk0CuJw4+3SqroYO9VoUh+HcuJivvtJemA==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.7.3:
     resolution: {integrity: sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==}
     engines: {node: '>=10'}
@@ -2854,8 +2849,10 @@ snapshots:
 
   '@floating-ui/utils@0.2.10': {}
 
-  '@hey-api/codegen-core@0.3.3(typescript@5.9.3)':
+  '@hey-api/codegen-core@0.4.0(typescript@5.9.3)':
     dependencies:
+      ansi-colors: 4.1.3
+      color-support: 1.1.3
       typescript: 5.9.3
 
   '@hey-api/json-schema-ref-parser@1.2.2':
@@ -2865,16 +2862,16 @@ snapshots:
       js-yaml: 4.1.1
       lodash: 4.17.21
 
-  '@hey-api/openapi-ts@0.88.1(typescript@5.9.3)':
+  '@hey-api/openapi-ts@0.89.2(typescript@5.9.3)':
     dependencies:
-      '@hey-api/codegen-core': 0.3.3(typescript@5.9.3)
+      '@hey-api/codegen-core': 0.4.0(typescript@5.9.3)
       '@hey-api/json-schema-ref-parser': 1.2.2
       ansi-colors: 4.1.3
       c12: 3.3.2
       color-support: 1.1.3
       commander: 14.0.2
       open: 11.0.0
-      semver: 7.7.2
+      semver: 7.7.3
       typescript: 5.9.3
     transitivePeerDependencies:
       - magicast
@@ -4587,8 +4584,6 @@ snapshots:
   scheduler@0.27.0: {}
 
   semver@6.3.1: {}
-
-  semver@7.7.2: {}
 
   semver@7.7.3: {}
 

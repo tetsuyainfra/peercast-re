@@ -25,10 +25,10 @@
     /* myconfif for shadcn */
     "baseUrl": ".",
     "paths": {
-      "@re-api": ["./libapi"],
       "@/*": ["./src/*"]
     }
   },
   "include": ["src"],
+  // ここで参照しているのでnode.jsonでいろいろ定義すること
   "references": [{ "path": "./tsconfig.node.json" }]
 }
