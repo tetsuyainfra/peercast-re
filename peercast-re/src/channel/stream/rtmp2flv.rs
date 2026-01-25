@@ -16,7 +16,7 @@ impl Rtmp2Flv {
     }
 
     /// この関数はFLVヘッダーを生成し、Bytesとして返す
-    /// また、一度この関数を呼び出した後は、ストリームの最初にFLVヘッダーを送信することを保証する必要がある
+    /// また、一度この関数を呼び出した後は、ストリームの最初にFLVヘッダーを送信することを保証しなくてはならない
     pub fn header(&mut self) -> Bytes {
         let has_audio = self.metadata.audio_channels.is_some();
         let has_video = self.metadata.video_codec_id.is_some();
