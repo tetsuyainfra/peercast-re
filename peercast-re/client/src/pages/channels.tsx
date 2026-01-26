@@ -40,30 +40,13 @@ export default function Channels() {
 
   const addChannel = (evt: React.FormEvent<HTMLFormElement>) => {
     evt.preventDefault()
-    // const form = evt.target as HTMLFormElement
-    // const formData = new FormData(form)
-    // console.log("evt: ", evt, formData.entries())
     let urlInput = (document.getElementById(urlInputId) as HTMLInputElement).value
     let url = new URL(urlInput)
     let id = url.pathname.split("/").at(-1) || ""
     let host = url.searchParams.get("tip") || ""
-
-    // let api = new ChannelApi(api_config())
-    //   api
-    //     .createRelayChannel({
-    //       reqCreateRelayChannel: {
-    //         id: id,
-    //         host: host,
-    //       },
-    //     })
-    //     .then((channel) => {
-    //       console.log("createRelayChannel", channel)
-    //       window.location.reload()
-    //     })
   }
 
   return <MainLayout pageTitle="Channels">
-    Channels
     {channels.map((channel) => (
       <div key={channel.id}>
         <h2>{channel.name} ({channel.id})</h2>

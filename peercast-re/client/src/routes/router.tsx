@@ -5,6 +5,7 @@ import ErrorPage from "@/pages/error-pages"
 import Index from "@/pages/index"
 import Config from "@/pages/config"
 import Channels from "@/pages/channels"
+import Channel from "@/pages/channel"
 import YellowPages from "@/pages/yellowPages"
 
 const router = createBrowserRouter(
@@ -25,6 +26,10 @@ const router = createBrowserRouter(
         {
           path: "channels/",
           element: <Channels />,
+        },
+        {
+          path: "channel/",
+          element: <Channel />,
         },
         {
           path: "yellowpages/",
