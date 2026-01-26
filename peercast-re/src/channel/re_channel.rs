@@ -17,8 +17,8 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 
 use super::manager;
 use super::stream;
-use crate::prelude::*;
 use crate::repository::Channel;
+use crate::{prelude::*, repository::ChannelType};
 
 #[allow(unused)]
 #[derive(Debug)]
@@ -80,6 +80,10 @@ impl Channel for ReChannel {
 
     fn id(&self) -> GnuId {
         self.with_impl(|s| s.cid)
+    }
+
+    fn channel_type(&self) -> ChannelType {
+        ChannelType::Tracker
     }
 }
 

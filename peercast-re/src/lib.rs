@@ -12,6 +12,7 @@ pub mod repository;
 pub mod prelude;
 
 pub const SWAGGER_PATH: &str = "/swagger-ui";
+pub const DUMMY_CHANNEL_ID: &str = "00000000000000000123456789ABCDEF";
 
 #[derive(Debug, Clone)]
 pub struct State {

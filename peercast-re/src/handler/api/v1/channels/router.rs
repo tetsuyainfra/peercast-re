@@ -33,14 +33,13 @@ pub fn router() -> axum::Router<AppState> {
     get,
     path = "",
     responses(
-        (status = 200, description = "get channels list")
+        (status = 200, description = "get channels list", body = Vec<JsonChannel>)
     )
 )]
 #[instrument(skip(store))]
 async fn list_channels(State(store): State<AppState>) -> impl axum::response::IntoResponse {
-    let channels = store.repository.get_channels();
+    let json_channels = store.repository.map_collect(|id, ch| JsonChannel::from(ch));
 
-    let json_channels: Vec<JsonChannel> = channels.iter().map(|ch| JsonChannel::from(ch)).collect();
     axum::Json(json_channels)
 }
 
@@ -63,10 +62,10 @@ async fn create_channel(State(store): State<AppState>) -> impl axum::response::I
     get,
     path = "/{id}",
     params(
-        ("id" = String, Path, description = "Channel ID", example = "00000000000000000123456789ABCDEF"),
+        ("id" = String, Path, description = "Channel ID", example = json!(crate::DUMMY_CHANNEL_ID)),
     ),
     responses(
-        (status = 200, description = "show channel")
+        (status = 200, description = "show channel", body = JsonChannel)
     )
 )]
 #[instrument(skip(store))]
@@ -89,7 +88,7 @@ async fn show_channel(State(store): State<AppState>, Path(path): Path<String>) -
     post,
     path = "/{id}",
     params(
-        ("id" = String, Path, description = "Channel ID", example = "00000000000000000123456789ABCDEF"),
+        ("id" = String, Path, description = "Channel ID", example = json!(crate::DUMMY_CHANNEL_ID)),
     ),
     responses(
         (status = 200, description = "update channel")

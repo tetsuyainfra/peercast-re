@@ -39,6 +39,18 @@ pub trait Channel {
     fn before_delete(&mut self) {}
 
     fn id(&self) -> GnuId;
+
+    fn channel_type(&self) -> ChannelType;
+}
+
+/// Peercast-re, およびそのクライアントでのみ使われるチャンネル型
+pub enum ChannelType {
+    /// RootはYPのチャンネルタイプである。Peercast-Reでは使われない
+    Root,
+    /// Trackerは配信者の立てるチャンネルタイプである。
+    Tracker,
+    /// Relayはリスナーが中継しているチャンネルタイプである。
+    Relay,
 }
 
 #[derive(Debug)]
@@ -130,6 +142,13 @@ where
     pub fn delete(&mut self, id: &GnuId) -> bool {
         self.with_impl(|s| s.delete(id))
     }
+
+    pub fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    where
+        F: FnMut(&GnuId, &C) -> R,
+    {
+        self.with_impl(|s| s.map_collect(&mut f))
+    }
 }
 
 #[derive(Debug)]
@@ -197,6 +216,13 @@ where
             }
             None => false,
         }
+    }
+
+    fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    where
+        F: FnMut(&GnuId, &C) -> R,
+    {
+        self.channels.iter().map(|(id, ch)| f(id, ch)).collect()
     }
 }
 
