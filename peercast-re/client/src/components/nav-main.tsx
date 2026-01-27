@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Link } from "react-router-dom"
+import { Link } from "react-router"
 
 export function NavMain({
   items,

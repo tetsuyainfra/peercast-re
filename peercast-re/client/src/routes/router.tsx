@@ -1,6 +1,8 @@
 import Root from "../routes/root"
 // import Index from "../routes/_index"
-import { createBrowserRouter } from "react-router-dom"
+import { createBrowserRouter, redirect } from "react-router"
+
+import Root from "../routes/root"
 import ErrorPage from "@/pages/error-pages"
 import Index from "@/pages/index"
 import Config from "@/pages/config"
