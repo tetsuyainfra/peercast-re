@@ -20,10 +20,10 @@ pub async fn init(
     if config.create_dummy {
         let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
         let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
-            name: "Dummy Channel".to_string(),
+            name: "Dummyチャンネル名".to_string(),
             url: "http://example.com".to_string(),
             genre: "Various".to_string(),
-            desc: "This is a dummy channel.".to_string(),
+            desc: "This is a dummy channel desc".to_string(),
             comment: "No comments.".to_string(),
             stream_type: "video/x-flv".to_string(),
             stream_ext: ".flv".to_string(),
