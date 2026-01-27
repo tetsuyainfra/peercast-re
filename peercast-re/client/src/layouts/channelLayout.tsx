@@ -4,27 +4,15 @@ import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
 import { SectionCards } from "@/components/section-cards"
 import { SiteHeader } from "@/components/site-header"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { useState } from "react"
 import { Outlet, useLoaderData } from "react-router"
 
-interface MainLayoutProps  extends React.HTMLAttributes<HTMLDivElement> {
+interface MainLayoutProps extends React.HTMLAttributes<HTMLDivElement> {
   pageTitle?: string
 }
 
-export type OutletContext = {
-  pageTitle: string;
-  setPageTitle: (v: string) => void;
-};
-
-
-
-export default function ChannelLayout({ children }: MainLayoutProps) {
-  const [pageTitle, setPageTitle] = useState("pageTitle");
-
+export default function ChannelLayout({ children, pageTitle }: MainLayoutProps) {
   return (
     <SidebarProvider
       style={

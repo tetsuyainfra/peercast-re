@@ -35,7 +35,6 @@ const router = createBrowserRouter(
     },
     {
       path: "/channel",
-      Component: ChannelLayout,
       children: [
         {
           path: ":channelId",
