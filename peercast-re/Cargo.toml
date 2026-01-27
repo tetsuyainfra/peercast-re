@@ -46,6 +46,7 @@ tower-http = { version = "*", features = [
     "fs",
     "trace",
     "cors",
+    "normalize-path",
     "util",
     "request-id",
     "timeout",

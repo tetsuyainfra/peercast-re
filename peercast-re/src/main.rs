@@ -1,7 +1,7 @@
 use anyhow::Context;
 use axum::response::Redirect;
+use axum::routing;
 use clap::Parser;
-use futures_util::future::FutureExt;
 use http::Uri;
 use libpeercast_re::ConnectionNo;
 use libpeercast_re::pcp::GnuId;
@@ -9,6 +9,8 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::timeout;
+use tower_http::cors::{self, CorsLayer};
+use tower_http::normalize_path::NormalizePathLayer;
 use tower_http::trace::DefaultOnFailure;
 
 use peercast_re::{AppState, prelude::*};
@@ -279,13 +281,32 @@ async fn api_server(
         .on_failure(DefaultOnFailure::new().level(Level::ERROR))
         .on_response(DefaultOnResponse::new().level(Level::INFO).latency_unit(tower_http::LatencyUnit::Millis));
 
+    let origins = if cfg!(debug_assertions) {
+        vec![
+            //
+            format!("http://localhost:{}", api_listener.local_addr().unwrap().port()).parse().unwrap(),
+            "http://localhost:5173".parse().unwrap(), // pnpm run dev
+            "http://localhost:4173".parse().unwrap(), // pnpm run preview
+        ]
+    } else {
+        vec![
+            //
+            format!("http://localhost:{}", api_listener.local_addr().unwrap().port()).parse().unwrap(),
+        ]
+    };
+    info!("CORS Allowed Origins: {:?}", origins);
+    let cors_layer = CorsLayer::new().allow_headers(cors::Any).allow_origin(origins).allow_headers(cors::Any);
+
     let router = axum::Router::new()
-        .route("/", axum::routing::get(|| async { Redirect::to("/ui") }))
+        .route("/", routing::get(|| async { Redirect::to("/ui") }))
         .nest("/ui", handler::ui::build_router())
+        .route("/ui/", routing::get(|| async { Redirect::to("/ui") })) // 力技だがこれで/ui/にアクセスしても対応できる
         .nest("/api", handler::api::build_router())
         .merge(handler::peercast::router())
-        .fallback(async || http::StatusCode::NOT_FOUND) // ← これが重要
+        .fallback(async || http::StatusCode::NOT_FOUND)
         .layer(trace_layer)
+        .layer(cors_layer)
+        .layer(NormalizePathLayer::trim_trailing_slash()) // Requst Pathの正規化 /A/B/ -> /A/B
         .with_state(store.clone());
 
     let router = if cfg!(debug_assertions) {

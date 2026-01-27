@@ -20,7 +20,7 @@ pub fn build_router() -> axum::Router<AppState> {
 async fn static_handler(uri: Uri) -> impl IntoResponse {
     debug!("Static file request: {}", uri.path());
     let path = uri.path().trim_start_matches('/');
-
+    debug!("Static file path: {}", path);
     match path {
         "" => {
             return index_html().await;
