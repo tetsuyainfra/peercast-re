@@ -7,46 +7,62 @@ import { visualizer } from 'rollup-plugin-visualizer'
 
 const PEERCAST_HOST = env.PEERCAST_RE_HOST || "localhost"
 const PEERCAST_PORT = env.PEERCAST_RE_PORT || 17145
-
 console.log(PEERCAST_HOST, PEERCAST_PORT)
 
-// https://vitejs.dev/config/
-export default defineConfig({
-  base: "/ui",
-  server: {
-    hmr: {
-      clientPort: 5173,
-      host: "localhost",
-    },
+const htmlTransformPlugin = (search: string, target: string) => ({
+  name: 'html-transform',
+  transformIndexHtml: (html: string): string => html.replace(search, target),
+});
 
-    // ブラウザからviteに直接アクセスした場合、本来のAPIへのプロキシが必要になる
-    // っていうかいどうすればいいんだろ
-    proxy: {
-      "/api": {
-        target: `http://${PEERCAST_HOST}:${PEERCAST_PORT}/`,
-        // changeOrigin: true,
-        // rewrite: (path) => path.replace(/^\/api/, ""),
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  const INDEX_TITLE = mode === "production" ? "PeerCast-Re" : "PeerCast-Re(Dev)"
+
+  return {
+    base: "/ui",
+    server: {
+      hmr: {
+        clientPort: 5173,
+        host: "localhost",
+      },
+
+      // ブラウザからviteに直接アクセスした場合、本来のAPIへのプロキシが必要になる
+      // っていうかいどうすればいいんだろ
+      proxy: {
+        "/api": {
+          target: `http://${PEERCAST_HOST}:${PEERCAST_PORT}/`,
+          // changeOrigin: true,
+          // rewrite: (path) => path.replace(/^\/api/, ""),
+        },
       },
     },
-  },
-  plugins: [
-    react(),
-    tailwindcss(),
-    visualizer({
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-    })
-  ],
-  resolve: {
-    alias: {
-      // "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
-      "@re-api": path.resolve(__dirname, "./libapi"),
-      "@": path.resolve(__dirname, "./src"),
+    plugins: [
+      react(),
+      tailwindcss(),
+      visualizer({
+        open: false,
+        gzipSize: true,
+        brotliSize: true,
+      }),
+      htmlTransformPlugin("%=INDEX_TITLE%", INDEX_TITLE),
+    ],
+    resolve: {
+      alias: {
+        // "@peercast-api": path.resolve(__dirname, "../../libpeercast-re-apis/gen/ts-fetch"),
+        "@re-api": path.resolve(__dirname, "./libapi"),
+        "@": path.resolve(__dirname, "./src"),
+      },
     },
-  },
-  define: {
-    PEERCAST_HOST: JSON.stringify(PEERCAST_HOST),
-    PEERCAST_PORT: JSON.stringify(PEERCAST_PORT),
-  },
+    define: {
+      PEERCAST_HOST: JSON.stringify(PEERCAST_HOST),
+      PEERCAST_PORT: JSON.stringify(PEERCAST_PORT),
+    },
+  }
 })
+
+// envからタイトルを取得させるプラグイン
+// const htmlTransformPlugin = (target, replace) => ({
+//   name: 'html-transform',
+//   transformIndexHtml: (html: string): string =>
+//     html.replace(/%=(.*?)%/g, (match, p1) => env[p1] ?? match),
+// });
