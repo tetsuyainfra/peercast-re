@@ -2,28 +2,17 @@ import React, { useEffect, useState } from "react"
 import { env } from "process"
 import MainLayout from "@/layouts/mainLayout"
 // import { RespChannel } from "@re-api"
-import { client } from "@/api/client.gen"
-import { createClient } from "@/api/client"
-import { listChannels } from "@/api"
-
-// configure internal service client
-client.setConfig({
-  // set default base url for requests
-  baseUrl: "http://localhost:5173",
-  // set default headers for requests
-  headers: {
-    Authorization: "Bearer <token_from_service_client>",
-  },
-})
+import { Link } from "react-router"
+import { channelApi } from "@/api"
 
 export default function Channels() {
   const urlInputId = React.useId()
   let [channels, channelsSet] = useState<any[]>([])
   useEffect(() => {
-    (async () => {
-      const { data, error } = await listChannels();
-      console.info("listChannels", { data, error });
-      channelsSet(data as any || []);
+    ;(async () => {
+      const { data, error } = await channelApi.list();
+      console.info("listChannels", { data, error })
+      channelsSet((data as any) || [])
     })()
     // (async () => {
     //   let api = new ChannelApi(api_config())
@@ -46,12 +35,34 @@ export default function Channels() {
     let host = url.searchParams.get("tip") || ""
   }
 
-  return <MainLayout pageTitle="Channels">
-    {channels.map((channel) => (
-      <div key={channel.id}>
-        <h2>{channel.name} ({channel.id})</h2>
-        <p>{channel.description}</p>
+  return (
+    <MainLayout pageTitle="Channels">
+      <div className="flex flex-col border-b border-gray-300 py-2">
+        <h2 className="">▶️ EmptyDummy - No name</h2>
+        <p className="flex flex-row gap-4 text-sm text-gray-600">
+          <Link to={`/channel/00000000000000000000`} className="underline">
+            Go to Channel Page
+          </Link>
+          <span>channel.comment</span>
+          <span>channel.genre</span>
+          <span>channel.id</span>
+        </p>
       </div>
-    ))}
+      {channels.map((channel) => (
+        <div key={channel.id} className="flex flex-col border-b border-gray-300 py-2">
+          <h2 className="">
+            ▶️{channel.desc} - {channel.name}
+          </h2>
+          <p className="flex flex-row gap-4 text-sm text-gray-600">
+            <Link to={`/channel/${channel.id}`} className="underline">
+              Go to Channel Page
+            </Link>
+            <span>{channel.comment}</span>
+            <span>{channel.genre}</span>
+            <span>{channel.id}</span>
+          </p>
+        </div>
+      ))}
     </MainLayout>
+  )
 }

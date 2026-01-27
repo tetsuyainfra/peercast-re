@@ -9,11 +9,7 @@ import router from "./routes/router"
 function App() {
   const [count, setCount] = React.useState(0)
 
-  return (
-    <>
-      <RouterProvider router={router} />
-    </>
-  )
+  return <RouterProvider router={router} />
 }
 
 export default App
