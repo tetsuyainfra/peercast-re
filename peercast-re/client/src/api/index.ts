@@ -9,7 +9,8 @@ client.setConfig({
   baseUrl: "http://localhost:17145",
   // set default headers for requests
   headers: {
-    Authorization: "Bearer <token_from_service_client>",
+    // Access-Control-Allow-Headers: を明示しないといずれCORSエラーになる
+    // Authorization: "Bearer <token_from_service_client>",
   },
 })
 

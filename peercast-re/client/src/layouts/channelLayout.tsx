@@ -1,3 +1,4 @@
+import { JsonChannel } from "@/_gen-api"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
@@ -7,13 +8,23 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@/components/ui/sidebar"
-import { Outlet } from "react-router"
+import { useState } from "react"
+import { Outlet, useLoaderData } from "react-router"
 
 interface MainLayoutProps  extends React.HTMLAttributes<HTMLDivElement> {
   pageTitle?: string
 }
 
-export default function ChannelLayout({ children, pageTitle }: MainLayoutProps) {
+export type OutletContext = {
+  pageTitle: string;
+  setPageTitle: (v: string) => void;
+};
+
+
+
+export default function ChannelLayout({ children }: MainLayoutProps) {
+  const [pageTitle, setPageTitle] = useState("pageTitle");
+
   return (
     <SidebarProvider
       style={
@@ -25,18 +36,14 @@ export default function ChannelLayout({ children, pageTitle }: MainLayoutProps) 
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader title={'channel |' + pageTitle} />
+        <SiteHeader title={pageTitle} />
         <div className="flex flex-1 flex-col">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
               <div className="px-4 lg:px-6">
-                <Outlet />
+                {/* <Outlet context={{pageTitle, setPageTitle}} /> */}
+                {children}
               </div>
-              {/* <SectionCards />
-              <div className="px-4 lg:px-6">
-                <ChartAreaInteractive />
-              </div>
-              <DataTable data={data} /> */}
             </div>
           </div>
         </div>

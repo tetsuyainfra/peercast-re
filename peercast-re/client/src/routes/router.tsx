@@ -14,8 +14,9 @@ import { channelApi } from "@/api"
 const router = createBrowserRouter(
   [
     // Root Object
+
     {
-      path: "/",
+      // この親ルートにはパスはなく、コンポーネントのみ
       errorElement: <ErrorPage />,
       children: [
         {
@@ -47,7 +48,7 @@ const router = createBrowserRouter(
               console.info("redirect to /channels")
               throw redirect("/channels")
             }
-            return data
+            return { channel: data }
           },
         },
       ],
