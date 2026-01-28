@@ -11,7 +11,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tower_http::cors::{self, CorsLayer};
 use tower_http::normalize_path::NormalizePathLayer;
-use tower_http::trace::DefaultOnFailure;
+use tower_http::trace::{DefaultOnFailure, DefaultOnRequest};
 
 use peercast_re::{AppState, prelude::*};
 use peercast_re::{cli, config, handler, peercast};
@@ -279,6 +279,7 @@ async fn api_server(
     let trace_layer = TraceLayer::new_for_http()
         .make_span_with(DefaultMakeSpan::new().level(Level::INFO).include_headers(true))
         .on_failure(DefaultOnFailure::new().level(Level::ERROR))
+        .on_request(DefaultOnRequest::new().level(Level::TRACE))
         .on_response(DefaultOnResponse::new().level(Level::INFO).latency_unit(tower_http::LatencyUnit::Millis));
 
     let origins = if cfg!(debug_assertions) {
