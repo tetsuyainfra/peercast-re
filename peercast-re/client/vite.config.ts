@@ -34,6 +34,12 @@ export default defineConfig(({ mode }) => {
           // changeOrigin: true,
           // rewrite: (path) => path.replace(/^\/api/, ""),
         },
+        "/pls": {
+          target: `http://${PEERCAST_HOST}:${PEERCAST_PORT}/`,
+        },
+        "/stream": {
+          target: `http://${PEERCAST_HOST}:${PEERCAST_PORT}/`,
+        },
       },
     },
     plugins: [
