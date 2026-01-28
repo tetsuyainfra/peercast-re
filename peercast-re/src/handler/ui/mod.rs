@@ -8,14 +8,14 @@ use tracing::debug;
 
 use crate::AppState;
 
+pub fn build_router() -> axum::Router<AppState> {
+    Router::new().fallback(static_handler)
+}
+
 #[derive(Embed)]
 #[folder = "client/dist/"]
 struct Assets;
 static INDEX_HTML: &str = "index.html";
-
-pub fn build_router() -> axum::Router<AppState> {
-    Router::new().fallback(static_handler)
-}
 
 async fn static_handler(uri: Uri) -> impl IntoResponse {
     debug!("Static file request: {}", uri.path());
