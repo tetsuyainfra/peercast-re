@@ -3,10 +3,10 @@ import { client } from "@/_gen-api/client.gen";
 import { channel } from "diagnostics_channel";
 
 if (import.meta.env.MODE === "production") {
-  // configure internal service client
-  client.setConfig({
-    baseUrl: "http://localhost:17145",
-  })
+  // 設定しないことで、ブラウザの現在のオリジンが使われる
+  // client.setConfig({
+  //   baseUrl: "http://localhost:17145",
+  // })
 } else {
   // configure internal service client
   client.setConfig({
