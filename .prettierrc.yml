@@ -2,7 +2,7 @@ arrowParens: always
 bracketSameLine: false
 bracketSpacing: true
 jsxSingleQuote: true
-printWidth: 80
+printWidth: 120
 requirePragma: true
 semi: true
 singleQuote: true

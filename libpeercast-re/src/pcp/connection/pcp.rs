@@ -15,13 +15,11 @@ use tokio::net::TcpStream;
 use crate::{
     pcp::{
         atom,
-        builder::{
-            HelloBuilder, OkBuilder, OlehBuilder, OlehInfo, PingBuilder, PongBuilder, QuitBuilder,
-        },
+        builder::{HelloBuilder, OkBuilder, OlehBuilder, OlehInfo, PingBuilder, PongBuilder, QuitBuilder},
         decode::{decode_i32, PcpBroadcast, PcpHelo},
         Atom, GnuId, Id4,
     },
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::{
@@ -39,7 +37,7 @@ pub struct PcpHandshake {
 }
 impl PcpHandshake {
     pub(super) fn new(
-        cid: ConnectionId,
+        cid: ConnectionNo,
         self_session_id: GnuId,
         stream: TcpStream,
         socket_addr: SocketAddr,
@@ -53,7 +51,7 @@ impl PcpHandshake {
         }
     }
 
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.inner.connection_id()
     }
     pub fn remote_addr(&self) -> &SocketAddr {
@@ -101,10 +99,8 @@ impl PcpHandshake {
 
         async move {
             // FIXME: OpenPortとPingPortの関係がイマイチわからん！
-            let mut ping = PingBuilder::new(inner.self_session_id().clone())
-                .port(Some(port))
-                .port_check(Some(port))
-                .build();
+            let mut ping =
+                PingBuilder::new(inner.self_session_id().clone()).port(Some(port)).port_check(Some(port)).build();
             dbg!(&ping);
             if let Err(_e) = inner.write_atoms(&mut ping).await {
                 return Err(todo!());
@@ -126,10 +122,7 @@ impl PcpHandshake {
     }
 
     /// 接続の待ち受け
-    pub async fn incoming(
-        self,
-        send_atom_before_ok: Option<Atom>,
-    ) -> Result<HandshakeType, PcpError> {
+    pub async fn incoming(self, send_atom_before_ok: Option<Atom>) -> Result<HandshakeType, PcpError> {
         let PcpHandshake {
             mut inner,
             connection_type,
@@ -137,10 +130,7 @@ impl PcpHandshake {
         assert_eq!(ConnectionType::Server, connection_type);
 
         // Protocol Check
-        let magic = inner
-            .read_atom()
-            .await
-            .map_err(|_| PcpError::FailedHandshake)?;
+        let magic = inner.read_atom().await.map_err(|_| PcpError::FailedHandshake)?;
         if magic.is_parent() {
             return Err(PcpError::FailedHandshake);
         }
@@ -156,20 +146,14 @@ impl PcpHandshake {
             return Err(PcpError::FailedHandshake);
         }
 
-        let helo = inner
-            .read_atom()
-            .await
-            .map_err(|_| PcpError::FailedHandshake)?;
+        let helo = inner.read_atom().await.map_err(|_| PcpError::FailedHandshake)?;
         dbg!(&helo);
 
         // Pingか判定する(なんだかんだスレッド作るのはコスト高いため)
         if (helo.is_parent() && helo.len() == 1) {
             let oleh = PongBuilder::new(inner.self_session_id().clone()).build();
             let quit = QuitBuilder::new(crate::pcp::builder::QuitReason::Any).build();
-            inner
-                .write_atoms(&mut VecDeque::from(vec![oleh, quit]))
-                .await
-                .map_err(|_| PcpError::FailedHandshake)?;
+            inner.write_atoms(&mut VecDeque::from(vec![oleh, quit])).await.map_err(|_| PcpError::FailedHandshake)?;
             inner.shutdown();
             return Ok(HandshakeType::Ping);
         }
@@ -179,8 +163,7 @@ impl PcpHandshake {
         let remote_ip = inner.remote_addr().clone().ip();
         let remote_port = helo.port.ok_or(PcpError::FailedHandshake)?;
 
-        let oleh =
-            OlehBuilder::new(inner.self_session_id().clone(), remote_ip, remote_port).build();
+        let oleh = OlehBuilder::new(inner.self_session_id().clone(), remote_ip, remote_port).build();
         let ok = OkBuilder::new(1).build();
 
         let atoms = match send_atom_before_ok {
@@ -189,10 +172,7 @@ impl PcpHandshake {
         };
 
         // SEND OLEH & (ROOT) & PCP_OK
-        inner
-            .write_atoms(&mut VecDeque::from(atoms))
-            .await
-            .map_err(|_| PcpError::FailedHandshake)?;
+        inner.write_atoms(&mut VecDeque::from(atoms)).await.map_err(|_| PcpError::FailedHandshake)?;
 
         let conn = PcpConnection::new(inner, connection_type);
         Ok(HandshakeType::YellowPage(conn))
@@ -200,8 +180,7 @@ impl PcpHandshake {
 }
 
 type PingPongFuture = futures_util::future::BoxFuture<'static, Result<GnuId, std::io::Error>>;
-type ConnectionFuture =
-    futures_util::future::BoxFuture<'static, Result<HandshakeType, std::io::Error>>;
+type ConnectionFuture = futures_util::future::BoxFuture<'static, Result<HandshakeType, std::io::Error>>;
 
 pub enum HandshakeType {
     Ping,
@@ -252,20 +231,14 @@ mod t {
             connection::{factory, pcp::PcpHandshake, ConnectionType},
             GnuId, PcpConnectionFactory,
         },
-        ConnectionId,
+        ConnectionNo,
     };
 
     #[tokio::test]
     async fn test_outgoing() {
         let addr = todo!();
         let stream = todo!();
-        let connection = PcpHandshake::new(
-            ConnectionId::new(),
-            GnuId::new(),
-            stream,
-            addr,
-            ConnectionType::Client,
-            None,
-        );
+        let connection =
+            PcpHandshake::new(ConnectionNo::new(), GnuId::new(), stream, addr, ConnectionType::Client, None);
     }
 }

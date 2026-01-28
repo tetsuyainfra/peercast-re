@@ -24,7 +24,7 @@ use crate::{
     pcp::{ChannelManager, GnuId},
     rtmp::stream_manager::StreamManagerMessage,
     util::Shutdown,
-    ConnectionId,
+    ConnectionNo,
 };
 
 pub use api::Api;
@@ -34,7 +34,7 @@ pub(crate) type ShutdownAndNotifySet = (Shutdown, tokio::sync::mpsc::Sender<()>)
 #[derive(Debug)]
 // pub struct MyIncomingStream<'a> {
 pub struct MyIncomingStream {
-    pub connection_id: ConnectionId,
+    pub connection_id: ConnectionNo,
     // pub tcp_stream: &'a TokioIo<TcpStream>,
     pub remote_addr: SocketAddr,
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
@@ -58,7 +58,7 @@ impl MyIncomingStream {
 pub struct MyConnectInfo {
     // pub local: SocketAddr,
     pub remote: SocketAddr,
-    pub connection_id: ConnectionId,
+    pub connection_id: ConnectionNo,
     // 長い通信があり、シャットダウンを綺麗にしたいならの変数を取得する
     pub(crate) shutdown: Arc<Mutex<Option<ShutdownAndNotifySet>>>,
 }

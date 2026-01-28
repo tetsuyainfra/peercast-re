@@ -9,24 +9,239 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/api/channels": {
+    "/api/v1/channels": {
       "get": {
+        "tags": [
+          "channels"
+        ],
         "operationId": "list_channels",
-        "responses": {}
+        "responses": {
+          "200": {
+            "description": "get channels list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JsonChannel"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "create_channel",
+        "responses": {
+          "200": {
+            "description": "create channel"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "delete_channel",
+        "responses": {
+          "200": {
+            "description": "delete channel"
+          }
+        }
       }
     },
-    "/api/channels/create": {
+    "/api/v1/channels/{id}": {
+      "get": {
+        "tags": [
+          "channels"
+        ],
+        "operationId": "show_channel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Channel ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000000000000123456789ABCDEF"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "show channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JsonChannel"
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
-        "operationId": "create_channel",
-        "responses": {}
+        "tags": [
+          "channels"
+        ],
+        "operationId": "update_channel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Channel ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "00000000000000000123456789ABCDEF"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "update channel"
+          }
+        }
+      }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "api::v1"
+        ],
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "description": "list users"
+          }
+        }
       }
     }
   },
-  "components": {},
+  "components": {
+    "schemas": {
+      "JsonChannel": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "contact_url",
+          "genre",
+          "raw_genre",
+          "desc",
+          "comment",
+          "stream_type",
+          "stream_ext",
+          "bitrate",
+          "number_of_listener",
+          "number_of_relay",
+          "created_at",
+          "track",
+          "type",
+          "channel_type"
+        ],
+        "properties": {
+          "bitrate": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channel_type": {
+            "$ref": "#/components/schemas/JsonChannelType"
+          },
+          "comment": {
+            "type": "string"
+          },
+          "contact_url": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "genre": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "number_of_listener": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "number_of_relay": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "raw_genre": {
+            "type": "string"
+          },
+          "stream_ext": {
+            "type": "string",
+            "description": "拡張子"
+          },
+          "stream_type": {
+            "type": "string",
+            "description": "MIME"
+          },
+          "track": {
+            "$ref": "#/components/schemas/JsonTrack"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "JsonChannelType": {
+        "type": "string",
+        "enum": [
+          "Root",
+          "Tracker",
+          "Relay"
+        ]
+      },
+      "JsonTrack": {
+        "type": "object",
+        "required": [
+          "title",
+          "creator",
+          "url",
+          "album",
+          "genre"
+        ],
+        "properties": {
+          "album": {
+            "type": "string"
+          },
+          "creator": {
+            "type": "string"
+          },
+          "genre": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
   "tags": [
     {
-      "name": "peercast-re",
-      "description": "PeerCast Re: API"
+      "name": "v1",
+      "description": "API v1"
     }
   ]
 }

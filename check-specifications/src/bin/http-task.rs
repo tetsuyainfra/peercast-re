@@ -1,20 +1,19 @@
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
-use anyhow::anyhow;
-use axum::{extract::ws::Message, routing, Router};
+use axum::{Router, extract::ws::Message, routing};
 use futures_util::{SinkExt, StreamExt};
-use tokio::{net::TcpListener, signal, sync::watch};
+use tokio::signal;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
 use tower_http::{
-    add_extension::AddExtensionLayer,
     services::ServeDir,
     trace::{DefaultMakeSpan, TraceLayer},
 };
 use tracing::{error, info};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 struct ShutdownState {
     graceful: CancellationToken,
+    #[allow(unused)]
     force: CancellationToken,
     tracker: TaskTracker,
 }
@@ -27,16 +26,13 @@ async fn main() -> anyhow::Result<()> {
     println!("asset_dir: {:?}", &assets_dir);
 
     let listener = tokio::net::TcpListener::bind(("localhost", 7143)).await?;
-    info!(
-        "HTTP listening on http://{}",
-        listener.local_addr().unwrap(),
-    );
+    info!("HTTP listening on http://{}", listener.local_addr().unwrap(),);
 
-    let axum_handle = axum_server::Handle::new();
+    // let axum_handle = axum_server::Handle::new();
     let tracker = tokio_util::task::TaskTracker::new();
 
     let graceful_token = CancellationToken::new();
-    let force_token = CancellationToken::new();
+    let _force_token = CancellationToken::new();
 
     let child_graceful_token = graceful_token.child_token(); // for http server
     let child_force_token = CancellationToken::new();
@@ -54,23 +50,17 @@ async fn main() -> anyhow::Result<()> {
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .route("/ws", routing::any(ws_handler))
         // logging so we can see what's going on
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(DefaultMakeSpan::default().include_headers(true)),
-        )
+        .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
         .with_state(Arc::new(shutdown_state));
 
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(async move {
-        child_graceful_token.cancelled().await;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(async move {
+            child_graceful_token.cancelled().await;
 
-        info!("graceful start!");
-    })
-    .await
-    .unwrap();
+            info!("graceful start!");
+        })
+        .await
+        .unwrap();
 
     tracker.close();
     tokio::select! {
@@ -86,8 +76,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn init_logger() {
-    let fmt_filter = tracing_subscriber::filter::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_e| "info".into());
+    let fmt_filter = tracing_subscriber::filter::EnvFilter::try_from_default_env().unwrap_or_else(|_e| "info".into());
 
     let fmt_layer = tracing_subscriber::fmt::layer();
     tracing_subscriber::registry()
@@ -128,11 +117,7 @@ async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, addr, state))
 }
 
-async fn handle_socket(
-    mut socket: axum::extract::ws::WebSocket,
-    who: SocketAddr,
-    shutdown: Arc<ShutdownState>,
-) {
+async fn handle_socket(socket: axum::extract::ws::WebSocket, _who: SocketAddr, shutdown: Arc<ShutdownState>) {
     let (mut sender, mut receiver) = socket.split();
 
     let graceful_token = shutdown.graceful.clone();

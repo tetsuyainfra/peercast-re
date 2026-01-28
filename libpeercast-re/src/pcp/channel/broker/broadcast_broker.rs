@@ -36,12 +36,11 @@ use crate::{
     },
     rtmp::rtmp_connection::RtmpConnectionEvent,
     util::util_mpsc::mpsc_send,
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::{
-    BrokerError, ChannelBrokerMessage, ChannelBrokerWorker, ChannelInfo, ChannelMessage,
-    ChannelReciever, TrackInfo,
+    BrokerError, ChannelBrokerMessage, ChannelBrokerWorker, ChannelInfo, ChannelMessage, ChannelReciever, TrackInfo,
 };
 
 #[async_trait]
@@ -80,11 +79,11 @@ pub(super) struct BroadcastBrokerWoker {
     channel_id: GnuId,
     shutdown_rx: UnboundedReceiver<()>,
     //
-    sender_by_connection_id: HashMap<ConnectionId, mpsc::UnboundedSender<ChannelMessage>>,
-    relays_ids: Vec<ConnectionId>,
+    sender_by_connection_id: HashMap<ConnectionNo, mpsc::UnboundedSender<ChannelMessage>>,
+    relays_ids: Vec<ConnectionNo>,
     //
     new_disconnect_futures: Vec<BoxFuture<'static, FutureResult>>,
-    new_disconnections: Vec<(ConnectionId, mpsc::UnboundedReceiver<()>)>,
+    new_disconnections: Vec<(ConnectionNo, mpsc::UnboundedReceiver<()>)>,
     //
     head_atom: Option<HeadAtom>,
     channel_info: Arc<RwLock<Option<ChannelInfo>>>,
@@ -123,7 +122,7 @@ impl BroadcastBrokerWoker {
         }
     }
 
-    fn cleanup_connection(&mut self, connection_id: ConnectionId) {
+    fn cleanup_connection(&mut self, connection_id: ConnectionNo) {
         println!("Stream manager is removing connection id {}", connection_id);
 
         self.sender_by_connection_id.remove(&connection_id);
@@ -145,9 +144,7 @@ impl BroadcastBrokerWoker {
         receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
     ) -> Result<(), BrokerError> {
         debug!("CID:{} ChannelBrokerWorker START", self.channel_id);
-        async fn new_receiver_future(
-            mut receiver: UnboundedReceiver<ChannelBrokerMessage>,
-        ) -> FutureResult {
+        async fn new_receiver_future(mut receiver: UnboundedReceiver<ChannelBrokerMessage>) -> FutureResult {
             let result = receiver.recv().await;
             FutureResult::MessageReceived {
                 receiver,
@@ -166,7 +163,10 @@ impl BroadcastBrokerWoker {
 
             // trace!(message = ?result);
             match result {
-                FutureResult::MessageReceived { receiver, message } => {
+                FutureResult::MessageReceived {
+                    receiver,
+                    message,
+                } => {
                     match message {
                         Some(message) => self.handle_message(message),
                         None => break,
@@ -174,9 +174,9 @@ impl BroadcastBrokerWoker {
                     new_futures.push(new_receiver_future(receiver).boxed()); // メッセージを処理したら、新たにリストに処理待ちする
                 }
 
-                FutureResult::Disconnection { connection_id } => {
-                    self.cleanup_connection(connection_id)
-                }
+                FutureResult::Disconnection {
+                    connection_id,
+                } => self.cleanup_connection(connection_id),
             }
 
             for future in self.new_disconnect_futures.drain(..) {
@@ -199,7 +199,10 @@ impl BroadcastBrokerWoker {
                 sender,
                 disconnection,
             } => self.handle_new_connection(connection_id, sender, disconnection),
-            ChannelBrokerMessage::UpdateChannelInfo { info, track } => {
+            ChannelBrokerMessage::UpdateChannelInfo {
+                info,
+                track,
+            } => {
                 // これは主にBroadcast側で実行される
                 let mut lock_info = self.channel_info.write().unwrap();
                 let mut lock_track = self.track_info.write().unwrap();
@@ -223,7 +226,10 @@ impl BroadcastBrokerWoker {
             } => {
                 self.handle_data(atom, payload, pos, continuation);
             }
-            ChannelBrokerMessage::AtomBroadcast { direction, atom } => todo!(),
+            ChannelBrokerMessage::AtomBroadcast {
+                direction,
+                atom,
+            } => todo!(),
             ChannelBrokerMessage::BroadcastEvent(event) => {
                 //
                 self.handle_rtmp_event(event)
@@ -233,7 +239,7 @@ impl BroadcastBrokerWoker {
 
     fn handle_new_connection(
         &mut self,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         mut sender: UnboundedSender<ChannelMessage>,
         disconnection: UnboundedReceiver<()>,
     ) {
@@ -263,8 +269,7 @@ impl BroadcastBrokerWoker {
             }
             None => {}
         };
-        self.new_disconnect_futures
-            .push(Self::wait_for_client_disconnection(connection_id, disconnection).boxed());
+        self.new_disconnect_futures.push(Self::wait_for_client_disconnection(connection_id, disconnection).boxed());
     }
 
     fn handle_head_data(
@@ -334,21 +339,19 @@ impl BroadcastBrokerWoker {
     fn handle_rtmp_event(&mut self, event: RtmpConnectionEvent) {
         // trace!(?event);
         let flv_tagged = match event {
-            RtmpConnectionEvent::NewMetadata { metadata } => self.flvnizer.write_meta(metadata),
+            RtmpConnectionEvent::NewMetadata {
+                metadata,
+            } => self.flvnizer.write_meta(metadata),
             RtmpConnectionEvent::NewVideoData {
                 timestamp,
                 data,
                 can_be_dropped,
-            } => self
-                .flvnizer
-                .write_video(timestamp.value, data, can_be_dropped),
+            } => self.flvnizer.write_video(timestamp.value, data, can_be_dropped),
             RtmpConnectionEvent::NewAudioData {
                 timestamp,
                 data,
                 can_be_dropped,
-            } => self
-                .flvnizer
-                .write_audio(timestamp.value, data, can_be_dropped),
+            } => self.flvnizer.write_audio(timestamp.value, data, can_be_dropped),
         };
 
         // trace!(?flv_tagged);
@@ -443,13 +446,15 @@ impl BroadcastBrokerWoker {
 
     // 送られてきたrecieverをラップするselect_allできるようにする
     async fn wait_for_client_disconnection(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         mut receiver: UnboundedReceiver<()>,
     ) -> FutureResult {
         // The channel should only be closed when the client has disconnected
         while let Some(()) = receiver.recv().await {}
 
-        FutureResult::Disconnection { connection_id }
+        FutureResult::Disconnection {
+            connection_id,
+        }
     }
 }
 
@@ -520,7 +525,7 @@ fn create_atom(
 #[derive(Debug)]
 enum FutureResult {
     Disconnection {
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
     },
     MessageReceived {
         receiver: UnboundedReceiver<ChannelBrokerMessage>,
@@ -575,12 +580,7 @@ impl RtmpFlvnizer {
     }
 
     // Noneが帰ってくるのはHeaderの準備ができていないため
-    fn write_video(
-        &mut self,
-        timestamp: u32,
-        data: Bytes,
-        can_be_dropped: bool,
-    ) -> Option<FlvnizedData> {
+    fn write_video(&mut self, timestamp: u32, data: Bytes, can_be_dropped: bool) -> Option<FlvnizedData> {
         if data.len() < 5 {
             warn!("rtmp video payload should be more bigger... {:?}", data);
             return None;
@@ -612,12 +612,7 @@ impl RtmpFlvnizer {
     }
 
     // See: write_video
-    fn write_audio(
-        &mut self,
-        timestamp: u32,
-        data: Bytes,
-        can_be_dropped: bool,
-    ) -> Option<FlvnizedData> {
+    fn write_audio(&mut self, timestamp: u32, data: Bytes, can_be_dropped: bool) -> Option<FlvnizedData> {
         if data.len() < 2 {
             warn!("rtmp audio payload should be more bigger... {:?}", &data);
             return None;
@@ -742,7 +737,11 @@ impl RtmpFlvnizer {
         // Field
         let frame_type = (head[0] & 0xF0) >> 4;
         let codec_id = (head[0] & 0x0F);
-        let avc_packet_type = if codec_id == 7 { Some(head[1]) } else { None };
+        let avc_packet_type = if codec_id == 7 {
+            Some(head[1])
+        } else {
+            None
+        };
         let compotion_time = if codec_id == 7 {
             let t = [0, head[2], head[3], head[4]].as_bytes().get_u32();
             Some(t)
@@ -800,12 +799,7 @@ mod t {
         let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
         let (broker_sender, broker_receiver) = mpsc::unbounded_channel();
 
-        let worker = BroadcastBrokerWoker::new(
-            GnuId::new(),
-            Default::default(),
-            Default::default(),
-            shutdown_rx,
-        );
+        let worker = BroadcastBrokerWoker::new(GnuId::new(), Default::default(), Default::default(), shutdown_rx);
         let h = tokio::spawn(async move {
             worker.start(broker_receiver).await;
         });
@@ -829,20 +823,18 @@ mod t {
             Default::default(),
         );
 
-        let mut reciever = broker.channel_reciever(ConnectionId::new());
+        let mut reciever = broker.channel_reciever(ConnectionNo::new());
         let handle = tokio::spawn(async move { reciever.recv().await });
 
         let atom: Atom = Atom::Child(ChildAtom::from((Id4::PCP_HELO, 1_u8)));
         let payload = Bytes::new();
-        broker
-            .sender()
-            .send(ChannelBrokerMessage::ArrivedChannelHead {
-                atom,
-                payload,
-                pos: 0,
-                info: Some(ChannelInfo::new()),
-                track: Some(TrackInfo::new()),
-            });
+        broker.sender().send(ChannelBrokerMessage::ArrivedChannelHead {
+            atom,
+            payload,
+            pos: 0,
+            info: Some(ChannelInfo::new()),
+            track: Some(TrackInfo::new()),
+        });
 
         let r = handle.await.unwrap();
         assert!(r.is_some());

@@ -18,7 +18,7 @@ use crate::{
         stream_manager::{ConnectionMessage, StreamManagerMessage},
     },
     util::util_mpsc::mpsc_send,
-    ConnectionId,
+    ConnectionNo,
 };
 use broker::ChannelBrokerMessage;
 
@@ -48,7 +48,7 @@ impl From<BroadcastTaskConfig> for SourceTaskConfig {
 impl BroadcastTask {
     pub(crate) fn new(
         channel_id: GnuId,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
     ) -> Self {
         let (tx, rx) = watch::channel(TaskStatus::Init);
@@ -113,7 +113,7 @@ enum WorkerError {
 
 struct BroadcastWorker {
     channel_id: GnuId,
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     config: BroadcastTaskConfig,
     //
     rtmp_manager: mpsc::UnboundedSender<StreamManagerMessage>,
@@ -126,7 +126,7 @@ struct BroadcastWorker {
 impl BroadcastWorker {
     fn new(
         channel_id: GnuId,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         config: BroadcastTaskConfig,
         // ワーカー内でリトライする必要は無いので直接RtmpConnectionを渡しても良い気がする
         rtmp_manager: mpsc::UnboundedSender<StreamManagerMessage>,
@@ -157,10 +157,7 @@ impl BroadcastWorker {
                 disconnection: shutdown_rx,
             },
         ) {
-            error!(
-                " BroadcastWorker({}) ChannelBrokerMessage send failed",
-                &self.connection_id
-            );
+            error!(" BroadcastWorker({}) ChannelBrokerMessage send failed", &self.connection_id);
             self.status_tx.send(TaskStatus::Error);
             return Err(WorkerError::Message("cant send ChannelBroker".to_string()));
         };
@@ -175,28 +172,19 @@ impl BroadcastWorker {
         );
 
         if !conn.connect().await {
-            error!(
-                " BroadcastWorker({}) RtmpConnection::connect() FAILED",
-                &self.connection_id
-            );
+            error!(" BroadcastWorker({}) RtmpConnection::connect() FAILED", &self.connection_id);
             self.status_tx.send(TaskStatus::Error);
-            return Err(WorkerError::Message(
-                "cant connect RtmpConnection".to_string(),
-            ));
+            return Err(WorkerError::Message("cant connect RtmpConnection".to_string()));
         };
-        info!(
-            " BroadcastWorker({}) RtmpConnection::connect()",
-            &self.connection_id
-        );
+        info!(" BroadcastWorker({}) RtmpConnection::connect()", &self.connection_id);
 
         let mut results = vec![];
 
         info!(" BroadcastWorker({}) recieve start", &self.connection_id);
         let reason = loop {
             // Channel Brokerへ送るメッセージ
-            let reaction = self
-                .handle_session_results(&mut results)
-                .map_err(|x| WorkerError::Message(format!("error")))?;
+            let reaction =
+                self.handle_session_results(&mut results).map_err(|x| WorkerError::Message(format!("error")))?;
             if reaction == BroadcastConnectionReaction::Disconnect {
                 info!("ConnectionReaction::Disconnect");
                 break TaskStatus::Finish;
@@ -266,10 +254,7 @@ impl BroadcastWorker {
         event: RtmpConnectionEvent,
     ) -> Result<BroadcastConnectionReaction, Box<dyn std::error::Error + Sync + Send>> {
         trace!(handle_raised_event=?event);
-        if !mpsc_send(
-            &self.broker_sender,
-            ChannelBrokerMessage::BroadcastEvent(event),
-        ) {
+        if !mpsc_send(&self.broker_sender, ChannelBrokerMessage::BroadcastEvent(event)) {
             return Ok(BroadcastConnectionReaction::Disconnect);
         }
         Ok(BroadcastConnectionReaction::None)

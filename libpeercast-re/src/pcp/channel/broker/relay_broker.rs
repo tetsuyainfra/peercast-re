@@ -18,7 +18,7 @@ use tracing::{debug, error, trace};
 use crate::{
     pcp::{Atom, ChannelInfo, ChannelType, GnuId, TrackInfo},
     util::{util_mpsc::mpsc_send, Shutdown},
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::{BrokerError, ChannelBrokerMessage, ChannelBrokerWorker, ChannelMessage};
@@ -47,7 +47,7 @@ impl ChannelBrokerWorker for RelayBrokerWorker {
 #[derive(Debug)]
 enum FutureResult {
     Disconnection {
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
     },
     MessageReceived {
         receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
@@ -70,9 +70,9 @@ pub(super) struct RelayBrokerWorker {
     track_info: Arc<RwLock<Option<TrackInfo>>>,
     shutdown_rx: mpsc::UnboundedReceiver<()>,
     //
-    sender_by_connection_id: HashMap<ConnectionId, mpsc::UnboundedSender<ChannelMessage>>,
+    sender_by_connection_id: HashMap<ConnectionNo, mpsc::UnboundedSender<ChannelMessage>>,
     new_disconnect_futures: Vec<BoxFuture<'static, FutureResult>>,
-    new_disconnections: Vec<(ConnectionId, mpsc::UnboundedReceiver<()>)>,
+    new_disconnections: Vec<(ConnectionNo, mpsc::UnboundedReceiver<()>)>,
     //
     head_data: Option<HeadData>,
 }
@@ -97,7 +97,7 @@ impl RelayBrokerWorker {
         }
     }
 
-    fn cleanup_connection(&mut self, connection_id: ConnectionId) {
+    fn cleanup_connection(&mut self, connection_id: ConnectionNo) {
         println!("Stream manager is removing connection id {}", connection_id);
 
         self.sender_by_connection_id.remove(&connection_id);
@@ -116,13 +116,15 @@ impl RelayBrokerWorker {
 
     // 送られてきたrecieverをラップするselect_allできるようにする
     async fn wait_for_client_disconnection(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         mut receiver: mpsc::UnboundedReceiver<()>,
     ) -> FutureResult {
         // The channel should only be closed when the client has disconnected
         while let Some(()) = receiver.recv().await {}
 
-        FutureResult::Disconnection { connection_id }
+        FutureResult::Disconnection {
+            connection_id,
+        }
     }
 
     // fn new_disconnect_futures
@@ -132,9 +134,7 @@ impl RelayBrokerWorker {
         mut manager_receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
     ) -> Result<(), BrokerError> {
         debug!("RelayBrokerWorker START CID:{:.07}", self.channel_id);
-        async fn new_receiver_future(
-            mut receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>,
-        ) -> FutureResult {
+        async fn new_receiver_future(mut receiver: mpsc::UnboundedReceiver<ChannelBrokerMessage>) -> FutureResult {
             let result = receiver.recv().await;
             FutureResult::MessageReceived {
                 receiver,
@@ -153,7 +153,10 @@ impl RelayBrokerWorker {
 
             // trace!(message = ?result);
             match result {
-                FutureResult::MessageReceived { receiver, message } => {
+                FutureResult::MessageReceived {
+                    receiver,
+                    message,
+                } => {
                     match message {
                         Some(message) => self.handle_message(message),
                         None => break,
@@ -161,9 +164,9 @@ impl RelayBrokerWorker {
                     new_futures.push(new_receiver_future(receiver).boxed()); // メッセージを処理したら、新たにリストに処理待ちする
                 }
 
-                FutureResult::Disconnection { connection_id } => {
-                    self.cleanup_connection(connection_id)
-                }
+                FutureResult::Disconnection {
+                    connection_id,
+                } => self.cleanup_connection(connection_id),
             }
 
             for future in self.new_disconnect_futures.drain(..) {
@@ -186,7 +189,10 @@ impl RelayBrokerWorker {
                 sender,
                 disconnection,
             } => todo!(),
-            ChannelBrokerMessage::UpdateChannelInfo { info, track } => todo!(),
+            ChannelBrokerMessage::UpdateChannelInfo {
+                info,
+                track,
+            } => todo!(),
             ChannelBrokerMessage::ArrivedChannelHead {
                 atom,
                 payload,
@@ -200,20 +206,27 @@ impl RelayBrokerWorker {
                 pos,
                 continuation,
             } => self.handle_arrived_channel_data(atom, pos, payload, continuation),
-            ChannelBrokerMessage::AtomBroadcast { direction, atom } => todo!(),
+            ChannelBrokerMessage::AtomBroadcast {
+                direction,
+                atom,
+            } => todo!(),
             ChannelBrokerMessage::BroadcastEvent(_) => todo!(),
         }
     }
 
     fn handle_new_connection(
         &mut self,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         mut sender: mpsc::UnboundedSender<ChannelMessage>,
         disconnection: mpsc::UnboundedReceiver<()>,
     ) {
         // metadataが有れば送っておく
         if (self.head_data.is_some()) {
-            let HeadData { atom, pos, payload } = self.head_data.as_ref().unwrap();
+            let HeadData {
+                atom,
+                pos,
+                payload,
+            } = self.head_data.as_ref().unwrap();
             let info = self.channel_info.read().unwrap().clone();
             let track = self.track_info.read().unwrap().clone();
             mpsc_send(
@@ -235,8 +248,7 @@ impl RelayBrokerWorker {
             }
             None => {}
         };
-        self.new_disconnect_futures
-            .push(Self::wait_for_client_disconnection(connection_id, disconnection).boxed());
+        self.new_disconnect_futures.push(Self::wait_for_client_disconnection(connection_id, disconnection).boxed());
     }
 
     fn handle_arrived_channel_head(
@@ -261,14 +273,22 @@ impl RelayBrokerWorker {
         if self.head_data.is_none() {
             trace!("BROKER UPDATE HAED_DATA CID:{:.07}", self.channel_id);
             trace!(HEAD_DATA_ATOM=?atom);
-            self.head_data = Some(HeadData { atom, pos, payload })
+            self.head_data = Some(HeadData {
+                atom,
+                pos,
+                payload,
+            })
         } else {
             let head_data = self.head_data.as_mut().unwrap();
             head_data.pos = pos;
             head_data.payload = payload;
         }
 
-        let HeadData { atom, pos, payload } = self.head_data.as_ref().unwrap();
+        let HeadData {
+            atom,
+            pos,
+            payload,
+        } = self.head_data.as_ref().unwrap();
         self.send_listener(ChannelMessage::RelayChannelHead {
             atom: atom.clone(),
             pos: pos.clone(),
@@ -277,13 +297,7 @@ impl RelayBrokerWorker {
             track: None,
         })
     }
-    fn handle_arrived_channel_data(
-        &mut self,
-        atom: Atom,
-        pos: u32,
-        payload: Bytes,
-        continuation: bool,
-    ) {
+    fn handle_arrived_channel_data(&mut self, atom: Atom, pos: u32, payload: Bytes, continuation: bool) {
         if self.head_data.is_none() {
             panic!("Headが送られてくる前にデータが来るのはおかしい");
         }
@@ -315,12 +329,7 @@ mod t {
         let info = Arc::new(RwLock::new(None));
         let track = Arc::new(RwLock::new(None));
         let (shutdown_tx, shutdown_rx) = mpsc::unbounded_channel();
-        let worker = RelayBrokerWorker::new(
-            GnuId::new(),
-            Arc::clone(&info),
-            Arc::clone(&track),
-            shutdown_rx,
-        );
+        let worker = RelayBrokerWorker::new(GnuId::new(), Arc::clone(&info), Arc::clone(&track), shutdown_rx);
 
         let (manager_tx, manager_rx) = mpsc::unbounded_channel();
         let handle = tokio::spawn(worker.start(manager_rx));

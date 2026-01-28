@@ -30,7 +30,7 @@ use crate::{
         stream_manager::{self, StreamManagerMessage},
     },
     util::{identify_protocol, ConnectionProtocol, Shutdown},
-    ConnectionId,
+    ConnectionNo,
 };
 
 #[derive(Debug, Error)]
@@ -59,20 +59,17 @@ impl CuiApp {
 
     pub fn run(config_path: PathBuf, config: Config) -> Result<(), CuiError> {
         debug!(?config);
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .worker_threads(4)
-            .build()
-            .unwrap();
+        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(4).build().unwrap();
 
         rt.block_on(async {
             let (notify_shutdown_tx, _) = broadcast::channel(1);
             let (shutdown_complete_tx, mut shutdown_complete_rx) = mpsc::channel(1);
 
             let mut app = Self {
-                config_path, config,
+                config_path,
+                config,
                 notify_shutdown_tx,
-                shutdown_complete_tx
+                shutdown_complete_tx,
             };
             // アプリケーションの実行
             tokio::select! {
@@ -90,7 +87,11 @@ impl CuiApp {
                 }
             };
 
-            let CuiApp { mut notify_shutdown_tx, mut shutdown_complete_tx ,..} = app;
+            let CuiApp {
+                mut notify_shutdown_tx,
+                mut shutdown_complete_tx,
+                ..
+            } = app;
             drop(notify_shutdown_tx); // シャットダウンをspawnしたタスクへ通知する
             drop(shutdown_complete_tx); //
 
@@ -141,8 +142,11 @@ impl CuiApp {
 
             match gracefull_reason {
                 GarcefullShutdownReason::Success => Ok(()),
-                GarcefullShutdownReason::AfterPeriod => Err(CuiError::ShutdownFailed(format!("Wait {}seconds, but can't shutdowned", Self::WAIT_FORCE_SHUTDOWN_SEC))),
-                GarcefullShutdownReason::UserForce =>Err(CuiError::ShutdownFailed("User send ctrl+c".into())),
+                GarcefullShutdownReason::AfterPeriod => Err(CuiError::ShutdownFailed(format!(
+                    "Wait {}seconds, but can't shutdowned",
+                    Self::WAIT_FORCE_SHUTDOWN_SEC
+                ))),
+                GarcefullShutdownReason::UserForce => Err(CuiError::ShutdownFailed("User send ctrl+c".into())),
             }
         }) // rt.block()
     }
@@ -171,20 +175,14 @@ impl CuiApp {
         let rtmp_addr = format!("{}:{}", "127.0.0.1", c.rtmp_port); // FIXME: config.rtmp_addressの追加が必要かな？
         info!("rtmp server -> rtmp://localhost:{}", c.rtmp_port);
         let rtmp_listener = tokio::net::TcpListener::bind(rtmp_addr.clone()).await?;
-        let _rtmp_handle = tokio::spawn(Self::spawn_rtmp_server(
-            manager_sender.clone(),
-            rtmp_listener,
-            rtmp_addr,
-        ));
+        let _rtmp_handle = tokio::spawn(Self::spawn_rtmp_server(manager_sender.clone(), rtmp_listener, rtmp_addr));
 
         // PORT CHECK
         let server_port = c.server_port;
         let port_check_handle = tokio::spawn(async move {
             info!("port check");
-            let res = reqwest::get(format!(
-                "http://ppc-v4.tetsuyainfra.dev:7145/ppc/portcheck?port={server_port}"
-            ))
-            .await;
+            let res =
+                reqwest::get(format!("http://ppc-v4.tetsuyainfra.dev:7145/ppc/portcheck?port={server_port}")).await;
             info!("res: {:?}", res);
         });
 
@@ -199,7 +197,7 @@ impl CuiApp {
         //     TrackInfo::default().into(),
         // );
         // ch.unwrap().connect(
-        //     ConnectionId::new(),
+        //     ConnectionNo::new(),
         //     session_id,
         //     BroadcastTaskConfig {
         //         app_key: "req1".into(),
@@ -224,7 +222,7 @@ impl CuiApp {
             .create(id, ChannelType::Relay, None, None)
             .unwrap();
         ch.connect(
-            ConnectionId::new(),
+            ConnectionNo::new(),
             SourceTaskConfig::Relay(RelayTaskConfig {
                 addr: addr,
                 self_addr: None,
@@ -236,7 +234,7 @@ impl CuiApp {
 
         #[allow(unused_labels)]
         'accept_loop: loop {
-            let connection_id = ConnectionId::new();
+            let connection_id = ConnectionNo::new();
             let shutdown = Shutdown::new(self.notify_shutdown_tx.subscribe());
             let shutdown_complete_tx = self.shutdown_complete_tx.clone();
             let shutdown_set = (shutdown, shutdown_complete_tx);
@@ -294,8 +292,7 @@ impl CuiApp {
                             tcp_stream,
                             remote_addr,
                             shutdown_set,
-                            cloned_http_service
-                                .into_make_service_with_connect_info::<MyConnectInfo>(),
+                            cloned_http_service.into_make_service_with_connect_info::<MyConnectInfo>(),
                         )
                         .await;
                     }
@@ -315,14 +312,10 @@ impl CuiApp {
 
         loop {
             let (stream, connection_info) = listener.accept().await?;
-            let current_id = ConnectionId::new();
+            let current_id = ConnectionNo::new();
 
             let connection = connection::Connection::new(current_id.0, manager_sender.clone());
-            println!(
-                "Connection {}: Connection received from {}",
-                current_id.0,
-                connection_info.ip()
-            );
+            println!("Connection {}: Connection received from {}", current_id.0, connection_info.ip());
 
             tokio::spawn(connection.start_handshake(stream));
         }
@@ -332,7 +325,7 @@ impl CuiApp {
     async fn spawn_pcp_portcheck(
         channel_manager: Arc<ChannelManager>,
         //
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
@@ -359,7 +352,7 @@ impl CuiApp {
         channel_manager: Arc<ChannelManager>,
         rtmp_stream_manager: UnboundedSender<StreamManagerMessage>,
         //
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
@@ -375,7 +368,7 @@ impl CuiApp {
     async fn spawn_http_server(
         // local_address: Arc<Vec<IpNet>>,
         //
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,
@@ -398,11 +391,10 @@ impl CuiApp {
 
         let socket = hyper_util::rt::TokioIo::new(tcp_stream);
 
-        let hyper_service =
-            hyper::service::service_fn(move |request: Request<hyper::body::Incoming>| {
-                use tower::ServiceExt;
-                tower_service.clone().oneshot(request)
-            });
+        let hyper_service = hyper::service::service_fn(move |request: Request<hyper::body::Incoming>| {
+            use tower::ServiceExt;
+            tower_service.clone().oneshot(request)
+        });
 
         match hyper_util::server::conn::auto::Builder::new(hyper_util::rt::TokioExecutor::new())
             .serve_connection_with_upgrades(socket, hyper_service)
@@ -419,7 +411,7 @@ impl CuiApp {
     async fn Xspawn_http_server<M, S>(
         // local_address: Arc<Vec<IpNet>>,
         //
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         tcp_stream: TcpStream,
         remote_addr: SocketAddr,
         shutdown_set: ShutdownAndNotifySet,

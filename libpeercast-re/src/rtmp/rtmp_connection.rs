@@ -5,13 +5,13 @@ use rml_rtmp::{messages::RtmpMessage, sessions::StreamMetadata, time::RtmpTimest
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use crate::{rtmp::send, ConnectionId};
+use crate::{rtmp::send, ConnectionNo};
 
 use super::stream_manager::{ConnectionMessage, StreamManagerMessage};
 
 pub struct RtmpConnection {
     manager_sender: mpsc::UnboundedSender<StreamManagerMessage>,
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     rtmp_app: String,
     stream_key: String,
     //
@@ -24,7 +24,7 @@ pub struct RtmpConnection {
 impl RtmpConnection {
     pub fn new(
         manager_sender: mpsc::UnboundedSender<StreamManagerMessage>,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         rtmp_app: &str,
         stream_key: &str,
     ) -> Self {
@@ -70,7 +70,9 @@ impl RtmpConnection {
         };
         debug!(?msg);
         match msg {
-            ConnectionMessage::RequestAccepted { request_id } => {
+            ConnectionMessage::RequestAccepted {
+                request_id,
+            } => {
                 assert_eq!(req_id, request_id);
             }
             _ => return false,
@@ -86,27 +88,26 @@ impl RtmpConnection {
         if self.reciever.is_none() {
             return None;
         }
-        self.reciever
-            .as_mut()
-            .unwrap()
-            .recv()
-            .await
-            .map(Self::connection_message_to_rtmp_message)
+        self.reciever.as_mut().unwrap().recv().await.map(Self::connection_message_to_rtmp_message)
     }
 
-    fn connection_message_to_rtmp_message(
-        connection_message: ConnectionMessage,
-    ) -> RtmpConnectionEvent {
+    fn connection_message_to_rtmp_message(connection_message: ConnectionMessage) -> RtmpConnectionEvent {
         match connection_message {
-            ConnectionMessage::RequestAccepted { request_id } => {
+            ConnectionMessage::RequestAccepted {
+                request_id,
+            } => {
                 unimplemented!()
             }
-            ConnectionMessage::RequestDenied { request_id } => {
+            ConnectionMessage::RequestDenied {
+                request_id,
+            } => {
                 unimplemented!()
             }
-            ConnectionMessage::NewMetadata { metadata } => {
-                RtmpConnectionEvent::NewMetadata { metadata }
-            }
+            ConnectionMessage::NewMetadata {
+                metadata,
+            } => RtmpConnectionEvent::NewMetadata {
+                metadata,
+            },
             ConnectionMessage::NewVideoData {
                 timestamp,
                 data,
@@ -167,10 +168,9 @@ impl std::fmt::Debug for RtmpConnectionEvent {
                 // .field("data", data)
                 .field("can_be_dropped", can_be_dropped)
                 .finish_non_exhaustive(),
-            Self::NewMetadata { metadata } => f
-                .debug_struct("NewMetadata")
-                .field("metadata", metadata)
-                .finish(),
+            Self::NewMetadata {
+                metadata,
+            } => f.debug_struct("NewMetadata").field("metadata", metadata).finish(),
         }
     }
 }

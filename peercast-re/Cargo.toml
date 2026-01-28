@@ -7,54 +7,71 @@ default-run = "peercast-re"
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
-anyhow = { version = "1.0.95" }
-thiserror = {version = "*"}
+# Error handling
+thiserror = { version = "*" }
+anyhow = { version = "*" }
 
 # tracing logging
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = [
+tracing = "*"
+tracing-subscriber = { version = "*", features = [
+    "tracing-log",
     "env-filter",
     "json",
     "fmt",
     "local-time",
 ] }
+tracing-futures = "*"
+tracing-attributes = "*"
+tracing-appender = "*"
+tracing-test = "*"
+log = "*"
 
-# Async
-futures-util = { version = "0.3.31", default-features = false, features = [
-    "alloc",
-] }
-tokio = { version = "1.43.0", features = ["full", "tracing"] }
-tokio-stream = { version = "0.1.17" }
-tokio-test = { version = "0.4.4" }
-tokio-util = { version = "0.7.13", features = ["rt"] }
-console-subscriber = { version = "0.4.1" }
+# Async Thread
+futures-core = "0.3"
+futures-util = "0.3"
 
-# Axum
-axum-core = { version = "*" }
-axum = { version = "0.8.1", features = ["tokio", "form", "ws", "tracing"] }
-axum-extra = { version = "0.10.0", features = ["typed-header"] }
-axum-server = { version = "0.7.2" } # THIS IS NOT Axum Community build
-tower = { version = "0.5.2" }
-tower-http = { version = "0.6.2", features = [
+# tokio -> [target.'cfg(target_os = XXX)'.dependencies]
+tokio = { version = "*", features = ["full", "tracing", "net"] }
+tokio-stream = { version = "*" }
+tokio-test = { version = "*" }
+tokio-util = { version = "*", features = ["rt"] }
+# tokio-graceful-shutdown = { version = "*", features = ["tracing"] }
+
+# HTTP
+axum = { version = "*", features = ["tokio", "form", "ws", "tracing"] }
+axum-core = "*"
+axum-extra = { version = "*", features = ["typed-header"] }
+tower = { version = "*" }
+tower-http = { version = "*", features = [
     "fs",
     "trace",
     "cors",
+    "normalize-path",
     "util",
     "request-id",
     "timeout",
     "add-extension",
 ] }
-hyper-util = { version = "0.1.10", features = ["full"] }
+hyper = { version = "*", features = ["full"] }
+hyper-util = { version = "*", features = ["full"] }
+http = { version = "*" }
+
+# API
+utoipa = { version = "5.4.0", features = ["axum_extras"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version="*", features = ["axum", "vendored"], default-features = false }
+
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }
 # serde_derive = { version = "1.0" } # serde features = ["derive"]しているので必要ない
 serde_json = "1.0.138"
+toml = { version = "0.9.8" }
 
 # url
 url = { version = "2.5.4" }
 html-escape = { version = "0.2.13" }
-
+mime_guess = { version = "2.0.5" }
 
 # バイナリ操作
 bytes = { version = "1.10.0", features = ["serde"] }
@@ -78,9 +95,34 @@ dirs = "6.0.0"
 # prcess exit code
 exitcode = "1"
 bitflags = "2.9.0"
-utoipa = { version = "5.3.1", features = ["axum_extras"] }
-utoipa-axum = "0.2.0"
-rust-embed = { version = "8.7.0", features = ["axum", "axum-ex"] }
+rust-embed = { version = "8.9.0", features = ["axum", "axum-ex"] }
+
+# RTMP
+rml_rtmp = { version = "*" }
+
+#[target.'cfg(target_os = "windows")'.dependencies]
+#tokio = { version = "*", features = ["full", "tracing"] }
+
+#[target.'cfg(target_os = "linux")'.dependencies]
+#tokio = { version = "*", features = ["full", "tracing", "unix"] }
+
+# tokio-console用
+console-subscriber = "0.5.0"
 
 [build-dependencies]
 embed-resource = "3.0.1"
+
+# These crates are used for running unit tests.
+[dev-dependencies]
+# 主にテストで使う
+assert_cmd = { version = "2.1.1" }
+# benchmark
+criterion  = { version = "0.8.1" }
+
+[[bench]]
+name = "channel_struct_clone"
+harness = false
+
+[[bench]]
+name = "mutex_or_channel"
+harness = false

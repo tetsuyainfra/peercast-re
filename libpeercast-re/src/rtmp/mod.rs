@@ -64,14 +64,18 @@ mod test {
             let (stream, connection_info) = listener.accept().await?;
 
             let connection = connection::Connection::new(current_id, manager_sender.clone());
-            println!(
-                "Connection {}: Connection received from {}",
-                current_id,
-                connection_info.ip()
-            );
+            println!("Connection {}: Connection received from {}", current_id, connection_info.ip());
 
             tokio::spawn(connection.start_handshake(stream));
             current_id = current_id + 1;
         }
+    }
+
+    #[crate::test]
+    async fn test_shutdown() {
+        let (manager_sender, handle) = stream_manager::start_with_handle();
+
+        drop(manager_sender);
+        assert_eq!(handle.await.unwrap(), ())
     }
 }

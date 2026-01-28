@@ -7,9 +7,13 @@ use tokio::net::TcpStream;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectionProtocol {
+    /// PCP Protocol
     PeerCast,
+    /// HTTP from PeerCast Client
     PeerCastHttp,
+    /// General HTTP Protocol
     Http,
+    /// Unknown Protocol
     Unknown,
 }
 

@@ -6,7 +6,7 @@ use tracing::info;
 use crate::{
     config::Config,
     pcp::{ChannelInfo, ChannelManager, ChannelType, GnuId, RelayTaskConfig, SourceTaskConfig},
-    ConnectionId,
+    ConnectionNo,
 };
 
 pub struct CuiDL {}
@@ -29,11 +29,11 @@ impl CuiDL {
             addr: connect_addr,
             self_addr: None,
         });
-        let _r = ch.connect(ConnectionId::new(), task_config);
+        let _r = ch.connect(ConnectionNo::new(), task_config);
 
         // Connectingになるのを待つ
 
-        let mut reciever = ch.channel_reciever(ConnectionId::new());
+        let mut reciever = ch.channel_reciever(ConnectionNo::new());
 
         let recieve_fut = async {
             loop {

@@ -6,7 +6,6 @@ use std::{
 
 use bytes::Buf;
 use tracing::warn;
-use tracing_subscriber::field::debug;
 
 use crate::pcp::{session::Session, Atom, GnuId, Id4};
 
@@ -116,40 +115,25 @@ impl HostInfo {
         match (ips.len(), ports.len()) {
             (2, 2) => {
                 // pop() means get last element.
-                info.local_address =
-                    Some(SocketAddr::new(ips.pop().unwrap(), ports.pop().unwrap()));
-                info.global_address =
-                    Some(SocketAddr::new(ips.pop().unwrap(), ports.pop().unwrap()));
+                info.local_address = Some(SocketAddr::new(ips.pop().unwrap(), ports.pop().unwrap()));
+                info.global_address = Some(SocketAddr::new(ips.pop().unwrap(), ports.pop().unwrap()));
             }
             _ => {}
         }
 
         match (extra_prefix, extra_number) {
-            (Some(prefix), Some(number)) => {
-                info.version_extra = Some(VersionExtra { prefix, number })
-            }
+            (Some(prefix), Some(number)) => info.version_extra = Some(VersionExtra { prefix, number }),
             (None, None) => {}
             _ => {
-                warn!(
-                    ?extra_prefix,
-                    ?extra_number,
-                    "PCP_HOST_VERSION_EX_* value have. but, something occur.",
-                );
+                warn!(?extra_prefix, ?extra_number, "PCP_HOST_VERSION_EX_* value have. but, something occur.",);
             }
         }
 
         match (up_ip, up_port, up_hops) {
-            (Some(ip), Some(port), hops) => {
-                info.uphost = Some((SocketAddr::from((ip, port)), hops))
-            }
+            (Some(ip), Some(port), hops) => info.uphost = Some((SocketAddr::from((ip, port)), hops)),
             (None, None, None) => {}
             _ => {
-                warn!(
-                    ?up_ip,
-                    ?up_port,
-                    ?up_hops,
-                    "PCP_HOST_UPHOST_* value have. but, something occur.",
-                );
+                warn!(?up_ip, ?up_port, ?up_hops, "PCP_HOST_UPHOST_* value have. but, something occur.",);
             }
         };
 

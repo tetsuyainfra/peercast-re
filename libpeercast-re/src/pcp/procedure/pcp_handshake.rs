@@ -14,13 +14,12 @@ use crate::{
     pcp::{
         atom::{self, read_atom},
         builder::{
-            HelloBuilder, HostInfo, OlehBuilder, OlehInfo, PingBuilder, PongBuilder, QuitBuilder,
-            QuitInfo, QuitReason,
+            HelloBuilder, HostInfo, OlehBuilder, OlehInfo, PingBuilder, PongBuilder, QuitBuilder, QuitInfo, QuitReason,
         },
         decode::{PcpPing, PcpPong},
         Atom, ChannelManager, GnuId, Id4,
     },
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::http_req::{create_channel_request, parse_pcp_http_response};
@@ -40,7 +39,7 @@ pub enum HandshakeReturn<T> {
     ChannelNotFound,
 }
 pub struct PcpHandshake {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     stream: TcpStream,
     self_addr: Option<SocketAddr>,
     remote: SocketAddr,
@@ -50,7 +49,7 @@ pub struct PcpHandshake {
 
 impl PcpHandshake {
     pub fn new(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         stream: TcpStream,
         self_addr: Option<SocketAddr>,
         remote: SocketAddr,
@@ -68,10 +67,7 @@ impl PcpHandshake {
     }
 
     #[instrument(fields(connection_id = self.connection_id.0))]
-    pub async fn outgoing(
-        mut self,
-        broadcast_id: GnuId,
-    ) -> Result<HandshakeReturn<TcpStream>, HandshakeError> {
+    pub async fn outgoing(mut self, broadcast_id: GnuId) -> Result<HandshakeReturn<TcpStream>, HandshakeError> {
         let mut req_buf = create_channel_request(broadcast_id);
 
         // ヘッダーの送信
@@ -86,8 +82,7 @@ impl PcpHandshake {
             trace!(CID=?&self.connection_id, read_buf = ?&self. read_buf);
 
             // Bytesの処理をすること
-            let resp = parse_pcp_http_response(&self.read_buf)
-                .map_err(|e| HandshakeError::HttpResponse)?;
+            let resp = parse_pcp_http_response(&self.read_buf).map_err(|e| HandshakeError::HttpResponse)?;
             match resp {
                 Some(r) => break r,
                 None => continue, // 途中までしかレスポンスが帰ってきていないので継続して読み取る
@@ -128,7 +123,11 @@ impl PcpHandshake {
                 let oleh = self.send_hello(broadcast_id).await?;
                 let (hosts, quit) = self.recv_hosts_and_quit().await?;
 
-                Ok(HandshakeReturn::NextHost { oleh, hosts, quit })
+                Ok(HandshakeReturn::NextHost {
+                    oleh,
+                    hosts,
+                    quit,
+                })
             }
             404 => {
                 // 配信終了後はこれになるっぽいんだよね
@@ -167,18 +166,11 @@ impl PcpHandshake {
     }
 
     #[instrument(fields(connection_id = self.connection_id.0))]
-    pub async fn incoming(
-        &mut self,
-        channel_manager: Arc<ChannelManager>,
-    ) -> Result<(), HandshakeError> {
+    pub async fn incoming(&mut self, channel_manager: Arc<ChannelManager>) -> Result<(), HandshakeError> {
         trace!("Incoming PCP");
         // TCP Streamの冒頭 pcp\nもAtomのヘッダーとして扱う
         let connect_atom = self.read_atom().await?;
-        trace!(
-            "incomming connection CID:{}, atom: {:#?}",
-            self.connection_id,
-            &connect_atom
-        );
+        trace!("incomming connection CID:{}, atom: {:#?}", self.connection_id, &connect_atom);
         if connect_atom.id() != Id4::PCP_CONNECT {
             return Err(AtomParseError::IdError.into());
         }
@@ -253,9 +245,7 @@ impl PcpHandshake {
     }
 
     /// Recv Hosts and Quit
-    async fn recv_hosts_and_quit(
-        &mut self,
-    ) -> Result<(Vec<HostInfo>, Option<QuitInfo>), HandshakeError> {
+    async fn recv_hosts_and_quit(&mut self) -> Result<(Vec<HostInfo>, Option<QuitInfo>), HandshakeError> {
         let mut hosts = vec![];
         let mut quit = None;
         loop {

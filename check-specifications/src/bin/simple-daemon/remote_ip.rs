@@ -50,9 +50,7 @@ where
 
     fn call(&mut self, mut req: Request<ReqBody>) -> Self::Future {
         // let real_remote_ip = SecureClientIp::from(&self.ip_src, req.headers(), req.extensions());
-        if let Ok(real_remote_ip) =
-            SecureClientIp::from(&self.ip_src, req.headers(), req.extensions())
-        {
+        if let Ok(real_remote_ip) = SecureClientIp::from(&self.ip_src, req.headers(), req.extensions()) {
             req.extensions_mut().insert(real_remote_ip);
         }
 
@@ -71,6 +69,7 @@ where
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub struct RemoteIp {}
 

@@ -13,7 +13,15 @@
   - dpkg -Dhで詳細
 
 # peercast-re
-- [] 
+- [] Configロードの仕組み作る
+- MPEG-DASH対応
+  - AAC
+    - FLV audio header parse
+    - ADTS
+    - PES
+  - H.264
+    - FLV video header parse
+    - PES
 
 # peercast-root
 - [] index.txtのfooterにStatus情報を表示

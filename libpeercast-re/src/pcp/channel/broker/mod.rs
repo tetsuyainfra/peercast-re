@@ -12,7 +12,7 @@ use crate::{
     pcp::{Atom, GnuId},
     rtmp::rtmp_connection::RtmpConnectionEvent,
     util::util_mpsc::mpsc_send,
-    ConnectionId,
+    ConnectionNo,
 };
 
 use self::{broadcast_broker::BroadcastBrokerWoker, relay_broker::RelayBrokerWorker};
@@ -31,7 +31,7 @@ enum BrokerError {}
 #[derive(Debug)]
 pub(crate) enum ChannelBrokerMessage {
     NewConnection {
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         sender: mpsc::UnboundedSender<ChannelMessage>,
         disconnection: mpsc::UnboundedReceiver<()>,
     },
@@ -131,21 +131,13 @@ impl ChannelBroker {
                 //     task_shutdown_rx,
                 // );
                 // tokio::spawn(broker.start(manager_rx))
-                let broker: BroadcastBrokerWoker = ChannelBrokerWorker::new(
-                    channel_id,
-                    channel_info,
-                    track_info,
-                    task_shutdown_rx,
-                );
+                let broker: BroadcastBrokerWoker =
+                    ChannelBrokerWorker::new(channel_id, channel_info, track_info, task_shutdown_rx);
                 tokio::spawn(broker.start(manager_rx))
             }
             ChannelType::Relay => {
-                let broker: RelayBrokerWorker = ChannelBrokerWorker::new(
-                    channel_id,
-                    channel_info,
-                    track_info,
-                    task_shutdown_rx,
-                );
+                let broker: RelayBrokerWorker =
+                    ChannelBrokerWorker::new(channel_id, channel_info, track_info, task_shutdown_rx);
                 tokio::spawn(broker.start(manager_rx))
             }
         };
@@ -161,7 +153,7 @@ impl ChannelBroker {
         self.manager_tx.clone()
     }
 
-    pub fn channel_reciever(&self, connection_id: ConnectionId) -> ChannelReciever {
+    pub fn channel_reciever(&self, connection_id: ConnectionNo) -> ChannelReciever {
         ChannelReciever::create(self.sender(), connection_id)
     }
 }
@@ -194,10 +186,7 @@ pub struct ChannelReciever {
     disconnection_tx: mpsc::UnboundedSender<()>,
 }
 impl ChannelReciever {
-    fn create(
-        mut broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>,
-        connection_id: ConnectionId,
-    ) -> Self {
+    fn create(mut broker_sender: mpsc::UnboundedSender<ChannelBrokerMessage>, connection_id: ConnectionNo) -> Self {
         let (reciever_tx, reciever_rx) = mpsc::unbounded_channel();
         let (disconnection_tx, disconnection) = mpsc::unbounded_channel();
         let message = ChannelBrokerMessage::NewConnection {
@@ -219,10 +208,7 @@ impl ChannelReciever {
         self.reciever_rx.recv().await
     }
 
-    pub fn poll_recv(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<ChannelMessage>> {
+    pub fn poll_recv(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<ChannelMessage>> {
         self.reciever_rx.poll_recv(cx)
     }
 }

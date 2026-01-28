@@ -1,9 +1,9 @@
 use libpeercast_re::{
+    ConnectionNo,
     rtmp::{
         self, connection,
         rtmp_connection::{RtmpConnection, RtmpConnectionEvent},
     },
-    ConnectionId,
 };
 
 #[tokio::main]
@@ -20,14 +20,9 @@ async fn main() -> Result<(), std::io::Error> {
         loop {
             let (stream, connection_info) = listener.accept().await?;
 
-            let connection_id = ConnectionId::new().0;
-            let connection =
-                connection::Connection::new(connection_id, manager_sender_cloned.clone());
-            println!(
-                "Connection {}: Connection received from {}",
-                connection_id,
-                connection_info.ip()
-            );
+            let connection_id = ConnectionNo::new().0;
+            let connection = connection::Connection::new(connection_id, manager_sender_cloned.clone());
+            println!("Connection {}: Connection received from {}", connection_id, connection_info.ip());
 
             tokio::spawn(connection.start_handshake(stream));
         }
@@ -35,7 +30,7 @@ async fn main() -> Result<(), std::io::Error> {
         Ok::<_, std::io::Error>(())
     });
 
-    let mut conn = RtmpConnection::new(manager_sender.clone(), ConnectionId::new(), "req1", "");
+    let mut conn = RtmpConnection::new(manager_sender.clone(), ConnectionNo::new(), "req1", "");
     let r = conn.connect().await;
     println!("connect: {r}");
 
@@ -65,15 +60,10 @@ async fn main() -> Result<(), std::io::Error> {
 }
 
 fn logging_init() {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
     tracing_subscriber::registry()
-        .with(
-            fmt::layer()
-                .with_file(true)
-                .with_line_number(true)
-                .with_target(false),
-        )
+        .with(fmt::layer().with_file(true).with_line_number(true).with_target(false))
         .with(EnvFilter::from("trace,hyper=info"))
         .init();
 }

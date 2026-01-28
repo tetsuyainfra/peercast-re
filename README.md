@@ -5,7 +5,7 @@ PeerCast is P2P based livestreaming software.
 
 Generally write it as peercast-re.
 
-# Directory structre
+## Directory structre
 | ディレクトリ名                               | 中身                                                                                  |
 | :------------------------------------------- | :------------------------------------------------------------------------------------ |
 | [libpeercast-re](libpeercast-re)             | 下記プログラムで利用されるライブラリ                                                  |
@@ -14,7 +14,7 @@ Generally write it as peercast-re.
 | [peercast-utils](peercast-utils)             | peercast-ping等を含むユーティリティープログラム                                       |
 | [check-specifications](check-specifications) | 作者が使用したライブラリの動作チェックなどに使っているディレクトリ (気にする必要なし) |
 
-# Create Package
+## Create Package
 - deb -> cargo-deb
 - rpm -> cargo-generate-rpm
 - tar.gz -> cargo-make

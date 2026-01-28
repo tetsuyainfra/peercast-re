@@ -27,7 +27,7 @@ use crate::{
         decode::{PcpHelo, PcpPing, PcpPong},
         GnuId, Id4,
     },
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::factory::PcpConnectionFactory;
@@ -38,7 +38,7 @@ use super::factory::PcpConnectionFactory;
 
 #[derive(Debug)]
 pub(super) struct Inner {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     self_session_id: GnuId,
     stream: TcpStream,
     remote: SocketAddr,
@@ -50,7 +50,7 @@ pub(super) struct Inner {
 
 impl Inner {
     pub(super) fn new(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         self_session_id: GnuId,
         stream: TcpStream,
         remote: SocketAddr,
@@ -68,7 +68,7 @@ impl Inner {
     }
 
     #[inline]
-    pub(super) fn connection_id(&self) -> ConnectionId {
+    pub(super) fn connection_id(&self) -> ConnectionNo {
         self.connection_id
     }
 
@@ -126,7 +126,7 @@ impl Inner {
 
 #[derive(Debug)]
 struct InnerReadHalf {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     self_session_id: GnuId,
     read_half: ReadHalf<TcpStream>,
     remote: SocketAddr,
@@ -143,7 +143,7 @@ impl InnerReadHalf {
 
 #[derive(Debug)]
 struct InnerWriteHalf {
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     self_session_id: GnuId,
     write_half: WriteHalf<TcpStream>,
     remote: SocketAddr,
@@ -171,7 +171,10 @@ pub struct PcpHandshake {
 impl PcpHandshake {
     const PCP_MAGIC_HEAD: &'static [u8; 4] = b"pcp\n";
     pub(super) fn new(inner: Inner, factory: PcpConnectionFactory) -> Self {
-        Self { inner, factory }
+        Self {
+            inner,
+            factory,
+        }
     }
 
     pub async fn incoming_http(mut self) -> Result<PcpConnection, HandshakeError> {
@@ -185,13 +188,8 @@ impl PcpHandshake {
         let helo = PcpHelo::parse(&helo_atom)?;
 
         // check is port opened?
-        let open_port_no: Option<u16> = check_port(
-            &self.factory,
-            self.inner.remote().ip(),
-            helo.port,
-            helo.session_id,
-        )
-        .await;
+        let open_port_no: Option<u16> =
+            check_port(&self.factory, self.inner.remote().ip(), helo.port, helo.session_id).await;
 
         // return oleh
 
@@ -225,12 +223,7 @@ impl PcpHandshake {
             // PingはPCP_HELOが親でchildにSESSION_IDしかないハズ。。。
             // PCP_HELO(PING)
             let ping_info = PcpPing::parse(&atom)?;
-            Ok(PcpConnection::new(
-                self.inner,
-                ping_info.session_id,
-                PcpConnectType::IncomingPing(ping_info),
-                None,
-            ))
+            Ok(PcpConnection::new(self.inner, ping_info.session_id, PcpConnectType::IncomingPing(ping_info), None))
         } else {
             // PCP_HELO(normal)を主体とする接続のハズ
             let helo_info = PcpHelo::parse(&atom)?;
@@ -254,21 +247,12 @@ impl PcpHandshake {
     /// return : Remoteのポートが解放していればSome(port:u16), 解放されていなければNone
     async fn _incoming_pcp_root(&mut self, helo: &PcpHelo) -> Result<Option<u16>, HandshakeError> {
         // Is port opened ?
-        let open_port_no: Option<u16> = check_port(
-            &self.factory,
-            self.inner.remote().ip(),
-            helo.ping,
-            helo.session_id,
-        )
-        .await;
+        let open_port_no: Option<u16> =
+            check_port(&self.factory, self.inner.remote().ip(), helo.ping, helo.session_id).await;
 
         // return oleh
-        let oleh_atom = OlehBuilder::new(
-            self.inner.self_session_id,
-            self.inner.remote.ip(),
-            open_port_no.unwrap_or(0),
-        )
-        .build();
+        let oleh_atom =
+            OlehBuilder::new(self.inner.self_session_id, self.inner.remote.ip(), open_port_no.unwrap_or(0)).build();
         self._write_atom(oleh_atom).await?;
 
         // return PCP_ROOT
@@ -376,7 +360,7 @@ impl PcpConnection {
         }
     }
 
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.inner.connection_id
     }
 
@@ -418,7 +402,7 @@ pub struct PcpConnectionReadHalf {
     pub remote_port: Option<u16>,
 }
 impl PcpConnectionReadHalf {
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.inner.connection_id
     }
     pub async fn read_atom(&mut self) -> Result<Atom, std::io::Error> {
@@ -434,7 +418,7 @@ pub struct PcpConnectionWriteHalf {
     pub remote_port: Option<u16>,
 }
 impl PcpConnectionWriteHalf {
-    pub fn connection_id(&self) -> ConnectionId {
+    pub fn connection_id(&self) -> ConnectionNo {
         self.inner.connection_id
     }
     pub async fn write_atom(&mut self, atom: Atom) -> Result<(), std::io::Error> {

@@ -20,7 +20,7 @@ use crate::{
         Atom, ChannelInfo, GnuId, TrackInfo,
     },
     util::util_mpsc::mpsc_send,
-    ConnectionId,
+    ConnectionNo,
 };
 
 use super::{SourceTask, SourceTaskConfig, TaskStatus};
@@ -101,7 +101,7 @@ impl SourceTask for RelayTask {
 
         let worker = ChannelTaskWoker::new(
             self.broadcast_id,
-            ConnectionId::new(),
+            ConnectionNo::new(),
             self.session_id,
             self.config.as_ref().unwrap().self_addr.clone(),
             self.config.as_ref().unwrap().addr.clone(),
@@ -136,7 +136,7 @@ impl SourceTask for RelayTask {
 #[derive(Debug)]
 struct ChannelTaskWoker {
     broadcast_id: GnuId,
-    connection_id: ConnectionId,
+    connection_id: ConnectionNo,
     //
     session_id: GnuId,
     self_addr: Option<SocketAddr>,
@@ -158,7 +158,7 @@ const TCP_CONNECT_TIMEOUT: Duration = Duration::from_millis(5000);
 impl ChannelTaskWoker {
     fn new(
         broadcast_id: GnuId,
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         //
         session_id: GnuId,
         self_addr: Option<SocketAddr>,
@@ -207,7 +207,7 @@ impl ChannelTaskWoker {
         let (broker_sender, mut broker_reciever) = mpsc::unbounded_channel();
         let (disconnection_sender, disconnection_reader) = mpsc::unbounded_channel();
         let message = ChannelBrokerMessage::NewConnection {
-            connection_id: ConnectionId::new(),
+            connection_id: ConnectionNo::new(),
             sender: broker_sender,
             disconnection: disconnection_reader,
         };
@@ -216,11 +216,8 @@ impl ChannelTaskWoker {
         }
 
         let mut results: Vec<SessionResult> = vec![];
-        let mut remaining_results = self
-            .session
-            .handle_input(&read_buf[..])
-            .map_err(|e| format!("Error occuerd"))
-            .unwrap();
+        let mut remaining_results =
+            self.session.handle_input(&read_buf[..]).map_err(|e| format!("Error occuerd")).unwrap();
 
         results.extend(remaining_results);
 
@@ -275,13 +272,10 @@ impl ChannelTaskWoker {
         Ok(())
     }
 
-    async fn connect_to_peer_only_root(
-        &mut self,
-    ) -> Result<(TcpStream, BytesMut, OlehInfo), HandshakeError> {
-        let stream_result =
-            tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(self.root_addr))
-                .await
-                .map_err(|_elapsed_err| HandshakeError::Failed)?;
+    async fn connect_to_peer_only_root(&mut self) -> Result<(TcpStream, BytesMut, OlehInfo), HandshakeError> {
+        let stream_result = tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(self.root_addr))
+            .await
+            .map_err(|_elapsed_err| HandshakeError::Failed)?;
         let stream = stream_result?;
 
         let handshake_result = PcpHandshake::new(
@@ -305,7 +299,11 @@ impl ChannelTaskWoker {
                 debug!(?oleh);
                 Ok((stream, read_buf, oleh))
             }
-            HandshakeReturn::NextHost { oleh, hosts, quit } => todo!(),
+            HandshakeReturn::NextHost {
+                oleh,
+                hosts,
+                quit,
+            } => todo!(),
             HandshakeReturn::ChannelNotFound => todo!(),
         }
     }
@@ -340,10 +338,8 @@ impl ChannelTaskWoker {
 
             // let stream = TcpStream::connect(target.addr()).await?;
             // info!(connection_id = ?self.connection_id, "TcpStream::connect({:?})", target);
-            let Ok(stream_result): Result<
-                Result<TcpStream, std::io::Error>,
-                tokio::time::error::Elapsed,
-            > = tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(target.addr())).await
+            let Ok(stream_result): Result<Result<TcpStream, std::io::Error>, tokio::time::error::Elapsed> =
+                tokio::time::timeout(TCP_CONNECT_TIMEOUT, TcpStream::connect(target.addr())).await
             else {
                 error!(connection_id = ?self.connection_id, "timeout TcpStream::connect({:?})", target.addr());
                 push_buck_or_failed(target, &mut self.target_hosts, &mut self.failed_hosts);
@@ -370,18 +366,16 @@ impl ChannelTaskWoker {
             info!("target: {:?}, result: {:?}", &target, &handshake_result);
             match handshake_result {
                 // 接続先が満杯だった
-                HandshakeReturn::NextHost { oleh, hosts, quit } => {
+                HandshakeReturn::NextHost {
+                    oleh,
+                    hosts,
+                    quit,
+                } => {
                     target.set_session_id(oleh.session_id);
                     for host in hosts.into_iter() {
                         // FIXME: targetは自分自身のはずなので含まれていないはずだけど念のため確認する？
-                        let exist_target_hosts = self
-                            .target_hosts
-                            .iter()
-                            .find(|h| h.session_id() == host.session_id);
-                        let exist_failed_hosts = self
-                            .failed_hosts
-                            .iter()
-                            .find(|h| h.session_id() == host.session_id);
+                        let exist_target_hosts = self.target_hosts.iter().find(|h| h.session_id() == host.session_id);
+                        let exist_failed_hosts = self.failed_hosts.iter().find(|h| h.session_id() == host.session_id);
                         match (exist_target_hosts, exist_failed_hosts) {
                             // 登録する
                             (None, None) => {
@@ -405,8 +399,12 @@ impl ChannelTaskWoker {
                 }
                 // 接続先はChannel持ってなかった
                 HandshakeReturn::ChannelNotFound => match target {
-                    HostCandidate::Server { .. } => return Err(HandshakeError::ServerNotFound),
-                    HostCandidate::Peer { .. } => drop(target),
+                    HostCandidate::Server {
+                        ..
+                    } => return Err(HandshakeError::ServerNotFound),
+                    HostCandidate::Peer {
+                        ..
+                    } => drop(target),
                 },
                 HandshakeReturn::Success {
                     stream,
@@ -610,12 +608,7 @@ mod t {
         let addr = val.parse::<SocketAddr>().unwrap();
 
         let session_id = GnuId::new();
-        let broker_task = ChannelBroker::new(
-            ChannelType::Relay,
-            id,
-            Default::default(),
-            Default::default(),
-        );
+        let broker_task = ChannelBroker::new(ChannelType::Relay, id, Default::default(), Default::default());
         let mut task = RelayTask::new(session_id, id, broker_task.sender());
 
         task.connect(

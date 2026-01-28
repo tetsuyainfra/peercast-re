@@ -39,7 +39,7 @@ struct Args {
     #[arg(long, default_value = "/api/v1/admin")]
     api_path: String,
 
-    #[arg(long, default_value_t = 3000, value_name="CONNECT_TIMEOUT_MILLI_SECS")]
+    #[arg(long, default_value_t = 3000, value_name = "CONNECT_TIMEOUT_MILLI_SECS")]
     connect_timeout: u64,
 
     #[arg(long, default_value = "http://localhost:7145")]
@@ -76,11 +76,8 @@ struct ApiDoc;
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let servers: Vec<_> = args
-        .servers
-        .split(",")
-        .map(|s| openapi::server::ServerBuilder::new().url(s).build())
-        .collect();
+    let servers: Vec<_> =
+        args.servers.split(",").map(|s| openapi::server::ServerBuilder::new().url(s).build()).collect();
 
     let (router, mut api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest(&args.path, ppc::router(args.path.clone(), args.connect_timeout))
@@ -97,12 +94,12 @@ async fn main() -> anyhow::Result<()> {
         _ => {}
     }
 
-    let registry = tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_target(true))
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+    let registry = tracing_subscriber::registry().with(tracing_subscriber::fmt::layer().with_target(true)).with(
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             println!("RUST_LOG=info");
             "info".into()
-        }));
+        }),
+    );
 
     match tracing_journald::layer() {
         Ok(layer) => {
@@ -120,21 +117,11 @@ async fn main() -> anyhow::Result<()> {
         router
     };
 
-    let listener = tokio::net::TcpListener::bind((args.bind, args.port))
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind((args.bind, args.port)).await.unwrap();
 
-    info!(
-        "listening on http://{}{}/",
-        listener.local_addr().unwrap(),
-        args.path
-    );
+    info!("listening on http://{}{}/", listener.local_addr().unwrap(), args.path);
 
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
 
     Ok(())
 }
@@ -154,7 +141,7 @@ mod ppc {
     use bytes::BytesMut;
     use hyper::StatusCode;
     use libpeercast_re::{
-        ConnectionId,
+        ConnectionNo,
         pcp::{GnuId, procedure::PcpHandshake},
     };
     use serde::{Deserialize, Serialize};
@@ -172,7 +159,10 @@ mod ppc {
     }
 
     pub(super) fn router(path: String, connect_timeout_mills: u64) -> OpenApiRouter {
-        let store = Arc::new(Store{ path, connect_timeout_mills });
+        let store = Arc::new(Store {
+            path,
+            connect_timeout_mills,
+        });
         OpenApiRouter::new()
             .routes(routes!(api_root))
             .routes(routes!(ip_check))
@@ -191,7 +181,8 @@ mod ppc {
     async fn api_root(State(store): State<Arc<Store>>) -> Html<String> {
         let path = &store.path;
 
-        Html(format!("<h1>PeerCast-Port-Checker</h1>
+        Html(format!(
+            "<h1>PeerCast-Port-Checker</h1>
 <div>
   <ul>
     <li><a href='{path}/ip_check'>{path}/ip</a></li>
@@ -289,7 +280,7 @@ mod ppc {
         ConnectInfo(addr): ConnectInfo<SocketAddr>,
         _req: Request,
     ) -> Result<Json<CheckedPort>, (StatusCode, Json<CheckedPortError>)> {
-        let connection_id = ConnectionId::new();
+        let connection_id = ConnectionNo::new();
 
         match outgoing_port_check(connection_id, addr, query.port, state.connect_timeout_mills).await {
             Err(e) => Err((
@@ -308,7 +299,7 @@ mod ppc {
     }
 
     async fn outgoing_port_check(
-        connection_id: ConnectionId,
+        connection_id: ConnectionNo,
         addr: SocketAddr,
         port: u16,
         connect_timeout: u64,
@@ -316,20 +307,10 @@ mod ppc {
         let ip = addr.ip();
 
         let remote: SocketAddr = (ip, port).into();
-        let stream = tokio::time::timeout(
-            Duration::from_millis(connect_timeout),
-            TcpStream::connect(remote),
-        )
-        .await??;
+        let stream = tokio::time::timeout(Duration::from_millis(connect_timeout), TcpStream::connect(remote)).await??;
 
-        let handshake = PcpHandshake::new(
-            connection_id,
-            stream,
-            None,
-            remote,
-            BytesMut::with_capacity(4096),
-            GnuId::new(),
-        );
+        let handshake =
+            PcpHandshake::new(connection_id, stream, None, remote, BytesMut::with_capacity(4096), GnuId::new());
 
         let result = match handshake.outgoing_ping().await {
             Ok(_session_id) => true,
