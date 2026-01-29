@@ -15,6 +15,7 @@ mod gnuid;
 mod id4;
 mod node;
 pub mod procedure;
+pub mod repository;
 pub mod service;
 mod session;
 mod stream;
