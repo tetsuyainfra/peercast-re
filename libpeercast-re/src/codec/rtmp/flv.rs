@@ -8,7 +8,6 @@ use rml_amf0::Amf0Value;
 use rml_rtmp::sessions::StreamMetadata;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tracing::debug;
-use tracing_subscriber::registry::Data;
 use uuid::timestamp;
 
 pub struct FlvWriter<W> {
@@ -39,11 +38,7 @@ where
         // self.writer.write_u32(0_u32).await // write empty previous tag
     }
 
-    pub async fn write_header(
-        &mut self,
-        stream_id: u32,
-        metadata: StreamMetadata,
-    ) -> Result<(), io::Error> {
+    pub async fn write_header(&mut self, stream_id: u32, metadata: StreamMetadata) -> Result<(), io::Error> {
         // self.write_magic(Header).await?;
         // let mut meta = Metadata::from(metadata);
         // let Metadata { properties } = meta;
@@ -79,8 +74,7 @@ where
         .write(&mut self.writer)
         .await;
 
-        self.last_stream_id_tag_length
-            .insert(stream_id, (payloda_size + 11) as u32);
+        self.last_stream_id_tag_length.insert(stream_id, (payloda_size + 11) as u32);
     }
 
     pub async fn write_audio(&mut self, stream_id: u32, timestamp: u32, data: Bytes) {
@@ -98,8 +92,7 @@ where
         .write(&mut self.writer)
         .await;
 
-        self.last_stream_id_tag_length
-            .insert(stream_id, (payloda_size + 11) as u32);
+        self.last_stream_id_tag_length.insert(stream_id, (payloda_size + 11) as u32);
     }
 }
 
@@ -174,29 +167,19 @@ struct Metadata {
 impl From<StreamMetadata> for Metadata {
     fn from(metadata: StreamMetadata) -> Self {
         let mut properties = HashMap::with_capacity(11);
-        metadata
-            .video_width
-            .map(|x| properties.insert("width".to_string(), Amf0Value::Number(x as f64)));
+        metadata.video_width.map(|x| properties.insert("width".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .video_height
-            .map(|x| properties.insert("height".to_string(), Amf0Value::Number(x as f64)));
+        metadata.video_height.map(|x| properties.insert("height".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .video_codec_id
-            .map(|x| properties.insert("videocodecid".to_string(), Amf0Value::Number(x as f64)));
+        metadata.video_codec_id.map(|x| properties.insert("videocodecid".to_string(), Amf0Value::Number(x as f64)));
 
         metadata
             .video_bitrate_kbps
             .map(|x| properties.insert("videodatarate".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .video_frame_rate
-            .map(|x| properties.insert("framerate".to_string(), Amf0Value::Number(x as f64)));
+        metadata.video_frame_rate.map(|x| properties.insert("framerate".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .audio_codec_id
-            .map(|x| properties.insert("audiocodecid".to_string(), Amf0Value::Number(x as f64)));
+        metadata.audio_codec_id.map(|x| properties.insert("audiocodecid".to_string(), Amf0Value::Number(x as f64)));
 
         metadata
             .audio_bitrate_kbps
@@ -206,20 +189,15 @@ impl From<StreamMetadata> for Metadata {
             .audio_sample_rate
             .map(|x| properties.insert("audiosamplerate".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .audio_channels
-            .map(|x| properties.insert("audiochannels".to_string(), Amf0Value::Number(x as f64)));
+        metadata.audio_channels.map(|x| properties.insert("audiochannels".to_string(), Amf0Value::Number(x as f64)));
 
-        metadata
-            .audio_is_stereo
-            .map(|x| properties.insert("stereo".to_string(), Amf0Value::Boolean(x)));
+        metadata.audio_is_stereo.map(|x| properties.insert("stereo".to_string(), Amf0Value::Boolean(x)));
 
-        metadata
-            .encoder
-            .as_ref()
-            .map(|x| properties.insert("encoder".to_string(), Amf0Value::Utf8String(x.clone())));
+        metadata.encoder.as_ref().map(|x| properties.insert("encoder".to_string(), Amf0Value::Utf8String(x.clone())));
 
-        Self { properties }
+        Self {
+            properties,
+        }
     }
 }
 
