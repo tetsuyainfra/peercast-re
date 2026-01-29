@@ -50,28 +50,25 @@ impl std::fmt::Debug for Id4 {
 }
 
 mod internal {
+    use std::fmt::Write;
+
     pub(super) fn fmt(val: u32, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write!(f, "b\"")?;
-        for b in val.to_be_bytes() {
-            // https://doc.rust-lang.org/reference/tokens.html#byte-escapes
-            if b == b'\n' {
-                write!(f, "\\n")?;
-            } else if b == b'\r' {
-                write!(f, "\\r")?;
-            } else if b == b'\t' {
-                write!(f, "\\t")?;
-            } else if b == b'\\' || b == b'"' {
-                write!(f, "\\{}", b as char)?;
-            } else if b == b'\0' {
-                write!(f, "\\0")?;
-            // ASCII printable
-            } else if (0x20..0x7f).contains(&b) {
-                write!(f, "{}", b as char)?;
-            } else {
-                write!(f, "\\x{:02x}", b)?;
+        let bs = val.to_be_bytes();
+        for b in bs {
+            match b {
+                b'A'..=b'Z' | b'a'..=b'z' => {
+                    f.write_char(b as char)?;
+                }
+                b'\n' => f.write_str("\\n")?,
+                b'\r' => f.write_str("\\r")?,
+                b'\t' => f.write_str("\\t")?,
+                b'\\' => f.write_str("\\\\")?,
+                b'\0' => f.write_str("\\0")?,
+                _ => write!(f, "\\x{:02x}", b)?,
             }
+            // https://doc.rust-lang.org/reference/tokens.html#byte-escapes
         }
-        // write!(f, "\"")?;
         Ok(())
     }
 }
