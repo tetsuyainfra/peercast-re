@@ -234,6 +234,7 @@ mod t {
         ConnectionNo,
     };
 
+    #[ignore = "TODO: 未実装"]
     #[tokio::test]
     async fn test_outgoing() {
         let addr = todo!();
