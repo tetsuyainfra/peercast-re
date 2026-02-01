@@ -6,7 +6,7 @@ use std::sync::{MutexGuard, PoisonError, RwLockReadGuard, RwLockWriteGuard};
 ///
 /// ```
 /// # use std::sync::Mutex;
-/// use peercast_re::util::mutex_poisoned;
+/// use libpeercast_re::util::mutex_poisoned;
 /// # let mut mutex_val = Mutex::new(1);
 /// let guard = mutex_val.lock().unwrap_or_else(mutex_poisoned);
 /// assert_eq!(*guard, 1);
