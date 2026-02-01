@@ -1,6 +1,6 @@
 /// Atom Packet Sturct
 mod atom;
-// mod atom2;
+mod atom2;
 
 /// atom packet Builder
 pub mod builder;
