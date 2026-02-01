@@ -315,9 +315,10 @@ mod test {
 
     /// config.example.iniへのパス
     fn path_to_example_ini() -> PathBuf {
-        let example_file = Path::new(file!());
-        let mut dir_buf = PathBuf::from(example_file.parent().unwrap());
-
+        // プロジェクトからの相対パス
+        let src = Path::new(file!());
+        let src = src.strip_prefix(env!("CARGO_PKG_NAME")).unwrap_or(&src);
+        let mut dir_buf = src.parent().unwrap();
         let path_buf = dir_buf.join("config.example.ini");
         path_buf
     }
