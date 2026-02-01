@@ -119,10 +119,14 @@ assert_cmd = { version = "2.1.1" }
 # benchmark
 criterion  = { version = "0.8.1" }
 
-[[bench]]
-name = "channel_struct_clone"
-harness = false
+#[[bench]]
+#name = "channel_struct_clone"
+#harness = false
+#
+#[[bench]]
+#name = "mutex_or_channel"
+#harness = false
 
 [[bench]]
-name = "mutex_or_channel"
+name = "bench_main"
 harness = false
