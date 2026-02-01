@@ -1,7 +1,7 @@
 use std::process::exit;
 
 use clap::{Parser, Subcommand};
-use peercast_root::{RestrictPortLevel};
+use peercast_root::RestrictPortLevel;
 
 /// Simple Daemon Program
 #[derive(Parser, Debug, Clone)]
@@ -53,11 +53,11 @@ pub struct Args {
     pub yp_listerer_hideable: bool,
 
     /// Portcheckのレベル制限
-    // genre: ypGame ->  制限無し(level=None)
-    // genre: yp[@]Game -> ポート解放をチェックする(level=1)
-    // genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
-    // genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
-    #[arg(long, default_value="port-check")]
+    /// genre: ypGame ->  制限無し(level=None)
+    /// genre: yp[@]Game -> ポート解放をチェックする(level=1)
+    /// genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
+    /// genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
+    #[arg(long, default_value = "port-check")]
     pub yp_restrict_port_level: RestrictPortLevel,
 
     /// Portcheckの規制速度(KBps単位、500以上)
@@ -66,17 +66,17 @@ pub struct Args {
     pub yp_limit_speed: u32,
 
     /// redisに使用するnamespace
-    #[arg(long, default_value="yproot")]
+    #[arg(long, default_value = "yproot")]
     pub redis_master_key: String,
 
     /// 接続先のredis_url(DEBUG MODEのみ)
     #[cfg(not(debug_assertions))]
-    #[arg(long, default_value="redis://127.0.0.1:6379")]
+    #[arg(long, default_value = "redis://127.0.0.1:6379")]
     pub redis_url: String,
 
     /// 接続先のredis_url(DEBUG MODE)
     #[cfg(debug_assertions)]
-    #[arg(long, default_value="redis://yproot:ypbared@127.0.0.1:6379")]
+    #[arg(long, default_value = "redis://yproot:ypbared@127.0.0.1:6379")]
     pub redis_url: String,
 
     // TODO: TIMEZONEの実装
@@ -103,11 +103,7 @@ pub struct Args {
 
     /// Path to log file by DEBUG MODE
     #[cfg(debug_assertions)]
-    #[arg(
-        short = 'L',
-        value_name = "ACCESS_LOG_FILE",
-        default_value = "./temp/debug.log"
-    )]
+    #[arg(short = 'L', value_name = "ACCESS_LOG_FILE", default_value = "./temp/debug.log")]
     pub access_log: std::path::PathBuf,
 
     /// Path to log file
@@ -121,7 +117,7 @@ pub struct Args {
 
     /// Path to footer file by DEBUG MODE
     #[cfg(debug_assertions)]
-    #[arg(long, value_name="FOOTER_FILE.toml", default_value = "share/peercast-root_footer.toml")]
+    #[arg(long, value_name = "FOOTER_FILE.toml", default_value = "share/peercast-root_footer.toml")]
     pub index_txt_footer: Option<std::path::PathBuf>,
 
     /// Path to footer file
@@ -150,14 +146,14 @@ pub struct Args {
     pub allow_cors: Vec<String>,
 
     #[cfg(not(debug_assertions))]
-    #[arg(long, value_parser, default_value_t=30)]
+    #[arg(long, value_parser, default_value_t = 30)]
     pub cache_max_age: u32,
 
     #[cfg(debug_assertions)]
-    #[arg(long, value_parser, default_value_t=0)]
+    #[arg(long, value_parser, default_value_t = 0)]
     pub cache_max_age: u32,
 
-    #[arg(long, default_value="ConnectInfo")]
+    #[arg(long, default_value = "ConnectInfo")]
     pub ip_source: axum_client_ip::ClientIpSource,
 
     #[command(flatten)]
@@ -177,7 +173,9 @@ pub enum Commands {
 
 pub fn version_print(args: &Args) -> anyhow::Result<()> {
     match args.command {
-        Some(Commands::Version { json }) => {
+        Some(Commands::Version {
+            json,
+        }) => {
             libpeercast_re::util::version_print_with(json, |envs| {
                 envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
                 envs.insert("VERGEN_BIN_VERSION", Some(env!("CARGO_PKG_VERSION")));
@@ -190,11 +188,9 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-
-const LONG_HELP_CORS:&str = r#"Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
+const LONG_HELP_CORS: &str = r#"Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
 ※ URL末尾のスラッシュも関係してくるので注意すること
 "#;
-
 
 #[cfg(test)]
 mod tests {
@@ -202,17 +198,13 @@ mod tests {
 
     #[test]
     fn test_args_yp_limit_speed() {
-        let args = Args::try_parse_from(vec![
-            "peercast-root",
-        ]).unwrap();
+        let args = Args::try_parse_from(vec!["peercast-root"]).unwrap();
         assert_eq!(args.yp_limit_speed, 2000);
     }
 
     #[test]
     fn test_args_yp_port_check_level() {
-        let args = Args::try_parse_from(vec![
-            "peercast-root",
-        ]).unwrap();
-        assert_eq!(args.yp_restrict_port_level, RestrictPortLevel::None);
+        let args = Args::try_parse_from(vec!["peercast-root"]).unwrap();
+        assert_eq!(args.yp_restrict_port_level, RestrictPortLevel::PortCheck);
     }
 }

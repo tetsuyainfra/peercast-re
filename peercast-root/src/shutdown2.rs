@@ -5,8 +5,6 @@ use tokio::signal;
 use tokio::time::{Duration, sleep};
 use tokio_util::sync::CancellationToken;
 
-
-
 #[cfg(test)]
 mod tests {
     use tokio_util::task::TaskTracker;
@@ -22,13 +20,14 @@ mod tests {
         println!("no: {no} finished");
     }
 
+    #[ignore = "slow"]
     #[tokio::test]
     async fn test_wait_for_cancellation() {
         let mut tracker = TaskTracker::new();
         let mut token = CancellationToken::new();
 
         let mut handles = Vec::new();
-        for i in 0..2  {
+        for i in 0..2 {
             println!("{i}");
             let handle = tracker.spawn(wait_for_cancellation(i, token.child_token()));
             handles.push(handle);

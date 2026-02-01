@@ -1,15 +1,12 @@
 use std::future::Future;
+use std::pin::pin;
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
-use std::pin::pin;
-use tokio::{signal, spawn};
 use tokio::time::{Duration, sleep};
+use tokio::{signal, spawn};
 use tokio_util::sync::CancellationToken;
 
-pub fn create_task() -> (
-    impl Future<Output = ()>,
-    CancellationToken,
-) {
+pub fn create_task() -> (impl Future<Output = ()>, CancellationToken) {
     let graceful_shutdown = CancellationToken::new();
 
     let child_graceful_shutdown = graceful_shutdown.child_token();
@@ -25,10 +22,7 @@ pub fn create_task() -> (
     (handler, child_graceful_shutdown)
 }
 
-pub fn create_task_anyhow() -> (
-    impl Future<Output = anyhow::Result<()>>,
-    CancellationToken,
-) {
+pub fn create_task_anyhow() -> (impl Future<Output = anyhow::Result<()>>, CancellationToken) {
     let (handler, graceful) = create_task();
 
     let new_handler = async move {
@@ -58,6 +52,7 @@ mod tests {
         println!("no: {no} finished");
     }
 
+    #[ignore = "this is example code"]
     #[tokio::test]
     async fn test_wait_for_cancellation() {
         let token = CancellationToken::new();
@@ -110,17 +105,17 @@ mod tests {
 
             loop {
                 tokio::select! {
-            //         result = conn.as_mut() => {
-            //             if let Err(_err) = result {
-            //                 trace!("failed to serve connection: {_err:#}");
-            //             }
-            //             break;
-            //         }
-                    _ = &mut signal_closed => {
-                        info!("signal received in task, starting graceful shutdown");
-                        // conn.as_mut().graceful_shutdown();
+                //         result = conn.as_mut() => {
+                //             if let Err(_err) = result {
+                //                 trace!("failed to serve connection: {_err:#}");
+                //             }
+                //             break;
+                //         }
+                        _ = &mut signal_closed => {
+                            info!("signal received in task, starting graceful shutdown");
+                            // conn.as_mut().graceful_shutdown();
+                        }
                     }
-                }
             }
             drop(close_rx);
         });
