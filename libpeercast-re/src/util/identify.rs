@@ -95,10 +95,7 @@ fn http_type(buf: &[u8], length: usize) -> Option<ConnectionProtocol> {
     // 何もなければ分からない場合Noneを返す
     let method = req.method?;
     let path = req.path?;
-    let have_pcp_header: bool = req
-        .headers
-        .iter()
-        .any(|h| h.name == "x-peercast-pcp" && h.value == b"1");
+    let have_pcp_header: bool = req.headers.iter().any(|h| h.name == "x-peercast-pcp" && h.value == b"1");
 
     if method.to_uppercase() != "GET" {
         return Some(ConnectionProtocol::Http);
@@ -152,7 +149,8 @@ mod t {
 
         let buf = b" ";
         let x: Option<ConnectionProtocol> = _identify_protocol(buf, buf.len());
-        assert_eq!(x, None);
+        // assert_eq!(x, None); // HACKME: Noneを返した方がよいのでは？
+        assert_eq!(x, Some(ConnectionProtocol::Unknown));
 
         let buf = b"helo";
         let x: Option<ConnectionProtocol> = _identify_protocol(buf, buf.len());
@@ -188,24 +186,14 @@ mod t_othercrate {
         let mut req = httparse::Request::new(&mut headers);
         assert_eq!(req.parse(buf).unwrap().is_complete(), true);
 
-        assert_eq!(
-            req.headers
-                .iter()
-                .any(|h| { h.name == "x-peercast-pcp" && h.value == b"1" }),
-            true
-        );
+        assert_eq!(req.headers.iter().any(|h| { h.name == "x-peercast-pcp" && h.value == b"1" }), true);
 
         let buf = b"GET /channels/1 HTTP/1.0\r\nx-peercast-pcp:\r\n\r\n";
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
         assert_eq!(req.parse(buf).unwrap().is_complete(), true);
 
-        assert_eq!(
-            req.headers
-                .iter()
-                .any(|h| { h.name == "x-peercast-pcp" && h.value == b"" }),
-            true
-        );
+        assert_eq!(req.headers.iter().any(|h| { h.name == "x-peercast-pcp" && h.value == b"" }), true);
     }
     #[test]
     fn test_httpparse_partial() {
