@@ -36,10 +36,7 @@ use tracing::{debug, error, info, warn};
 
 use bb8_redis::RedisConnectionManager;
 
-use crate::{
-    INDEX_TXT_FOOTER,
-    app::{ApiConfig, AppState, ArcState, cli, portcheck::get_portcheck_level},
-};
+use crate::app::{ApiConfig, AppState, ArcState, cli, portcheck::get_portcheck_level};
 use peercast_root::RestrictPortLevel;
 
 pub struct ApiError(anyhow::Error);
@@ -231,8 +228,8 @@ pub async fn index_json(
     );
 
     // Footerを追加する
-    channels.reserve(INDEX_TXT_FOOTER().len());
-    channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
+    channels.reserve(state.0.index_txt_footer.len());
+    channels.extend(state.0.index_txt_footer.iter().map(|e| e.into()));
 
     Ok(channels.into())
 }

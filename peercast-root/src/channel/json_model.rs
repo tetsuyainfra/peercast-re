@@ -139,8 +139,8 @@ impl JsonChannel {
     }
 }
 
-impl From<IndexInfo> for JsonChannel {
-    fn from(value: IndexInfo) -> Self {
+impl From<&IndexInfo> for JsonChannel {
+    fn from(value: &IndexInfo) -> Self {
         let mut j = JsonChannel::empty();
         let IndexInfo {
             id,
@@ -158,19 +158,20 @@ impl From<IndexInfo> for JsonChannel {
             number_of_relay,
             created_at,
         } = value;
-        j.id = id;
-        j.typee = typee;
-        j.name = name;
-        j.tracker_addr = tracker_addr;
-        j.contact_url = contact_url;
+        j.id = id.clone();
+        j.typee = typee.clone();
+        j.name = name.clone();
+        j.tracker_addr = tracker_addr.clone();
+        j.contact_url = contact_url.clone();
         j.genre = genre.clone();
-        j.raw_genre = genre;
-        j.desc = desc;
-        j.comment = comment;
-        j.stream_ext = stream_ext;
-        j.bitrate = bitrate;
-        j.number_of_listener = number_of_listener;
-        j.number_of_relay = number_of_relay;
+        j.raw_genre = genre.clone();
+        j.desc = desc.clone();
+        j.comment = comment.clone();
+        j.stream_ext = stream_ext.clone();
+        j.stream_type = stream_type.clone();
+        j.bitrate = *bitrate;
+        j.number_of_listener = *number_of_listener;
+        j.number_of_relay = *number_of_relay;
         j.created_at = created_at.unwrap_or_else(|| chrono::Utc::now());
         j
     }
@@ -190,8 +191,8 @@ fn create_index_line(
     number_of_relay: i32,
     bitrate: i32,
     typee: &String,
-    stream_type: &String,
-    stream_ext: &String,
+    _stream_type: &String,
+    _stream_ext: &String,
     created_at: &DateTime<Utc>,
 ) -> String {
     use html_escape::{encode_quoted_attribute, encode_safe};

@@ -71,19 +71,11 @@ mod test_helper;
 
 // Don't use directly. SEE: CONN_FACTORY()
 static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
-// Don't use directly. SEE: INDEX_TXT_FOOTER()
-static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
 
 #[inline]
 #[allow(non_snake_case)]
 pub fn CONN_FACTORY() -> &'static PcpConnectionFactory {
     _CONN_FACTORY.get().unwrap()
-}
-
-#[inline]
-#[allow(non_snake_case, private_interfaces)]
-pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
-    _INDEX_TXT_FOOTER.get().unwrap()
 }
 
 #[tokio::main]
@@ -129,21 +121,19 @@ async fn main() -> anyhow::Result<()> {
 async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
-    _INDEX_TXT_FOOTER.get_or_init(|| {
-        let mut v = vec![];
-        if let Some(ref path) = args.index_txt_footer {
-            let mut t = FooterToml::from_path(path)
-                .with_context(|| {
-                    let p = path.display();
-                    format!("index.txtのフッターファイル({p})の読み込みに失敗しました。")
-                })
-                .unwrap();
-            let mut infos: Vec<IndexInfo> = t.infomations.into_iter().map(|i| i.into()).collect();
-            dbg!(&infos);
-            v.append(&mut infos);
-        }
-        v
-    });
+
+    let mut index_txt_footer = vec![];
+    if let Some(ref path) = args.index_txt_footer {
+        let mut t = FooterToml::from_path(path)
+            .with_context(|| {
+                let p = path.display();
+                format!("index.txtのフッターファイル({p})の読み込みに失敗しました。")
+            })
+            .unwrap();
+        let mut infos: Vec<IndexInfo> = t.infomations.into_iter().map(|i| i.into()).collect();
+        dbg!(&infos);
+        index_txt_footer.append(&mut infos);
+    }
 
     let repository = ChannelRepository::new(&self_session_id);
     if args.create_dummy_channel {
@@ -179,10 +169,11 @@ async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketA
     let db_pool = init_db(args).await;
 
     let app_sate = AppState {
+        config: Arc::new(api_config),
+        index_txt_footer,
         redis_master_key: args.redis_master_key.clone(),
         db_pool: db_pool,
         repository,
-        config: Arc::new(api_config),
     };
 
     ArcState(Arc::new(app_sate))

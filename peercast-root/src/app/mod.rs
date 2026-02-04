@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use bb8_redis::RedisConnectionManager;
-use peercast_root::{RestrictPortLevel, channel::RootChannel, repository::ChannelRepository};
+use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository};
 
 pub mod cli;
 pub mod handler;
@@ -19,6 +19,7 @@ pub struct ApiConfig {
 #[derive(Debug)]
 pub struct AppState {
     pub config: Arc<ApiConfig>,
+    pub index_txt_footer: Vec<IndexInfo>,
     pub redis_master_key: String,
     pub db_pool: bb8::Pool<RedisConnectionManager>,
     pub repository: ChannelRepository<RootChannel>,
