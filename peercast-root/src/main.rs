@@ -69,15 +69,6 @@ use crate::app::{ApiConfig, AppState, ArcState};
 #[cfg(test)]
 mod test_helper;
 
-// Don't use directly. SEE: CONN_FACTORY()
-static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
-
-#[inline]
-#[allow(non_snake_case)]
-pub fn CONN_FACTORY() -> &'static PcpConnectionFactory {
-    _CONN_FACTORY.get().unwrap()
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
@@ -120,7 +111,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
-    _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
+    let conn_factory = PcpConnectionFactory::new(self_session_id, self_socket);
 
     let mut index_txt_footer = vec![];
     if let Some(ref path) = args.index_txt_footer {
@@ -174,6 +165,7 @@ async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketA
         redis_master_key: args.redis_master_key.clone(),
         db_pool: db_pool,
         repository,
+        conn_factory,
     };
 
     ArcState(Arc::new(app_sate))
@@ -384,7 +376,7 @@ async fn serve_root(
     let read_buf = BytesMut::new();
 
     // HandshakeFutureにすればよさそう
-    let handshake = CONN_FACTORY().accept(cid, stream, remote);
+    let handshake = state.0.conn_factory.accept(cid, stream, remote);
 
     // Handshake時に送ってもらうAtomを作成する
     let root_atom = RootBuilder::default().set_update_interval(10).set_next_update_interval(10).build();
