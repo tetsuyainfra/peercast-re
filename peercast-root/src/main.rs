@@ -1,7 +1,7 @@
 #![allow(unused)]
 use std::{
     any,
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, Shutdown, SocketAddr},
     path::PathBuf,
     process::exit,
     sync::{Arc, Mutex, OnceLock, RwLock},
@@ -18,6 +18,7 @@ use axum::{
     serve::Listener,
 };
 use axum_extra::headers::Header;
+use bb8_redis::RedisConnectionManager;
 use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
@@ -35,7 +36,7 @@ use libpeercast_re::{
     util::{ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
 };
 use peercast_root::{
-    ExitCode, FooterToml, IndexInfo,
+    ExitCode, FooterToml, IndexInfo, RestrictPortLevel,
     channel::{RootChannel, RootConfig, get_tracker_addr},
     repository::ChannelRepository,
 };
@@ -51,7 +52,7 @@ use tokio::{
     time::Interval,
 };
 use tokio_util::sync::CancellationToken;
-use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
+use tower_http::{cors::CorsLayer, services::ServeDir, set_header::SetResponseHeaderLayer};
 use tracing::{debug, error, info, instrument::WithSubscriber, trace, warn};
 use url::Url;
 
@@ -107,6 +108,46 @@ pub fn INDEX_TXT_FOOTER() -> &'static Vec<IndexInfo> {
     _INDEX_TXT_FOOTER.get().unwrap()
 }
 
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let args = cli::Args::parse();
+    cli::version_print(&args)?;
+
+    init_app(&args, GnuId::new(), (args.bind, args.port).into());
+    logging::init(&args)?;
+
+    // Init socket
+    let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
+    info!("PCP listening on pcp://{}", listener_pcp.local_addr().unwrap(),);
+
+    let listener_http: TcpListener = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
+    info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
+
+    let cancell_token = CancellationToken::new();
+    let mut set = tokio::task::JoinSet::new();
+    set.build_task().name("ApiServer").spawn(
+        //
+        server_api(args.clone(), listener_http, cancell_token.child_token()),
+    )?;
+    set.build_task().name("RootServer").spawn(
+        // server_peercast(shutdown_token.child_token(), store.clone(), svr_listener),
+        server_peercast(args.clone(), listener_pcp, cancell_token.child_token()),
+    )?;
+    set.build_task().name("WaitShutdownSig").spawn(async move {
+        tokio::signal::ctrl_c().await.expect("failed to listen for event");
+        cancell_token.cancel();
+        info!("SHUTDOWN SIGNAL SENT");
+        anyhow::Ok(())
+    })?;
+
+    while let Some(res) = set.join_next().await {
+        let r = res.context("A server thread has panicked")?;
+        info!("A server thread has shut down : {:?}", r);
+    }
+
+    Ok(())
+}
+
 fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
     _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
@@ -151,40 +192,111 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
     }
 }
 
-async fn root() -> &'static str {
-    "Hello, World!"
+#[derive(Debug)]
+struct ApiConfig {
+    restrict_speed: u32,
+    listener_hideable: bool,
+    port_check_level: RestrictPortLevel,
+    name_space: String,
 }
+#[derive(Debug, Clone)]
+struct AppState(bb8::Pool<RedisConnectionManager>, Arc<ApiConfig>);
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args = cli::Args::parse();
+async fn server_api(
+    args: cli::Args,
+    listener: TcpListener,
+    graceful_shutdown: CancellationToken,
+) -> anyhow::Result<()> {
+    use bb8_redis::RedisConnectionManager;
+    use redis::AsyncCommands;
+    use tokio::time::timeout;
+    use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
-    cli::version_print(&args)?;
-    logging::init(&args)?;
+    debug!("connecting to redis: {}", args.redis_url);
+    let manager = RedisConnectionManager::new(args.redis_url).unwrap();
+    let pool = bb8::Pool::builder().build(manager).await.unwrap();
+    {
+        // let mut conn = pool.get().await.unwrap();
+        let mut conn = match tokio::time::timeout(Duration::from_millis(2000), pool.get()).await {
+            Ok(Ok(conn)) => conn,
+            Ok(Err(e)) => {
+                error!("redis connect failed :{}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(e) => {
+                error!("redis connect timeout: {}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
 
-    init_app(&args, GnuId::new(), (args.bind, args.port).into());
+        let key = format!("{}:CHECK", REDIS_MASTER_KEY());
+        // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
+        match timeout(Duration::from_millis(2000), conn.set::<&str, &str, ()>(&key, "CHECK_ME")).await {
+            Ok(Ok(())) => {
+                debug!("redis connect SET COMMAND success");
+            }
+            Ok(Err(e)) => {
+                error!("redis connect SET COMMAND failed: {}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(_) => {
+                error!("redis connect SET COMMAND timeout");
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
 
-    // Init socket
-    let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
-    info!("PCP listening on pcp://{}", listener_pcp.local_addr().unwrap(),);
+        match timeout(Duration::from_millis(1000), conn.get::<_, String>(&key)).await {
+            Ok(Ok(r)) => {
+                debug!("redis connect GET COMMAND success: {}", r);
+                assert_eq!(r, "CHECK_ME");
+            }
+            Ok(Err(e)) => {
+                error!("redis connect GET COMMAND failed: {}", e);
+                std::process::exit(ExitCode::Failure as i32);
+            }
+            Err(_) => {
+                error!("redis connect GET COMMAND timeout");
+                std::process::exit(ExitCode::Failure as i32);
+            }
+        };
+    }
+    tracing::debug!("successfully connected to redis and pinged it");
 
-    let listener_http: TcpListener = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
-    info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
+    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+    info!("asset_dir: {:?}", &assets_dir);
 
-    let shutdown_token = CancellationToken::new();
-    let peercast_server_task = tokio::spawn(server_peercast(args.clone(), listener_pcp, shutdown_token.child_token()));
-    let http_server_task = tokio::spawn(handler::server_http(args, listener_http, shutdown_token.child_token()));
-    let shutdown_task = tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("failed to listen for event");
-        shutdown_token.cancel();
-        info!("SHUTDOWN SIGNAL SENT");
-        anyhow::Ok(())
-    });
+    let cor_origins: Vec<_> = args.allow_cors.iter().map(|origin| origin.parse::<HeaderValue>().unwrap()).collect();
+    info!("cor_origins: {:?}", &cor_origins);
 
-    // futures_util::future::join_all(vec![http_server_task])
-    // futures_util::future::join_all(vec![shutdown_task, http_server_task])
-    // futures_util::future::join_all(vec![peercast_server_task, http_server_task])
-    futures_util::future::join_all(vec![shutdown_task, peercast_server_task, http_server_task]).await;
+    let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
+    info!("cache-control: {}", &cache_control_value);
+
+    let api_config = handler::ApiConfig {
+        restrict_speed: args.yp_limit_speed,
+        listener_hideable: args.yp_listerer_hideable,
+        port_check_level: args.yp_restrict_port_level,
+        name_space: args.yp_name_space,
+    };
+
+    let tracker = tokio_util::task::TaskTracker::new();
+    info!("START HTTP SERVER");
+
+    let app = Router::new()
+        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .route("/index.txt", routing::get(handler::index_txt))
+        .route("/api/index.json", routing::get(handler::index_json))
+        .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
+        .layer(CorsLayer::new().allow_origin(cor_origins).allow_methods([Method::GET]))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            axum::http::header::CACHE_CONTROL,
+            HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap(),
+        ))
+        .layer(args.ip_source.into_extension())
+        .with_state(handler::AppState(pool, Arc::new(api_config)));
+
+    let _ = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(graceful_shutdown.cancelled_owned())
+        .await;
 
     Ok(())
 }

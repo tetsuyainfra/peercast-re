@@ -42,7 +42,7 @@ use crate::{
 };
 use peercast_root::RestrictPortLevel;
 
-struct ApiError(anyhow::Error);
+pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
@@ -62,15 +62,15 @@ where
 }
 
 #[derive(Debug)]
-struct ApiConfig {
-    restrict_speed: u32,
-    listener_hideable: bool,
-    port_check_level: RestrictPortLevel,
-    name_space: String,
+pub struct ApiConfig {
+    pub restrict_speed: u32,
+    pub listener_hideable: bool,
+    pub port_check_level: RestrictPortLevel,
+    pub name_space: String,
 }
 
 #[derive(Debug, Clone)]
-struct AppState(bb8::Pool<RedisConnectionManager>, Arc<ApiConfig>);
+pub struct AppState(pub bb8::Pool<RedisConnectionManager>, pub Arc<ApiConfig>);
 
 //-------------------------------------------------------------------------------
 // Api Server
@@ -188,7 +188,7 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
 //-------------------------------------------------------------------------------
 // Api Handlers
 //-------------------------------------------------------------------------------
-async fn index_txt(
+pub async fn index_txt(
     client_ip: ClientIp,
     query_params: Query<IndexTextParams>,
     mut conn: DatabaseConnection,
@@ -200,8 +200,7 @@ async fn index_txt(
     Ok(itertools::join(channels, "\n"))
 }
 
-#[inline]
-async fn index_json(
+pub async fn index_json(
     ClientIp(ip): ClientIp,
     Query(params): Query<IndexTextParams>,
     mut conn: DatabaseConnection,
@@ -288,7 +287,7 @@ where
 /// index.txtに対するクエリ型
 #[allow(non_snake_case)]
 #[derive(Debug, Deserialize)]
-struct IndexTextParams {
+pub struct IndexTextParams {
     #[serde(default, deserialize_with = "empty_string_as_none", alias = "host")]
     pub Host: Option<(String, u16)>,
 }
