@@ -37,7 +37,7 @@ use tracing::{debug, error, info, warn};
 use bb8_redis::RedisConnectionManager;
 
 use crate::{
-    INDEX_TXT_FOOTER, REDIS_MASTER_KEY,
+    INDEX_TXT_FOOTER,
     app::{ApiConfig, AppState, ArcState, cli, portcheck::get_portcheck_level},
 };
 use peercast_root::RestrictPortLevel;
@@ -209,7 +209,7 @@ pub async fn index_json(
     State(state): State<ArcState>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
     let own_level = if let Some(host) = &params.Host {
-        get_portcheck_level(&mut conn, ip, host.1).await.unwrap_or_else(|e| {
+        get_portcheck_level(&state.0.redis_master_key, &mut conn, ip, host.1).await.unwrap_or_else(|e| {
             error!("Failed to get_portcheck_level for {}:{} -> {}", host.0, host.1, e);
             PortLevel::None
         })

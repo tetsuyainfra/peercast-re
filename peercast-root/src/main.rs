@@ -77,20 +77,6 @@ static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
 static _HTTP_API: OnceLock<Router> = OnceLock::new();
 // Don't use directly. SEE: INDEX_TXT_FOOTER()
 static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
-// Don't use directly. SEE: REDIS_MASTER_KEY()
-static _REDIS_MASTER_KEY: OnceLock<String> = OnceLock::new();
-
-#[inline]
-#[allow(non_snake_case, private_interfaces)]
-pub fn REDIS_MASTER_KEY() -> &'static str {
-    _REDIS_MASTER_KEY.get().unwrap()
-}
-
-// #[inline]
-// #[allow(non_snake_case)]
-// pub fn REPOSITORY() -> &'static ChannelRepository<RootChannel> {
-//     _REPOSITORY.get().unwrap()
-// }
 
 #[inline]
 #[allow(non_snake_case)]
@@ -145,7 +131,6 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
-    _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
     _INDEX_TXT_FOOTER.get_or_init(|| {
@@ -198,6 +183,7 @@ async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketA
     let db_pool = init_db(args).await;
 
     let app_sate = AppState {
+        redis_master_key: args.redis_master_key.clone(),
         db_pool: db_pool,
         repository,
         config: Arc::new(api_config),
@@ -227,7 +213,7 @@ async fn init_db(args: &cli::Args) -> Pool<RedisConnectionManager> {
             }
         };
 
-        let key = format!("{}:CHECK", REDIS_MASTER_KEY());
+        let key = format!("{}:CHECK", args.redis_master_key);
         // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
         match timeout(Duration::from_millis(2000), conn.set::<&str, &str, ()>(&key, "CHECK_ME")).await {
             Ok(Ok(())) => {

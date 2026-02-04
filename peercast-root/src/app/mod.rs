@@ -19,6 +19,7 @@ pub struct ApiConfig {
 #[derive(Debug)]
 pub struct AppState {
     pub config: Arc<ApiConfig>,
+    pub redis_master_key: String,
     pub db_pool: bb8::Pool<RedisConnectionManager>,
     pub repository: ChannelRepository<RootChannel>,
 }

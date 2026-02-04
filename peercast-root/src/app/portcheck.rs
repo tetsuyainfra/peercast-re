@@ -6,21 +6,20 @@ use redis::AsyncCommands;
 use tokio::time::timeout;
 use tracing::{debug, info};
 
-use crate::REDIS_MASTER_KEY;
-
-fn portcheck_key(host: IpAddr, port: u16) -> String {
-    format!("{}:PORTCHECK:{}:{}", REDIS_MASTER_KEY(), host, port)
+fn portcheck_key(redis_master_key: &str, host: IpAddr, port: u16) -> String {
+    format!("{}:PORTCHECK:{}:{}", redis_master_key, host, port)
 }
 
 //-------------------------------------------------------------------------------
 // PortCheck
 //-------------------------------------------------------------------------------
 pub async fn get_portcheck_level(
+    redis_master_key: &str,
     DatabaseConnection(conn): &mut DatabaseConnection,
     host: IpAddr,
     port: u16,
 ) -> anyhow::Result<PortLevel> {
-    let key = portcheck_key(host, port);
+    let key = portcheck_key(redis_master_key, host, port);
     // DBに結果を問い合わせ
     if let Some::<String>(port_level) = timeout(Duration::from_secs(1), conn.get(&key)).await?? {
         // あればそれを返す
