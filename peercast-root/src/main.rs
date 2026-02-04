@@ -18,6 +18,7 @@ use axum::{
     serve::Listener,
 };
 use axum_extra::headers::Header;
+use bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
@@ -32,6 +33,7 @@ use libpeercast_re::{
         connection::PcpConnection,
         decode::{PcpBroadcast, PcpChannel, PcpHost},
         procedure::PcpHandshake,
+        repository,
     },
     util::{ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
 };
@@ -57,24 +59,18 @@ use tracing::{debug, error, info, instrument::WithSubscriber, trace, warn};
 use url::Url;
 
 // App modules
-mod app {
-    pub mod cli;
-    pub mod handler;
-    pub mod logging;
-    pub mod portcheck;
-}
+mod app;
 use app::cli;
 use app::handler;
 use app::logging;
 
+use crate::app::{ApiConfig, AppState, ArcState};
+
 #[cfg(test)]
 mod test_helper;
 
-#[derive(Debug, Clone)]
-struct ApiState {}
-
 // Don't use directly. SEE: REPOSITORY()
-static _REPOSITORY: OnceLock<ChannelRepository<RootChannel>> = OnceLock::new();
+// static _REPOSITORY: OnceLock<ChannelRepository<RootChannel>> = OnceLock::new();
 // Don't use directly. SEE: CONN_FACTORY()
 static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
 // Don't use directly. SEE: HTTP_API()
@@ -90,11 +86,11 @@ pub fn REDIS_MASTER_KEY() -> &'static str {
     _REDIS_MASTER_KEY.get().unwrap()
 }
 
-#[inline]
-#[allow(non_snake_case)]
-pub fn REPOSITORY() -> &'static ChannelRepository<RootChannel> {
-    _REPOSITORY.get().unwrap()
-}
+// #[inline]
+// #[allow(non_snake_case)]
+// pub fn REPOSITORY() -> &'static ChannelRepository<RootChannel> {
+//     _REPOSITORY.get().unwrap()
+// }
 
 #[inline]
 #[allow(non_snake_case)]
@@ -113,8 +109,8 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     cli::version_print(&args)?;
 
-    init_app(&args, GnuId::new(), (args.bind, args.port).into());
     logging::init(&args)?;
+    let arc_state = init_app(&args, GnuId::new(), (args.bind, args.port).into()).await;
 
     // Init socket
     let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
@@ -127,11 +123,11 @@ async fn main() -> anyhow::Result<()> {
     let mut set = tokio::task::JoinSet::new();
     set.build_task().name("ApiServer").spawn(
         //
-        server_api(args.clone(), listener_http, cancell_token.child_token()),
+        server_api(args.clone(), arc_state.clone(), listener_http, cancell_token.child_token()),
     )?;
     set.build_task().name("RootServer").spawn(
         // server_peercast(shutdown_token.child_token(), store.clone(), svr_listener),
-        server_peercast(args.clone(), listener_pcp, cancell_token.child_token()),
+        server_peercast(args.clone(), arc_state, listener_pcp, cancell_token.child_token()),
     )?;
     set.build_task().name("WaitShutdownSig").spawn(async move {
         tokio::signal::ctrl_c().await.expect("failed to listen for event");
@@ -148,9 +144,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
+async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
     _REDIS_MASTER_KEY.get_or_init(|| args.redis_master_key.clone());
-    _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
+    // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     _CONN_FACTORY.get_or_init(|| PcpConnectionFactory::new(self_session_id, self_socket));
     _INDEX_TXT_FOOTER.get_or_init(|| {
         let mut v = vec![];
@@ -168,6 +164,7 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
         v
     });
 
+    let repository = ChannelRepository::new(&self_session_id);
     if args.create_dummy_channel {
         let mut chinfo = ChannelInfo::new();
         let level_fmt = match args.yp_restrict_port_level {
@@ -188,32 +185,33 @@ fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) {
         let config = RootConfig {
             tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
         };
-        REPOSITORY().create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
+        repository.create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
     }
+
+    let api_config = ApiConfig {
+        restrict_speed: args.yp_limit_speed,
+        listener_hideable: args.yp_listerer_hideable,
+        port_check_level: args.yp_restrict_port_level,
+        name_space: args.yp_name_space.clone(),
+    };
+
+    let db_pool = init_db(args).await;
+
+    let app_sate = AppState {
+        db_pool: db_pool,
+        repository,
+        config: Arc::new(api_config),
+    };
+
+    ArcState(Arc::new(app_sate))
 }
 
-#[derive(Debug)]
-struct ApiConfig {
-    restrict_speed: u32,
-    listener_hideable: bool,
-    port_check_level: RestrictPortLevel,
-    name_space: String,
-}
-#[derive(Debug, Clone)]
-struct AppState(bb8::Pool<RedisConnectionManager>, Arc<ApiConfig>);
-
-async fn server_api(
-    args: cli::Args,
-    listener: TcpListener,
-    graceful_shutdown: CancellationToken,
-) -> anyhow::Result<()> {
-    use bb8_redis::RedisConnectionManager;
+async fn init_db(args: &cli::Args) -> Pool<RedisConnectionManager> {
     use redis::AsyncCommands;
     use tokio::time::timeout;
-    use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
     debug!("connecting to redis: {}", args.redis_url);
-    let manager = RedisConnectionManager::new(args.redis_url).unwrap();
+    let manager = RedisConnectionManager::new(args.redis_url.clone()).unwrap();
     let pool = bb8::Pool::builder().build(manager).await.unwrap();
     {
         // let mut conn = pool.get().await.unwrap();
@@ -262,6 +260,18 @@ async fn server_api(
     }
     tracing::debug!("successfully connected to redis and pinged it");
 
+    pool
+}
+
+async fn server_api(
+    args: cli::Args,
+    state: ArcState,
+    listener: TcpListener,
+    graceful_shutdown: CancellationToken,
+) -> anyhow::Result<()> {
+    use bb8_redis::RedisConnectionManager;
+    use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
     info!("asset_dir: {:?}", &assets_dir);
 
@@ -270,13 +280,6 @@ async fn server_api(
 
     let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
     info!("cache-control: {}", &cache_control_value);
-
-    let api_config = handler::ApiConfig {
-        restrict_speed: args.yp_limit_speed,
-        listener_hideable: args.yp_listerer_hideable,
-        port_check_level: args.yp_restrict_port_level,
-        name_space: args.yp_name_space,
-    };
 
     let tracker = tokio_util::task::TaskTracker::new();
     info!("START HTTP SERVER");
@@ -292,7 +295,7 @@ async fn server_api(
             HeaderValue::from_bytes(cache_control_value.as_bytes()).unwrap(),
         ))
         .layer(args.ip_source.into_extension())
-        .with_state(handler::AppState(pool, Arc::new(api_config)));
+        .with_state(state);
 
     let _ = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .with_graceful_shutdown(graceful_shutdown.cancelled_owned())
@@ -303,6 +306,7 @@ async fn server_api(
 
 async fn server_peercast(
     args: cli::Args,
+    state: ArcState,
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
@@ -317,6 +321,7 @@ async fn server_peercast(
         let name = format!("tcp({})", cid);
         let spawner = tokio::task::Builder::new().name(&name);
         let child_graceful_shutdown = graceful_shutdown.child_token();
+        let state = state.clone();
 
         // Dropすることで、全ての接続終了を確認する
         let closed_rx = closed_rx.clone();
@@ -327,7 +332,7 @@ async fn server_peercast(
                 match accept {
                     Ok((stream, addr)) => {
                         println!("{}: accept connection from {}", &name, &addr);
-                        let _handle = spawner.spawn(tracker.track_future(serve_peercast( cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
+                        let _handle = spawner.spawn(tracker.track_future(serve_peercast(state, cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
                         // let _handle = spawner.spawn(serve_peercast( cid, stream, addr, child_graceful_shutdown, closed_rx));
                     }
                     Err(e) => {
@@ -357,6 +362,7 @@ async fn server_peercast(
 
 #[inline]
 async fn serve_peercast(
+    state: ArcState,
     cid: ConnectionNo,
     mut stream: TcpStream,
     remote: SocketAddr,
@@ -365,7 +371,9 @@ async fn serve_peercast(
 ) {
     info!(?cid, ?remote, "SPAWN SERVE");
     match identify_protocol(&stream).await {
-        Ok(ConnectionProtocol::PeerCast) => serve_root(cid, stream, remote, graceful_shutdown, closed_send).await,
+        Ok(ConnectionProtocol::PeerCast) => {
+            serve_root(state, cid, stream, remote, graceful_shutdown, closed_send).await
+        }
         Ok(ConnectionProtocol::PeerCastHttp) => {
             error!("PeerCastHttp is not allowed");
             let _ = stream.shutdown().await;
@@ -391,6 +399,7 @@ async fn serve_peercast(
 //-------------------------------------------------------------------------------
 
 async fn serve_root(
+    state: ArcState,
     cid: ConnectionNo,
     mut stream: TcpStream,
     remote: SocketAddr,
@@ -398,6 +407,7 @@ async fn serve_root(
     closed_send: watch::Receiver<()>,
 ) {
     use libpeercast_re::pcp::connection::HandshakeType;
+
     let read_buf = BytesMut::new();
 
     // HandshakeFutureにすればよさそう
@@ -475,7 +485,7 @@ async fn serve_root(
     };
 
     // 対象チャンネルを取得
-    let repo = REPOSITORY();
+    let repo = &state.0.repository;
     let ch = repo.create_or_get(*channel_id_in_bcst, channel_info, track_info, Some(config));
 
     // Channelにコネクションを接続

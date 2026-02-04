@@ -37,8 +37,8 @@ use tracing::{debug, error, info, warn};
 use bb8_redis::RedisConnectionManager;
 
 use crate::{
-    INDEX_TXT_FOOTER, REDIS_MASTER_KEY, REPOSITORY,
-    app::{cli, portcheck::get_portcheck_level},
+    INDEX_TXT_FOOTER, REDIS_MASTER_KEY,
+    app::{ApiConfig, AppState, ArcState, cli, portcheck::get_portcheck_level},
 };
 use peercast_root::RestrictPortLevel;
 
@@ -61,6 +61,7 @@ where
     }
 }
 
+/*
 #[derive(Debug)]
 pub struct ApiConfig {
     pub restrict_speed: u32,
@@ -184,6 +185,7 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
     }
     .boxed()
 }
+    */
 
 //-------------------------------------------------------------------------------
 // Api Handlers
@@ -192,9 +194,9 @@ pub async fn index_txt(
     client_ip: ClientIp,
     query_params: Query<IndexTextParams>,
     mut conn: DatabaseConnection,
-    state_config: State<Arc<ApiConfig>>,
+    state: State<ArcState>,
 ) -> Result<String, ApiError> {
-    let channels = index_json(client_ip, query_params, conn, state_config).await?;
+    let channels = index_json(client_ip, query_params, conn, state).await?;
     let channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
     Ok(itertools::join(channels, "\n"))
@@ -204,7 +206,7 @@ pub async fn index_json(
     ClientIp(ip): ClientIp,
     Query(params): Query<IndexTextParams>,
     mut conn: DatabaseConnection,
-    State(config): State<Arc<ApiConfig>>,
+    State(state): State<ArcState>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
     let own_level = if let Some(host) = &params.Host {
         get_portcheck_level(&mut conn, ip, host.1).await.unwrap_or_else(|e| {
@@ -215,7 +217,8 @@ pub async fn index_json(
         PortLevel::None
     };
 
-    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
+    let mut channels: Vec<JsonChannel> = state.0.repository.map_collect(|(id, ch)| ch.into());
+    let config = &state.0.config;
 
     let mut channels: Vec<JsonChannel> = filter_channels(
         &config.name_space,
@@ -234,35 +237,35 @@ pub async fn index_json(
     Ok(channels.into())
 }
 
-fn merged_channels() -> Vec<JsonChannel> {
-    let mut channels: Vec<JsonChannel> = REPOSITORY().map_collect(|(id, ch)| ch.into());
+// fn merged_channels(state: ArcState) -> Vec<JsonChannel> {
+//     let mut channels: Vec<JsonChannel> = state.0.repository.map_collect(|(id, ch)| ch.into());
 
-    channels.reserve(INDEX_TXT_FOOTER().len());
-    channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
-    channels
-}
+//     channels.reserve(INDEX_TXT_FOOTER().len());
+//     channels.extend(INDEX_TXT_FOOTER().clone().into_iter().map(|e| e.into()));
+//     channels
+// }
 
 //-------------------------------------------------------------------------------
 // ApiConfig Mapper
 //-------------------------------------------------------------------------------
 // AppStateからApiConfigを取り出すためのFromRef実装
-impl FromRef<AppState> for Arc<ApiConfig> {
-    fn from_ref(state: &AppState) -> Arc<ApiConfig> {
-        state.1.clone()
-    }
-}
+// impl FromRef<Arc<AppState>> for Arc<ApiConfig> {
+//     fn from_ref(state: &Arc<AppState>) -> Arc<ApiConfig> {
+//         state.config
+//     }
+// }
 
 //-------------------------------------------------------------------------------
 // Database mapper
 //-------------------------------------------------------------------------------
-impl FromRequestParts<AppState> for DatabaseConnection {
+impl FromRequestParts<ArcState> for DatabaseConnection {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(
         _parts: &mut axum::http::request::Parts,
-        state: &AppState,
+        state: &ArcState,
     ) -> Result<Self, Self::Rejection> {
-        let pool = ConnectionPool::from_ref(&state.0);
+        let pool = ConnectionPool::from_ref(&state.0.db_pool);
 
         // let conn = pool.get_owned().await.map_err(internal_error)?;
         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned()).await.map_err(internal_error)?;

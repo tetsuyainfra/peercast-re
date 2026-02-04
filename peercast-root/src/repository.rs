@@ -9,6 +9,7 @@ use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo},
     util::mutex_poisoned,
 };
+use serde::de;
 use tokio::{
     io::DuplexStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
@@ -32,6 +33,7 @@ pub trait Channel {
     fn before_delete(&mut self) {}
 }
 
+#[derive(Debug)]
 pub struct ChannelRepository<C> {
     session_id: GnuId,
     channels: Arc<Mutex<HashMap<GnuId, C>>>,
