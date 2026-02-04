@@ -68,11 +68,12 @@ where
         }
     }
 
-    fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    fn filter_map_collect<F, G, R>(&self, mut f: F, mut g: G) -> Vec<R>
     where
-        F: FnMut(&GnuId, &C) -> R,
+        F: FnMut(&GnuId, &C) -> bool,
+        G: FnMut(&GnuId, &C) -> R,
     {
-        self.channels.iter().map(|(k, v)| f(k, v)).collect()
+        self.channels.iter().filter(|(k, v)| f(k, v)).map(|(k, v)| g(k, v)).collect()
     }
 }
 
@@ -97,6 +98,16 @@ pub(crate) async fn test_repository<C: Channel>(mut repo: impl Repository<C>) {
     let _ = repo.create_or_get(GnuId::new(), None).await;
     let all_channels = repo.get_all();
     assert_eq!(all_channels.len(), 3);
+
+    let filter_channels = repo.filter_collect(|i, c| c.id() == channel.id());
+    assert_eq!(filter_channels.len(), 1);
+
+    let mapped_channels = repo.map_collect(|i, c| i.clone());
+    assert_eq!(mapped_channels.len(), 3);
+
+    let filter_mapped_channels = repo.filter_map_collect(|i, c| c.id() == channel.id(), |i, c| i.clone());
+    assert_eq!(filter_mapped_channels.len(), 1);
+    assert_eq!(filter_mapped_channels[0], channel.id());
 
     let deleted = repo.delete_channel(id.clone());
     assert!(deleted);

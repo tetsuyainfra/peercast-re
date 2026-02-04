@@ -69,13 +69,32 @@ pub trait Repository<C: Channel> {
     fn get(&self, id: GnuId) -> Option<C>;
     fn get_all(&self) -> Vec<C>;
 
-
     fn create(&mut self, id: GnuId, config: Option<C::Config>) -> (C, bool);
     fn create_or_get(&mut self, id: GnuId, config: Option<C::Config>) -> impl Future<Output = C> + Send;
     fn delete_channel(&mut self, id: GnuId) -> bool;
 
     fn delete_all(&mut self);
 
-    fn map_collect<F, R>(&self, f: F) -> Vec<R>
-        where F: FnMut(&GnuId, &C) -> R, { unimplemented!() }
+    fn filter_map_collect<F, G, R>(&self, f: F, g: G) -> Vec<R>
+    where
+        F: FnMut(&GnuId, &C) -> bool,
+        G: FnMut(&GnuId, &C) -> R,
+    {
+        unimplemented!()
+    }
+
+    fn filter_collect<F>(&self, f: F) -> Vec<C>
+    where
+        F: FnMut(&GnuId, &C) -> bool,
+    {
+        self.filter_map_collect(f, |k, v| v.clone())
+    }
+
+    fn map_collect<G, R>(&self, g: G) -> Vec<R>
+    where
+        G: FnMut(&GnuId, &C) -> R,
+    {
+        self.filter_map_collect(|_, _| true, g)
+    }
+
 }

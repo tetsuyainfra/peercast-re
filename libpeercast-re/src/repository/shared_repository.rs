@@ -63,11 +63,12 @@ where
         self.lock_impl().delete_all();
     }
 
-    fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    fn filter_map_collect<F, G, R>(&self, f: F, g: G) -> Vec<R>
     where
-        F: FnMut(&GnuId, &C) -> R,
+        F: FnMut(&GnuId, &C) -> bool,
+        G: FnMut(&GnuId, &C) -> R,
     {
-        self.lock_impl().map_collect(f)
+        self.lock_impl().filter_map_collect(f, g)
     }
 }
 
