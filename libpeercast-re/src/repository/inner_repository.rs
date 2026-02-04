@@ -5,22 +5,22 @@ use crate::{
     repository::{Channel, Repository},
 };
 
-pub(super) struct _ImplRepository<C> {
+pub(super) struct InnerRepository<C> {
     channels: HashMap<GnuId, C>,
 }
 
-impl<C> _ImplRepository<C>
+impl<C> InnerRepository<C>
 where
     C: Channel,
 {
     pub fn new() -> Self {
-        _ImplRepository {
+        InnerRepository {
             channels: HashMap::new(),
         }
     }
 }
 
-impl<C> Repository<C> for _ImplRepository<C>
+impl<C> Repository<C> for InnerRepository<C>
 where
     C: Channel,
 {

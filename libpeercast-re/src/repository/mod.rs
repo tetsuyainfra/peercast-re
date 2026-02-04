@@ -3,7 +3,7 @@ use std::future::Future;
 use crate::pcp::GnuId;
 
 pub(self) mod dummy_channel;
-pub(self) mod impl_repository;
+pub(self) mod inner_repository;
 pub mod local_repository;
 pub mod shared_repository;
 

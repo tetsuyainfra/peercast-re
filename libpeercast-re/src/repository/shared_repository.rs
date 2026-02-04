@@ -7,7 +7,7 @@ use crate::{
     util::mutex_poisoned,
     {
         pcp::GnuId,
-        repository::{impl_repository::_ImplRepository, Channel, Repository},
+        repository::{inner_repository::InnerRepository, Channel, Repository},
     },
 };
 
@@ -15,17 +15,17 @@ use crate::{
 /// このリポジトリは Send(スレッド間の移動禁止) Sync(スレッド間の共有禁止)を実装しているため
 /// 複数のスレッド間で安全に共有および移動されることを意図しています。
 pub struct SharedRepository<C> {
-    impl_: Arc<Mutex<_ImplRepository<C>>>,
+    impl_: Arc<Mutex<InnerRepository<C>>>,
 }
 
 impl<C: Channel> SharedRepository<C> {
     pub fn new() -> Self {
         SharedRepository {
-            impl_: Arc::new(Mutex::new(_ImplRepository::new())),
+            impl_: Arc::new(Mutex::new(InnerRepository::new())),
         }
     }
 
-    fn lock_impl(&self) -> std::sync::MutexGuard<'_, _ImplRepository<C>> {
+    fn lock_impl(&self) -> std::sync::MutexGuard<'_, InnerRepository<C>> {
         self.impl_.lock().unwrap_or_else(mutex_poisoned)
     }
 }
@@ -75,7 +75,7 @@ where
 mod tests {
     use super::*;
     use crate::{
-        repository::{dummy_channel::DummyChannel, impl_repository::test_repository},
+        repository::{dummy_channel::DummyChannel, inner_repository::test_repository},
         test_helper::{assert_send, assert_sync},
     };
 

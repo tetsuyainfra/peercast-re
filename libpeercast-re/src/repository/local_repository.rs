@@ -1,6 +1,6 @@
 use std::{collections::HashMap, future::Future, marker::PhantomData};
 
-use crate::{pcp::GnuId, repository::impl_repository::_ImplRepository};
+use crate::{pcp::GnuId, repository::inner_repository::InnerRepository};
 
 use super::{Channel, Repository};
 
@@ -8,7 +8,7 @@ use super::{Channel, Repository};
 /// このリポジトリは Send(スレッド間の移動禁止) Sync(スレッド間の共有禁止)を実装していないため
 /// ローカルスレッド内でのみ使用されることを意図しています。
 pub struct LocalRepository<C> {
-    impl_: _ImplRepository<C>,
+    impl_: InnerRepository<C>,
 
     /// This marker ensures that LocalRepository is !Send and !Sync
     _marker: PhantomData<std::rc::Rc<()>>,
@@ -17,7 +17,7 @@ pub struct LocalRepository<C> {
 impl<C: Channel> LocalRepository<C> {
     pub fn new() -> Self {
         LocalRepository {
-            impl_: _ImplRepository::<C>::new(),
+            impl_: InnerRepository::<C>::new(),
             _marker: PhantomData,
         }
     }
@@ -68,7 +68,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{dummy_channel::DummyChannel, impl_repository::test_repository};
+    use crate::repository::{dummy_channel::DummyChannel, inner_repository::test_repository};
 
     /// ```compile_fail
     /// コンパイルエラーになることを確認するテストコード
