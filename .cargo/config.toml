@@ -1,3 +1,8 @@
+# .cargo/config.toml
+[alias]
+run-root = "run -p peercast-root"
+run-re   = "run -p peercast-re"
+
 # デフォルトの設定でtarget.TARGET_SYSTEMを上書きしている、排他的な設定
 # [build]
 # rustflags = [
