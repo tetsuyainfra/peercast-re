@@ -2,6 +2,8 @@
 name = "peercast-root"
 version = "0.1.0"
 edition = "2024"
+default-run = "peercast-root"
+
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }

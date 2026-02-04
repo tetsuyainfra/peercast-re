@@ -1,0 +1,111 @@
+use std::{collections::HashMap, future::Future};
+
+use crate::{
+    pcp::GnuId,
+    repository::{Channel, Repository},
+};
+
+pub(super) struct _ImplRepository<C> {
+    channels: HashMap<GnuId, C>,
+}
+
+impl<C> _ImplRepository<C>
+where
+    C: Channel,
+{
+    pub fn new() -> Self {
+        _ImplRepository {
+            channels: HashMap::new(),
+        }
+    }
+}
+
+impl<C> Repository<C> for _ImplRepository<C>
+where
+    C: Channel,
+{
+    fn get(&self, id: crate::pcp::GnuId) -> Option<C> {
+        self.channels.get(&id).cloned()
+    }
+
+    fn get_all(&self) -> Vec<C> {
+        self.channels.values().cloned().collect()
+    }
+
+    fn create(&mut self, id: GnuId, config: Option<<C as Channel>::Config>) -> (C, bool) {
+        match self.channels.get(&id) {
+            Some(ch) => (ch.clone(), false),
+            None => {
+                // let ch =
+                // C::new(self.session_id.clone(), id.clone(), channel_info, track_info, rtmp_stream_manager, config);
+                let ch: C = C::new(id.clone(), config);
+                tracing::info!("Created new channel: {:?}", ch);
+                self.channels.insert(id, ch.clone());
+                (ch, true)
+            }
+        }
+    }
+
+    /// This method is only used internally. Use create() method instead.
+    fn create_or_get(&mut self, id: GnuId, config: Option<C::Config>) -> impl Future<Output = C> + Send {
+        async { unimplemented!("Use create() method instead") }
+    }
+
+    fn delete_channel(&mut self, id: crate::pcp::GnuId) -> bool {
+        if let Some(mut ch) = self.channels.remove(&id) {
+            ch.before_delete();
+            tracing::info!("Deleted channel: {:?}", ch);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn delete_all(&mut self) {
+        let keys_to_remove: Vec<GnuId> = self.channels.iter().map(|(k, _)| *k).collect();
+        for id in keys_to_remove {
+            self.delete_channel(id);
+        }
+    }
+
+    fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    where
+        F: FnMut(&GnuId, &C) -> R,
+    {
+        self.channels.iter().map(|(k, v)| f(k, v)).collect()
+    }
+}
+
+#[cfg(test)]
+pub(crate) async fn test_repository<C: Channel>(mut repo: impl Repository<C>) {
+    let id = GnuId::new();
+    let channel = repo.create_or_get(id.clone(), None).await;
+    assert_eq!(channel.id(), id);
+
+    let fetched_channel = repo.get(id.clone());
+    assert!(fetched_channel.is_some());
+    assert_eq!(channel, fetched_channel.unwrap());
+
+    let (channel_be_cloned, is_created) = repo.create(id, None);
+    assert_eq!(channel_be_cloned, channel);
+    assert_eq!(is_created, false);
+
+    let all_channels = repo.get_all();
+    assert_eq!(all_channels.len(), 1);
+
+    let _ = repo.create_or_get(GnuId::new(), None).await;
+    let _ = repo.create_or_get(GnuId::new(), None).await;
+    let all_channels = repo.get_all();
+    assert_eq!(all_channels.len(), 3);
+
+    let deleted = repo.delete_channel(id.clone());
+    assert!(deleted);
+    let all_channels = repo.get_all();
+    assert_eq!(all_channels.len(), 2);
+
+    let fetched_channel_after_delete = repo.get(id);
+    assert!(fetched_channel_after_delete.is_none());
+
+    let deleted = repo.delete_all();
+    assert_eq!(repo.get_all().len(), 0);
+}

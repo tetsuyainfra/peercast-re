@@ -225,7 +225,7 @@ async fn spawned_peercast_connection_handler(
             // Handle the connection
             tracing::info!("Accepted connection({}) from {}", cid, remote);
 
-            match libpeercast_re::util::identify_protocol(&conn).await {
+            match timeout(Duration::from_secs(5), libpeercast_re::util::identify_protocol(&conn)).await? {
                 Ok(ConnectionProtocol::PeerCast) => {
                     tracing::info!(?cid, ?remote, "STREAM is PeerCast Protocol");
                     // serve_root(cid, stream, remote, graceful_shutdown, closed_send).await

@@ -3,8 +3,11 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
 async fn main() -> () {
-    let file_appender = tracing_appender::rolling::hourly("./tmp", "prefix.log");
+    // 標準出力にカラフルな整形ログを出力するレイヤーを作成
     let pretty_layer = fmt::layer().pretty().with_writer(std::io::stdout);
+
+    // JSON ログをファイルに出力するレイヤーを作成
+    let file_appender = tracing_appender::rolling::hourly("./tmp", "prefix.log");
     let json_layer = fmt::layer().json().with_writer(file_appender);
 
     // tracing_subscriber::registry() is an alias for Registry::default()

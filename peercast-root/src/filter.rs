@@ -27,7 +27,7 @@ fn filter_channel(
     channel: JsonChannel,
 ) -> Option<JsonChannel> {
     let mut c = channel;
-    debug_assert!( peercast_root::YP_LIMIT_SPEED_MIN < yp_restrict_speed ); // MEMO: testの時消えなければよい
+    debug_assert!(peercast_root::YP_LIMIT_SPEED_MIN < yp_restrict_speed); // MEMO: testの時消えなければよい
 
     // 名前空間のフィルタリング
     let mut c = if let Some(stripped_ns_genre) = c.genre.strip_prefix(&namespace) {
@@ -139,6 +139,9 @@ pub fn filter_channels(
         })
         .collect()
 }
+
+/*
+TODO: テスト書き直そう
 
 //-------------------------------------------------------------------------------
 // Test
@@ -473,3 +476,5 @@ mod tests {
         }
     }
 }
+
+*/

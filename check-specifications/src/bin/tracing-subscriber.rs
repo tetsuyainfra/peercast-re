@@ -1,5 +1,4 @@
 use tracing::{Level, debug, info};
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -26,3 +25,14 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/*
+https://docs.rs/tracing/latest/tracing/
+https://docs.rs/tracing/latest/tracing/#in-libraries
+
+https://docs.rs/tracing-subscriber/latest/tracing_subscriber/
+https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/
+
+https://docs.rs/tracing-appender/latest/tracing_appender/
+https://docs.rs/tracing-journald/latest/tracing_journald/
+*/

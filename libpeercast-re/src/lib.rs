@@ -24,15 +24,12 @@ pub mod config;
 mod conn;
 pub use conn::ConnectionNo;
 
-pub mod error;
-
 pub mod codec;
-
+pub mod error;
+pub mod http;
 /// Peercast Protocol
 pub mod pcp;
-
-pub mod http;
-
+pub mod repository;
 pub mod rtmp;
 
 pub mod app {

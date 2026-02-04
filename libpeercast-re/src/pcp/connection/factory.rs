@@ -199,7 +199,7 @@ mod t {
         assert_send::<PcpConnectionFactory>();
         assert_sync::<PcpConnectionFactory>();
         let self_session_id = GnuId::new();
-        let self_socket = "192.168.0.1".parse().unwrap();
+        let self_socket: SocketAddr = "192.168.0.1:0".parse().unwrap();
         let factory = PcpConnectionFactory::new(self_session_id, self_socket);
     }
 }
