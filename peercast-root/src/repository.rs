@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use chrono::{DateTime, Utc};
@@ -9,12 +9,9 @@ use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo},
     util::mutex_poisoned,
 };
-use serde::de;
 use tokio::{
-    io::DuplexStream,
     sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
     task::JoinHandle,
-    time::{Interval, interval},
 };
 use tracing::{debug, info};
 
@@ -152,7 +149,7 @@ where
                 // channelが無かった場合
                 let channel = Channel::new(self.session_id, id, channel_info, track_info, config);
                 match channels.insert(id, channel) {
-                    Some(id) => panic!("ChannelManager have same GnuID. {:?}", &self.channels),
+                    Some(_id) => panic!("ChannelManager have same GnuID. {:?}", &self.channels),
                     None => {
                         let ch = channels.get(&id).unwrap().clone();
                         info!("created channels. {:?}", &ch);

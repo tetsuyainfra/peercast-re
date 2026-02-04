@@ -41,7 +41,7 @@ pub struct RootConfig {
 impl Channel for RootChannel {
     type Config = RootConfig;
     fn new(
-        self_session_id: GnuId,
+        _self_session_id: GnuId,
         cid: GnuId,
         channel_info: Option<libpeercast_re::pcp::ChannelInfo>,
         track_info: Option<libpeercast_re::pcp::TrackInfo>,
@@ -169,7 +169,7 @@ impl RootChannel {
 impl RootChannel {
     pub fn attach_connection(
         self,
-        mut pcp_connection: PcpConnection,
+        pcp_connection: PcpConnection,
         graceful_shutdown: CancellationToken,
         closed_send: watch::Receiver<()>,
     ) -> AttachTaskFuture {

@@ -1,7 +1,6 @@
 use std::i32;
 
 // use peercast_root::{PortLevel, RestrictPortLevel};
-use tracing::info;
 
 use crate::{PortLevel, RestrictPortLevel, channel::json_model::JsonChannel};
 
@@ -121,7 +120,7 @@ pub fn filter_channels(
     yp_restrict_port_level: RestrictPortLevel,
     yp_restrict_speed: u32,
     own_port_level: PortLevel,
-    own_speed: u32,
+    _own_speed: u32,
     // Input
     channel: Vec<JsonChannel>,
 ) -> Vec<JsonChannel> {
