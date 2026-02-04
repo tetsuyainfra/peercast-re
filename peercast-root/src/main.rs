@@ -1,5 +1,6 @@
 #![allow(unused)]
 use std::{
+    any,
     net::{IpAddr, SocketAddr},
     path::PathBuf,
     process::exit,
@@ -60,10 +61,6 @@ mod filter;
 mod logging;
 mod portcheck;
 mod repository;
-mod shutdown;
-mod shutdown2;
-mod shutdown3;
-
 #[cfg(test)]
 mod test_helper;
 
@@ -169,12 +166,15 @@ async fn main() -> anyhow::Result<()> {
     let listener_http: TcpListener = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
     info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
 
-    // let (shutdown_task, graceful, force) = shutdown::create_task_anyhow();
-    let (shutdown_task, graceful) = shutdown3::create_task_anyhow();
-
-    let shutdown_task = tokio::spawn(shutdown_task);
-    let peercast_server_task = tokio::spawn(server_peercast(args.clone(), listener_pcp, graceful.clone()));
-    let http_server_task = tokio::spawn(api::server_http(args, listener_http, graceful));
+    let shutdown_token = CancellationToken::new();
+    let peercast_server_task = tokio::spawn(server_peercast(args.clone(), listener_pcp, shutdown_token.child_token()));
+    let http_server_task = tokio::spawn(api::server_http(args, listener_http, shutdown_token.child_token()));
+    let shutdown_task = tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.expect("failed to listen for event");
+        shutdown_token.cancel();
+        info!("SHUTDOWN SIGNAL SENT");
+        anyhow::Ok(())
+    });
 
     // futures_util::future::join_all(vec![http_server_task])
     // futures_util::future::join_all(vec![shutdown_task, http_server_task])
