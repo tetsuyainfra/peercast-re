@@ -1,12 +1,12 @@
 use std::{net::IpAddr, time::Duration};
 
 use bb8_redis::RedisConnectionManager;
-use peercast_root::PortLevel;
+use peercast_root::{PortLevel, db::DatabaseConnection};
 use redis::AsyncCommands;
 use tokio::time::timeout;
 use tracing::{debug, info};
 
-use crate::{db::DatabaseConnection, REDIS_MASTER_KEY};
+use crate::REDIS_MASTER_KEY;
 
 fn portcheck_key(host: IpAddr, port: u16) -> String {
     format!("{}:PORTCHECK:{}:{}", REDIS_MASTER_KEY(), host, port)
@@ -52,27 +52,26 @@ pub async fn portcheck(
 ) -> anyhow::Result<bool> {
     use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
     let self_addr = "0.0.0.0:7144".parse().unwrap();
-    let factory = PcpConnectionFactory::builder(GnuId::new(), self_addr)
-        .connect_timeout(Duration::from_secs(1))
-        .build();
+    let factory =
+        PcpConnectionFactory::builder(GnuId::new(), self_addr).connect_timeout(Duration::from_secs(1)).build();
 
     let handshake = match factory.connect((host, port).into()).await {
         Ok(h) => h,
         Err(_e) => {
             info!("Failed to connect to {}:{}", host, port);
-            return Ok(false)
-        },
+            return Ok(false);
+        }
     };
 
     match handshake.ping().await {
         Ok(remote_id) => {
             info!("Success to PCP connect to {}:{}({})", host, port, remote_id);
             // HACKME: handshakeの切断処理を確認する
-            return Ok(true)
+            return Ok(true);
         }
         Err(_e) => {
             info!("Failed to PCP connect to {}:{}", host, port);
-            return Ok(false)
+            return Ok(false);
         }
     }
 }

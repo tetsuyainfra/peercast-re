@@ -1,12 +1,18 @@
-
 mod index_info;
 
 use clap::ValueEnum;
-pub use index_info::{IndexInfo, FooterToml};
+pub use index_info::{FooterToml, IndexInfo};
+
+pub mod channel;
+pub mod db;
+pub mod filter;
+pub(crate) mod prelude;
+pub mod repository;
+pub mod test_helper;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？
 #[repr(i32)]
-pub enum ExitCode{
+pub enum ExitCode {
     Success = 0,
     Failure = 1,
 }
@@ -27,9 +33,8 @@ pub enum RestrictPortLevel {
     RestrictSpeed,
 }
 
-
 /// ポートチェックの制限速度で設定できる最小値（この値は含めない）
-pub static YP_LIMIT_SPEED_MIN : u32  = 499; // 500KBps
+pub static YP_LIMIT_SPEED_MIN: u32 = 499; // 500KBps
 
 /// ポートチェックされたPeerCastの疎通レベル
 #[repr(i8)]
@@ -45,9 +50,8 @@ pub enum PortLevel {
     Welldone = 1,
 
     // 疎通OK, 配信速度OK
-    WelldoneWithSpeed(u16) = 2
+    WelldoneWithSpeed(u16) = 2,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -62,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn test_port_level(){
+    fn test_port_level() {
         assert!(PortLevel::Incomplete == PortLevel::Incomplete);
         assert!(PortLevel::Incomplete < PortLevel::None);
         assert!(PortLevel::Incomplete < PortLevel::Welldone);

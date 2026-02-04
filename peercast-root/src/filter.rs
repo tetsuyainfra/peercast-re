@@ -1,9 +1,9 @@
 use std::i32;
 
-use peercast_root::{PortLevel, RestrictPortLevel};
+// use peercast_root::{PortLevel, RestrictPortLevel};
 use tracing::info;
 
-use crate::api::JsonChannel;
+use crate::{PortLevel, RestrictPortLevel, channel::json_model::JsonChannel};
 
 /// Vec<JsonChannel>を条件についてフィルタリングす
 /// @param namespace: YPの名前空間
@@ -27,7 +27,7 @@ fn filter_channel(
     channel: JsonChannel,
 ) -> Option<JsonChannel> {
     let mut c = channel;
-    debug_assert!(peercast_root::YP_LIMIT_SPEED_MIN < yp_restrict_speed); // MEMO: testの時消えなければよい
+    debug_assert!(crate::YP_LIMIT_SPEED_MIN < yp_restrict_speed); // MEMO: testの時消えなければよい
 
     // 名前空間のフィルタリング
     let mut c = if let Some(stripped_ns_genre) = c.genre.strip_prefix(&namespace) {

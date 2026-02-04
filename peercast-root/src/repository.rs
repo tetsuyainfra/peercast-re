@@ -11,9 +11,9 @@ use libpeercast_re::{
 };
 use tokio::{
     io::DuplexStream,
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
     task::JoinHandle,
-    time::{interval, Interval},
+    time::{Interval, interval},
 };
 use tracing::{debug, info};
 
@@ -53,8 +53,7 @@ where
     pub fn new(session_id: &GnuId) -> Self {
         let channels = Arc::new(Mutex::new(HashMap::default()));
         let (deleter_sender, deleter_reciever) = unbounded_channel();
-        let deleter_task =
-            tokio::spawn(Self::deleter_task(Arc::clone(&channels), deleter_reciever));
+        let deleter_task = tokio::spawn(Self::deleter_task(Arc::clone(&channels), deleter_reciever));
 
         Self {
             session_id: session_id.clone(),
@@ -73,10 +72,7 @@ where
         let check_timeout_channel = || {
             let check_time = Utc::now() - Duration::from_secs(Self::DELETE_PERIOD_SEC); // before 5min
             let mut channels = channels.lock().unwrap_or_else(mutex_poisoned);
-            let cid = channels
-                .iter()
-                .find(|c| c.1.last_update() < check_time)
-                .map(|(cid, _)| cid.clone());
+            let cid = channels.iter().find(|c| c.1.last_update() < check_time).map(|(cid, _)| cid.clone());
             if let Some(cid) = cid {
                 channels.remove(&cid)
             } else {
@@ -84,8 +80,7 @@ where
             }
         };
 
-        let mut interval =
-            tokio::time::interval(Duration::from_secs(Self::DELETE_CHECK_INTERVAL_SEC));
+        let mut interval = tokio::time::interval(Duration::from_secs(Self::DELETE_CHECK_INTERVAL_SEC));
         let mut check_interval = async || loop {
             interval.tick().await;
             match check_timeout_channel() {
@@ -222,14 +217,12 @@ mod t {
     };
     use tokio::{
         sync::{
-            mpsc::{unbounded_channel, UnboundedSender},
+            mpsc::{UnboundedSender, unbounded_channel},
             watch,
         },
         time::sleep,
     };
     use tracing::info;
-
-    use crate::test_helper;
 
     use super::{Channel, ChannelRepository};
 
@@ -259,10 +252,7 @@ mod t {
         }
 
         fn last_update(&self) -> DateTime<Utc> {
-            self.last_update
-                .lock()
-                .unwrap_or_else(mutex_poisoned)
-                .clone()
+            self.last_update.lock().unwrap_or_else(mutex_poisoned).clone()
         }
     }
 
@@ -312,8 +302,8 @@ mod t {
             }
             {
                 // 最後のアップデートが300秒前とする
-                *ch.last_update.lock().unwrap_or_else(mutex_poisoned) = Utc::now()
-                    - Duration::from_secs(ChannelRepository::<TestChannel>::DELETE_PERIOD_SEC);
+                *ch.last_update.lock().unwrap_or_else(mutex_poisoned) =
+                    Utc::now() - Duration::from_secs(ChannelRepository::<TestChannel>::DELETE_PERIOD_SEC);
             }
             repo.check_expire();
             // Channelはすべて破棄されている
