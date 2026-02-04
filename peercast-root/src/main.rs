@@ -69,12 +69,8 @@ use crate::app::{ApiConfig, AppState, ArcState};
 #[cfg(test)]
 mod test_helper;
 
-// Don't use directly. SEE: REPOSITORY()
-// static _REPOSITORY: OnceLock<ChannelRepository<RootChannel>> = OnceLock::new();
 // Don't use directly. SEE: CONN_FACTORY()
 static _CONN_FACTORY: OnceLock<PcpConnectionFactory> = OnceLock::new();
-// Don't use directly. SEE: HTTP_API()
-static _HTTP_API: OnceLock<Router> = OnceLock::new();
 // Don't use directly. SEE: INDEX_TXT_FOOTER()
 static _INDEX_TXT_FOOTER: OnceLock<Vec<IndexInfo>> = OnceLock::new();
 
