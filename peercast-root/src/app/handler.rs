@@ -1,43 +1,26 @@
-use std::{
-    collections::HashMap,
-    net::{IpAddr, SocketAddr},
-    path::PathBuf,
-    sync::Arc,
-    time::Duration,
-};
+use std::time::Duration;
 
 use axum::{
-    Json, Router,
+    Json,
     extract::{FromRef, FromRequestParts, Query, State},
-    http::HeaderValue,
     response::IntoResponse,
-    routing,
 };
 
 use axum_client_ip::ClientIp;
-use bb8::PooledConnection;
-use chrono::{DateTime, TimeZone, Utc};
-use futures_util::{FutureExt, future::BoxFuture, select};
-use hyper::{Method, StatusCode};
-use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
+use futures_util::FutureExt;
+use hyper::StatusCode;
 use peercast_root::{
-    ExitCode, PortLevel,
+    PortLevel,
     channel::json_model::JsonChannel,
     db::{ConnectionPool, DatabaseConnection},
     filter::filter_channels,
 };
-use redis::AsyncCommands;
-use serde::{Deserialize, Serialize};
-use serde_with::{NoneAsEmptyString, serde_as};
+use serde::Deserialize;
 use tokio::time::timeout;
-use tokio_util::sync::CancellationToken;
-use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
-use tracing::{debug, error, info, warn};
+use tracing::error;
 
-use bb8_redis::RedisConnectionManager;
 
-use crate::app::{ApiConfig, AppState, ArcState, cli, portcheck::get_portcheck_level};
-use peercast_root::RestrictPortLevel;
+use crate::app::{ArcState, portcheck::get_portcheck_level};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -190,7 +173,7 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
 pub async fn index_txt(
     client_ip: ClientIp,
     query_params: Query<IndexTextParams>,
-    mut conn: DatabaseConnection,
+    conn: DatabaseConnection,
     state: State<ArcState>,
 ) -> Result<String, ApiError> {
     let channels = index_json(client_ip, query_params, conn, state).await?;
@@ -214,7 +197,7 @@ pub async fn index_json(
         PortLevel::None
     };
 
-    let mut channels: Vec<JsonChannel> = state.0.repository.map_collect(|(id, ch)| ch.into());
+    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|(_id, ch)| ch.into());
     let config = &state.0.config;
 
     let mut channels: Vec<JsonChannel> = filter_channels(

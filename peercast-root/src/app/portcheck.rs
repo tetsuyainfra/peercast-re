@@ -45,7 +45,7 @@ pub async fn get_portcheck_level(
 }
 
 pub async fn portcheck(
-    conn: &mut bb8::PooledConnection<'static, RedisConnectionManager>,
+    _conn: &mut bb8::PooledConnection<'static, RedisConnectionManager>,
     host: IpAddr,
     port: u16,
 ) -> anyhow::Result<bool> {

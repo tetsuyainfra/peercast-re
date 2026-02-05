@@ -1,67 +1,33 @@
-#![allow(unused)]
 use std::{
-    any,
-    net::{IpAddr, Shutdown, SocketAddr},
-    path::PathBuf,
+    net::SocketAddr,
     process::exit,
-    sync::{Arc, Mutex, OnceLock, RwLock},
-    time::{Duration, Instant},
+    sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Context;
-use axum::{
-    Json, Router,
-    extract::Query,
-    http::{HeaderValue, Method},
-    response::IntoResponse,
-    routing,
-    serve::Listener,
-};
+use axum::serve::Listener;
 use axum_extra::headers::Header;
 use bb8::Pool;
 use bb8_redis::RedisConnectionManager;
-use bytes::BytesMut;
-use chrono::{DateTime, TimeZone, Utc};
 use clap::Parser;
-use futures_util::{FutureExt, SinkExt, StreamExt, future::BoxFuture};
-use itertools::concat;
-use libpeercast_re::{
-    ConnectionNo,
-    pcp::{
-        ChannelInfo, GnuId, Id4, ParentAtom, PcpConnectionFactory, TrackInfo,
-        builder::{QuitBuilder, QuitReason, RootBuilder},
-        connection::PcpConnection,
-        decode::{PcpBroadcast, PcpChannel, PcpHost},
-        procedure::PcpHandshake,
-        repository,
-    },
-    util::{ConnectionProtocol, identify_protocol, mutex_poisoned, rwlock_read_poisoned, rwlock_write_poisoned},
-};
+use futures_util::{FutureExt, StreamExt};
+use libpeercast_re::pcp::{
+        ChannelInfo, GnuId, PcpConnectionFactory,
+    };
 use peercast_root::{
-    ExitCode, FooterToml, IndexInfo, RestrictPortLevel,
-    channel::{RootChannel, RootConfig, get_tracker_addr},
+    ExitCode, FooterToml, IndexInfo,
+    channel::RootConfig,
     repository::ChannelRepository,
 };
 // use peercast_re_api::models::channel_info;
-use serde::{Deserialize, Serialize};
-use serde_json::value::Index;
-use serde_with::{NoneAsEmptyString, serde_as};
-use tokio::{
-    fs::read,
-    io::AsyncWriteExt,
-    net::{TcpListener, TcpStream},
-    sync::watch,
-    time::Interval,
-};
+use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
-use tower_http::{cors::CorsLayer, services::ServeDir, set_header::SetResponseHeaderLayer};
-use tracing::{debug, error, info, instrument::WithSubscriber, trace, warn};
-use url::Url;
+use tracing::{debug, error, info};
 
 // App modules
 mod app;
 use app::cli;
-use app::handler;
 use app::logging;
 
 use crate::app::{ApiConfig, AppState, ArcState, config::create_config, server_http, server_peercast};
@@ -75,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
     cli::version_print(&args)?;
 
     logging::init(&args)?;
-    let config = create_config(&args)?;
+    let _config = create_config(&args)?;
     let arc_state = init_app(&args, GnuId::new(), (args.bind, args.port).into()).await;
 
     // Init socket
@@ -116,7 +82,7 @@ async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketA
 
     let mut index_txt_footer = vec![];
     if let Some(ref path) = args.index_txt_footer {
-        let mut t = FooterToml::from_path(path)
+        let t = FooterToml::from_path(path)
             .with_context(|| {
                 let p = path.display();
                 format!("index.txtのフッターファイル({p})の読み込みに失敗しました。")

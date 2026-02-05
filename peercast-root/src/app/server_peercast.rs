@@ -23,7 +23,7 @@ use peercast_root::{
 };
 
 pub async fn serve(
-    args: cli::Args,
+    _args: cli::Args,
     state: ArcState,
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
@@ -119,14 +119,14 @@ async fn serve_peercast(
 async fn serve_root(
     state: ArcState,
     cid: ConnectionNo,
-    mut stream: TcpStream,
+    stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
     closed_send: watch::Receiver<()>,
 ) {
     use libpeercast_re::pcp::connection::HandshakeType;
 
-    let read_buf = BytesMut::new();
+    let _read_buf = BytesMut::new();
 
     // HandshakeFutureにすればよさそう
     let handshake = state.0.conn_factory.accept(cid, stream, remote);
@@ -135,7 +135,7 @@ async fn serve_root(
     let root_atom = RootBuilder::default().set_update_interval(10).set_next_update_interval(10).build();
 
     let mut conn = match handshake.incoming(root_atom.into()).await {
-        Err(e) => {
+        Err(_e) => {
             todo!();
             return;
         }
@@ -184,7 +184,7 @@ async fn serve_root(
         ..
     } = channel_packet;
 
-    let (channel_id_in_chpkt, braodcast_id) = match (channel_id, broadcast_id) {
+    let (channel_id_in_chpkt, _braodcast_id) = match (channel_id, broadcast_id) {
         (Some(chid), Some(bcid)) => (chid, bcid),
         _ => return,
     };

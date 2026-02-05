@@ -15,7 +15,7 @@ pub async fn serve(
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
-    use bb8_redis::RedisConnectionManager;
+    
     use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
@@ -27,7 +27,7 @@ pub async fn serve(
     let cache_control_value = format!("max-age={}, public, mustrelvalidate", &args.cache_max_age);
     info!("cache-control: {}", &cache_control_value);
 
-    let tracker = tokio_util::task::TaskTracker::new();
+    let _tracker = tokio_util::task::TaskTracker::new();
     info!("START HTTP SERVER");
 
     let app = Router::new()
