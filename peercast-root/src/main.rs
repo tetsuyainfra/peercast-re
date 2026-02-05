@@ -60,12 +60,11 @@ use url::Url;
 
 // App modules
 mod app;
-mod config;
 use app::cli;
 use app::handler;
 use app::logging;
 
-use crate::app::{ApiConfig, AppState, ArcState, server_http, server_peercast};
+use crate::app::{ApiConfig, AppState, ArcState, config::create_config, server_http, server_peercast};
 
 #[cfg(test)]
 mod test_helper;
@@ -76,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
     cli::version_print(&args)?;
 
     logging::init(&args)?;
+    let config = create_config(&args)?;
     let arc_state = init_app(&args, GnuId::new(), (args.bind, args.port).into()).await;
 
     // Init socket

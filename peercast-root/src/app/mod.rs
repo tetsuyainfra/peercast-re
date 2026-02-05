@@ -5,6 +5,7 @@ use libpeercast_re::pcp::PcpConnectionFactory;
 use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository};
 
 pub mod cli;
+pub mod config;
 pub mod handler;
 pub mod logging;
 pub mod portcheck;
