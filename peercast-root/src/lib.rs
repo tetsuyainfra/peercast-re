@@ -5,6 +5,7 @@ pub use index_info::{FooterToml, IndexInfo};
 use thiserror::Error;
 
 pub mod channel;
+pub mod config;
 pub mod db;
 pub mod filter;
 pub mod prelude;

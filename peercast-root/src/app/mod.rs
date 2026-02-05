@@ -5,7 +5,6 @@ use libpeercast_re::pcp::PcpConnectionFactory;
 use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository};
 
 pub mod cli;
-pub mod config;
 pub mod handler;
 pub mod logging;
 pub mod portcheck;
@@ -14,6 +13,16 @@ pub mod server_peercast;
 
 #[derive(Debug)]
 pub struct ApiConfig {
+    /// CORS許可リスト
+    pub allow_cors: Vec<String>,
+
+    /// APIが返すデータのキャッシュの最大有効期限（秒）
+    pub cache_max_age: u32,
+
+    /// クライアントIPの取得元
+    pub client_ip_source: axum_client_ip::ClientIpSource,
+
+    /// PortCheckの制限速度
     pub restrict_speed: u32,
     pub listener_hideable: bool,
     pub port_check_level: RestrictPortLevel,

@@ -1,27 +1,11 @@
-use std::{
-    net::SocketAddr,
-    process::exit,
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::SocketAddr, process::exit, sync::Arc, time::Duration};
 
 use anyhow::Context;
-use axum::serve::Listener;
-use axum_extra::headers::Header;
 use bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use clap::Parser;
-use futures_util::{FutureExt, StreamExt};
-use libpeercast_re::pcp::{
-        ChannelInfo, GnuId, PcpConnectionFactory,
-    };
-use peercast_root::{
-    ExitCode, FooterToml, IndexInfo,
-    channel::RootConfig,
-    repository::ChannelRepository,
-};
-// use peercast_re_api::models::channel_info;
-use tokio::net::TcpListener;
+use libpeercast_re::pcp::{ChannelInfo, GnuId, PcpConnectionFactory};
+use peercast_root::{ExitCode, FooterToml, IndexInfo, channel::RootConfig, repository::ChannelRepository};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
@@ -30,7 +14,7 @@ mod app;
 use app::cli;
 use app::logging;
 
-use crate::app::{ApiConfig, AppState, ArcState, config::create_config, server_http, server_peercast};
+use crate::app::{ApiConfig, AppState, ArcState, server_http, server_peercast};
 
 #[cfg(test)]
 mod test_helper;
@@ -41,26 +25,26 @@ async fn main() -> anyhow::Result<()> {
     cli::version_print(&args)?;
 
     logging::init(&args)?;
-    let _config = create_config(&args)?;
-    let arc_state = init_app(&args, GnuId::new(), (args.bind, args.port).into()).await;
+    let arc_state = init(&args, GnuId::new(), (args.bind, args.port).into()).await;
 
-    // Init socket
+    // Init Socket
     let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
     info!("PCP listening on pcp://{}", listener_pcp.local_addr().unwrap(),);
-
-    let listener_http: TcpListener = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
+    let listener_http = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
     info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
 
     let cancell_token = CancellationToken::new();
     let mut set = tokio::task::JoinSet::new();
-    set.build_task().name("ApiServer").spawn(
-        //
-        server_http::serve(args.clone(), arc_state.clone(), listener_http, cancell_token.child_token()),
-    )?;
-    set.build_task().name("RootServer").spawn(
-        // server_peercast(shutdown_token.child_token(), store.clone(), svr_listener),
-        server_peercast::serve(args.clone(), arc_state, listener_pcp, cancell_token.child_token()),
-    )?;
+    set.build_task().name("ApiServer").spawn(server_http::serve(
+        arc_state.clone(),
+        listener_http,
+        cancell_token.child_token(),
+    ))?;
+    set.build_task().name("RootServer").spawn(server_peercast::serve(
+        arc_state,
+        listener_pcp,
+        cancell_token.child_token(),
+    ))?;
     set.build_task().name("WaitShutdownSig").spawn(async move {
         tokio::signal::ctrl_c().await.expect("failed to listen for event");
         cancell_token.cancel();
@@ -72,11 +56,10 @@ async fn main() -> anyhow::Result<()> {
         let r = res.context("A server thread has panicked")?;
         info!("A server thread has shut down : {:?}", r);
     }
-
     Ok(())
 }
 
-async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
+async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     let conn_factory = PcpConnectionFactory::new(self_session_id, self_socket);
 
@@ -122,6 +105,9 @@ async fn init_app(args: &cli::Args, self_session_id: GnuId, self_socket: SocketA
         listener_hideable: args.yp_listerer_hideable,
         port_check_level: args.yp_restrict_port_level,
         name_space: args.yp_name_space.clone(),
+        allow_cors: args.allow_cors.clone(),
+        cache_max_age: args.cache_max_age,
+        client_ip_source: args.ip_source.clone(),
     };
 
     let db_pool = init_db(args).await;
