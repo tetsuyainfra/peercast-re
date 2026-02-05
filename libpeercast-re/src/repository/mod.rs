@@ -32,7 +32,7 @@ pub enum ChannelType {
 /// このトレイトを実装することで、様々な種類のチャンネルを扱うことができます。
 /// Send と Sync トレイトを継承しているため、チャンネルインスタンスが複数のスレッド間で安全に共有および移動できることを保証します。
 #[rustfmt::skip]
-pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug {
+pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 'static{
     type Config ;
 
     fn new(id: GnuId, config: Option<Self::Config>) -> Self;

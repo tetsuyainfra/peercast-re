@@ -8,6 +8,8 @@ pub mod cli;
 pub mod handler;
 pub mod logging;
 pub mod portcheck;
+pub mod server_http;
+pub mod server_peercast;
 
 #[derive(Debug)]
 pub struct ApiConfig {

@@ -2,11 +2,12 @@ mod index_info;
 
 use clap::ValueEnum;
 pub use index_info::{FooterToml, IndexInfo};
+use thiserror::Error;
 
 pub mod channel;
 pub mod db;
 pub mod filter;
-pub(crate) mod prelude;
+pub mod prelude;
 pub mod repository;
 pub mod test_helper;
 
@@ -51,6 +52,15 @@ pub enum PortLevel {
 
     // 疎通OK, 配信速度OK
     WelldoneWithSpeed(u16) = 2,
+}
+
+#[derive(Debug, Error)]
+pub enum TomlConfigError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("TOML deserialize error: {0}")]
+    Toml(#[from] toml::de::Error),
 }
 
 #[cfg(test)]
