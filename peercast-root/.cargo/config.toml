@@ -1,0 +1,4 @@
+# .cargo/config.toml
+[alias]
+run-root = "run -p peercast-root"
+run-kvs  = "run --bin root-kvs"
