@@ -14,6 +14,9 @@ pub fn init_logger(env_format: &str) {
     use tracing_subscriber::prelude::*;
     use tracing_subscriber::{EnvFilter, fmt};
 
+    // SQL Queryだけログを出したい場合は、次のように環境変数を設定する
+    // RUST_LOG=sqlx::query=info
+
     static INIT_LOGGER: OnceLock<bool> = OnceLock::new();
     let _v = INIT_LOGGER.get_or_init(|| {
         tracing_subscriber::registry()

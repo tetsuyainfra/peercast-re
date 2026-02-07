@@ -10,6 +10,7 @@ cargo run
 cargo run-db
 ```
 
+
 ### SQLXについて
 環境変数をmise.tomlで制御しています。現在のディレクトリによってSQLXのSQL文静的解析の方法が変わります。
 - SQLX_OFFLINE=false : DATABASE_URLを参照して解析
@@ -20,6 +21,15 @@ cargo run-db
 - peercast-re/peercast-root/(現在のフォルダ)
   - SQLX_OFFLINE=false
   - DATABASE_URL=${PWD}/temp/peercast-root.db
+
+### DBのschemaを更新した時
+```
+cargo sqlx prepare
+```
+
+
+## TODO
+- IPv4 in IPv6で最適化(DB上も16bytes固定になっていいかも？)
 
 ## Appendix Binary
 - create_info : index.txtに追加できるFooterテキストを定義するTOMLを出力するためのコマンドです

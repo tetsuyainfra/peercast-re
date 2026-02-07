@@ -22,6 +22,7 @@ tracing-subscriber = { version = "0.3.19", features = [
 tracing-journald = "0.3.1"
 
 # Async
+async-trait = "0.1.89"
 futures-util = { version = "0.3.31", default-features = false, features = [
     "alloc",
 ] }
@@ -51,7 +52,7 @@ hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 
 # DB
-sqlx = { version = "0.8", features = [ "runtime-tokio", "macros", "sqlite", "chrono", "json"] }
+sqlx = { version = "0.8", features = [ "runtime-tokio", "derive", "macros", "sqlite", "chrono", "json"] }
 
 bb8 = { version= "0.9.0" }
 bb8-redis = { version= "0.24.0" }

@@ -1,7 +1,10 @@
 use std::net::IpAddr;
 
+use axum_extra::headers::Date;
+use chrono::DateTime;
 use clap::Parser;
-use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
+use peercast_root::db::{CheckedHost, CheckedHostRepository, DbIpAddr, checked_host::SqliteCheckedHostRepository};
+use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 
 #[tokio::main]
@@ -10,50 +13,39 @@ async fn main() -> anyhow::Result<()> {
     println!("DB_URI: {}", args.database_url.as_str());
 
     let pool = SqlitePoolOptions::new().connect(args.database_url.as_str()).await?;
-    let migrate = sqlx::migrate!("./migrations").run(&pool).await?;
-    println!("MIGRATED: {:?}", migrate);
-    // let hosts: Vec<_> = sqlx::query_as("select id, name, created_at from checked_host").fetch_all(&pool).await?;
-    let hosts: Vec<_> = sqlx::query_as!(CheckedHost, "select id, name from checked_hosts").fetch_all(&pool).await?;
-    dbg!(hosts);
+    let repo = SqliteCheckedHostRepository::new(pool.clone());
 
     match args.command {
-        SubCommand::List => {}
+        SubCommand::List => {
+            repo.all().await?.iter().for_each(|host| {
+                println!("ID: {}, IP: {} created_at: {:?}", host.id.unwrap(), host.ip.0, host.created_at);
+            });
+        }
         SubCommand::Show {
-            key,
-        } => todo!(),
+            id,
+        } => {
+            let host = repo.find_by_id(id).await?;
+            if let Some(host) = host {
+                println!("ID: {}, IP: {} created_at: {:?}", host.id.unwrap(), host.ip.0, host.created_at);
+            } else {
+                println!("Host with ID {} not found.", id);
+            }
+        }
+        SubCommand::Add {ip } => {
+            let new_val = CheckedHost {
+                id: None,
+                ip: DbIpAddr(ip),
+                created_at: DateTime::default(),
+            };
+            repo.add(&new_val).await?;
+            let host = repo.find_by_ip(&new_val.ip).await?.unwrap();
+            println!("Added host with IP: {}, created_at: {:?}", *host.ip, host.created_at);
+        }
     }
 
     Ok(())
 }
-////////////////////////////////////////////////////////////////////////////////
-//  List
-//
 
-////////////////////////////////////////////////////////////////////////////////
-//  Repository
-//
-
-#[derive(Debug, sqlx::FromRow)]
-struct CheckedHost {
-    pub id: i64,
-    pub name: String, // ip: IpAddr,
-                      // port: u16,
-                      // stats: bool
-}
-
-struct CheckedHostRepository {
-    pool: SqlitePool,
-}
-
-impl CheckedHostRepository {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self {
-            pool,
-        }
-    }
-
-    pub async fn all(&self) {}
-}
 
 ////////////////////////////////////////////////////////////////////////////////
 //  CLI
@@ -83,6 +75,9 @@ pub enum SubCommand {
     /// 指定したkeyの内容を表示する
     Show {
         /// 取得するkey
-        key: String,
+        id: i64,
+    },
+    Add {
+        ip: IpAddr
     },
 }
