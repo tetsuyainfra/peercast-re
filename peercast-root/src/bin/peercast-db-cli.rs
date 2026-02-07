@@ -1,9 +1,7 @@
 use std::net::IpAddr;
 
-use axum_extra::headers::Date;
-use chrono::DateTime;
 use clap::Parser;
-use peercast_root::db::{CheckedHost, CheckedHostRepository, DbIpAddr, checked_host::SqliteCheckedHostRepository};
+use peercast_root::db::{CheckedHostRepository,  checked_host::SqliteCheckedHostRepository};
 use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 
@@ -18,34 +16,79 @@ async fn main() -> anyhow::Result<()> {
     match args.command {
         SubCommand::List => {
             repo.all().await?.iter().for_each(|host| {
-                println!("ID: {}, IP: {} created_at: {:?}", host.id.unwrap(), host.ip.0, host.created_at);
+                println!(
+                    "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                    host.id.unwrap(),
+                    host.ip_address.0,
+                    host.port,
+                    host.speed,
+                    host.created_at
+                );
             });
+        }
+        SubCommand::Find {
+            ip,
+            port,
+        } => {
+            let hosts = match port {
+                None => repo.find_all_by_ip(ip).await?,
+                Some(port) => {
+                    let host = repo.find_by_ip_port(ip, port).await?;
+                    host.into_iter().collect()
+                }
+            };
+            if hosts.is_empty() {
+                println!("Host with IP {} not found.", ip);
+            } else {
+                for host in hosts {
+                    println!(
+                        "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                        host.id.unwrap(),
+                        host.ip_address.0,
+                        host.port,
+                        host.speed,
+                        host.created_at
+                    );
+                }
+            }
         }
         SubCommand::Show {
             id,
         } => {
             let host = repo.find_by_id(id).await?;
             if let Some(host) = host {
-                println!("ID: {}, IP: {} created_at: {:?}", host.id.unwrap(), host.ip.0, host.created_at);
+                println!(
+                    "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                    host.id.unwrap(),
+                    host.ip_address.0,
+                    host.port,
+                    host.speed,
+                    host.created_at
+                );
             } else {
                 println!("Host with ID {} not found.", id);
             }
         }
-        SubCommand::Add {ip } => {
-            let new_val = CheckedHost {
-                id: None,
-                ip: DbIpAddr(ip),
-                created_at: DateTime::default(),
-            };
-            repo.add(&new_val).await?;
-            let host = repo.find_by_ip(&new_val.ip).await?.unwrap();
-            println!("Added host with IP: {}, created_at: {:?}", *host.ip, host.created_at);
+        SubCommand::Add {
+            ip,
+            port,
+            speed,
+        } => {
+            repo.add(ip, port, speed).await?;
+            let host = repo.find_by_ip_port(ip, port).await?;
+            if let Some(h) = host {
+                println!(
+                    "Added host with IP: {}, port: {}, speed: {}, created_at: {:?}",
+                    *h.ip_address, h.port, h.speed, h.created_at
+                );
+            } else {
+                println!("Failed to add host with IP: {}, port: {}", ip, port);
+            }
         }
     }
 
     Ok(())
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 //  CLI
@@ -72,12 +115,24 @@ pub struct Args {
 pub enum SubCommand {
     /// KVSの内容を一覧表示する
     List,
-    /// 指定したkeyの内容を表示する
+
+    /// IPからチェック済みホストを検索する
+    Find {
+        /// 取得するIPアドレス
+        ip: IpAddr,
+        port: Option<u16>,
+    },
+
+    /// 指定したIDの内容を表示する
     Show {
-        /// 取得するkey
+        /// 取得するID
         id: i64,
     },
+
+    /// チェック済みホストを追加する
     Add {
-        ip: IpAddr
+        ip: IpAddr,
+        port: u16,
+        speed: i32,
     },
 }

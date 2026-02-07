@@ -5,6 +5,7 @@ use sqlx::{Sqlite, sqlite::SqliteTypeInfo};
 
 #[derive(Debug)]
 pub struct DbIpAddr(pub IpAddr);
+
 // 便利にするためのDeref実装（DbIpAddrをIpAddrのように扱える）
 impl std::ops::Deref for DbIpAddr {
     type Target = IpAddr;

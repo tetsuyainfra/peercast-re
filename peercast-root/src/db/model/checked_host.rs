@@ -6,10 +6,10 @@ use super::DbIpAddr;
 #[derive(Debug)]
 pub struct CheckedHost {
     pub id: Option<i64>,
-    pub ip: DbIpAddr,
+    pub ip_address: DbIpAddr,
+    pub port: u16,
+    pub speed: i32,
     pub created_at: DateTime<Utc>,
-    // pub hostname: DbIpAddr,
-    // pub is_active: bool,
 }
 
 impl CheckedHost {

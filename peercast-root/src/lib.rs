@@ -7,6 +7,7 @@ use thiserror::Error;
 pub mod channel;
 pub mod config;
 pub mod db;
+pub mod service;
 pub mod filter;
 pub mod prelude;
 pub mod repository;
