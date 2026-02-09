@@ -49,4 +49,52 @@ impl Channel for DummyChannel {
     fn after_create(&mut self) -> impl std::future::Future<Output = ()> + Send {
         async {}
     }
+
+    fn state(&self) -> super::ChannelState {
+        todo!()
+    }
+
+    fn channel_type(&self) -> super::ChannelType {
+        todo!()
+    }
+
+    fn config(&self) -> Option<&Self::Config> {
+        todo!()
+    }
+
+    fn update_config(&mut self, config: Self::Config) {
+        todo!()
+    }
+
+    fn tracker_address(&self) -> Option<std::net::SocketAddr> {
+        todo!()
+    }
+
+    fn channel_info(&self) -> Option<ChannelInfo> {
+        todo!()
+    }
+
+    fn track_info(&self) -> Option<TrackInfo> {
+        todo!()
+    }
+
+    fn number_of_listener(&self) -> i32 {
+        todo!()
+    }
+
+    fn number_of_relay(&self) -> i32 {
+        todo!()
+    }
+
+    fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
+    }
+
+    fn updated_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
+    }
+
+    fn viewed_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
+    }
 }

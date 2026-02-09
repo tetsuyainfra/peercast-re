@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, net::SocketAddr};
 
 use crate::pcp::{ChannelInfo, GnuId, TrackInfo};
 
@@ -53,19 +53,22 @@ pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 's
     /// This method is called BEFORE deleting the channel FROM Repository.
     fn before_delete(&mut self) {}
 
-    fn cid(&self) -> GnuId { unimplemented!() }
-    fn state(&self) -> ChannelState{ unimplemented!() }
-    fn channel_type(&self) -> ChannelType { unimplemented!() }
+    fn cid(&self) -> GnuId;
+    fn state(&self) -> ChannelState;
+    fn channel_type(&self) -> ChannelType;
 
-    fn config(&self) -> Option<&Self::Config> { unimplemented!() }
-    fn update_config(&mut self, config: Self::Config) { unimplemented!() }
+    fn config(&self) -> Option<&Self::Config>;
+    fn update_config(&mut self, config: Self::Config);
 
-    fn channel_info(&self) -> Option<ChannelInfo> { unimplemented!()}
-    fn track_info(&self) -> Option<TrackInfo> { unimplemented!()}
+    fn tracker_address(&self) -> Option<SocketAddr>;
+    fn channel_info(&self) -> Option<ChannelInfo>;
+    fn track_info(&self) -> Option<TrackInfo>;
+    fn number_of_listener(&self) -> i32;
+    fn number_of_relay(&self) -> i32;
 
-    fn created_at(&self) -> chrono::DateTime<chrono::Utc> { unimplemented!() }
-    fn updated_at(&self) -> chrono::DateTime<chrono::Utc> { unimplemented!() }
-    fn viewed_at(&self) -> chrono::DateTime<chrono::Utc> { unimplemented!() }
+    fn created_at(&self) -> chrono::DateTime<chrono::Utc>;
+    fn updated_at(&self) -> chrono::DateTime<chrono::Utc>;
+    fn viewed_at(&self) -> chrono::DateTime<chrono::Utc>;
 
 }
 
