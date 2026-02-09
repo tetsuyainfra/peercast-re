@@ -12,7 +12,6 @@ use tokio::sync::{
     mpsc::{self, UnboundedSender},
     watch,
 };
-use tokio_util::sync::CancellationToken;
 
 use crate::prelude::*;
 ////////////////////////////////////////////////////////////////////////////////
@@ -72,13 +71,24 @@ impl Channel for RootChannel2 {
     fn config(&self) -> Option<&Self::Config> {
         self.0.config()
     }
-    // fn update_config(&mut self, config: Self::Config) { std::unimplemented!() }
+    fn update_config(&mut self, config: Self::Config) {
+        todo!()
+    }
 
+    fn tracker_address(&self) -> Option<std::net::SocketAddr> {
+        self.0.tracker_address()
+    }
     fn channel_info(&self) -> Option<ChannelInfo> {
         self.0.channel_info()
     }
     fn track_info(&self) -> Option<TrackInfo> {
         self.0.track_info()
+    }
+    fn number_of_listener(&self) -> i32 {
+        self.0.number_of_listener()
+    }
+    fn number_of_relay(&self) -> i32 {
+        self.0.number_of_relay()
     }
 
     fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
@@ -90,6 +100,8 @@ impl Channel for RootChannel2 {
     fn viewed_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.0.viewed_at()
     }
+
+
 }
 
 impl RootChannel2 {
@@ -122,15 +134,20 @@ impl Future for AttachTaskFuture {
 #[derive(Debug)]
 struct ImplChannel {
     cid: libpeercast_re::pcp::GnuId,
+    config: RootConfig,
+    //
+    ch_task_sender: UnboundedSender<ChMainMessage>,
+    //
+    tracker_addr_rx: watch::Receiver<Option<SocketAddr>>,
     channel_info_rx: watch::Receiver<Option<ChannelInfo>>,
     track_info_rx: watch::Receiver<Option<TrackInfo>>,
     status_rx: watch::Receiver<ChannelState>,
-    config: RootConfig,
+    number_of_listener_rx: watch::Receiver<i32>,
+    number_of_relay_rx: watch::Receiver<i32>,
+    //
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at_rx: watch::Receiver<chrono::DateTime<chrono::Utc>>,
     viewed_at_rx: watch::Receiver<chrono::DateTime<chrono::Utc>>,
-
-    ch_task_sender: UnboundedSender<ChMainMessage>,
 }
 
 impl ImplChannel {
@@ -144,9 +161,12 @@ impl ImplChannel {
 
         let task_name = format!("Ch-{}", cid);
         let (ch_task_tx, ch_task_rx) = mpsc::unbounded_channel();
+        let (tracker_addr_tx, tracker_addr_rx) = watch::channel(None::<SocketAddr>);
         let (channel_info_tx, channel_info_rx) = watch::channel(channel_info);
         let (track_info_tx, track_info_rx) = watch::channel(track_info);
         let (status_tx, status_rx) = watch::channel(ChannelState::Idle);
+        let (number_of_listener_tx, number_of_listener_rx) = watch::channel(0);
+        let (number_of_relay_tx, number_of_relay_rx) = watch::channel(0);
         let created_at = chrono::Utc::now();
         let (updated_at_tx, updated_at_rx) = watch::channel(created_at.clone());
         let (viewed_at_tx, viewed_at_rx) = watch::channel(created_at.clone());
@@ -155,9 +175,12 @@ impl ImplChannel {
             task_name: task_name.clone(),
             cid,
             info_ch: InfoChannels {
+                tracker_addr_tx,
                 channel_info_tx,
                 track_info_tx,
                 status_tx,
+                number_of_listener_tx,
+                number_of_relay_tx,
                 updated_at_tx,
                 viewed_at_tx,
             },
@@ -172,10 +195,15 @@ impl ImplChannel {
 
         Self {
             cid,
+            config,
+            //
+            tracker_addr_rx,
             channel_info_rx,
             track_info_rx,
             status_rx,
-            config,
+            number_of_listener_rx,
+            number_of_relay_rx,
+            //
             created_at,
             updated_at_rx,
             viewed_at_rx,
@@ -200,15 +228,22 @@ impl ImplChannel {
     fn config(&self) -> Option<&RootConfig> {
         Some(&self.config)
     }
-
     // fn update_config(&mut self, config: Self::Config) { std::unimplemented!() }
 
+    fn tracker_address(&self) -> Option<std::net::SocketAddr> {
+        self.tracker_addr_rx.borrow().clone()
+    }
     fn channel_info(&self) -> Option<ChannelInfo> {
         self.channel_info_rx.borrow().clone()
     }
-
     fn track_info(&self) -> Option<TrackInfo> {
         self.track_info_rx.borrow().clone()
+    }
+    fn number_of_listener(&self) -> i32 {
+        self.number_of_listener_rx.borrow().clone()
+    }
+    fn number_of_relay(&self) -> i32 {
+        self.number_of_relay_rx.borrow().clone()
     }
 
     fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
@@ -228,9 +263,15 @@ enum ChMainMessage {
 }
 
 struct InfoChannels {
+    tracker_addr_tx: watch::Sender<Option<SocketAddr>>,
     channel_info_tx: watch::Sender<Option<ChannelInfo>>,
     track_info_tx: watch::Sender<Option<TrackInfo>>,
     status_tx: watch::Sender<ChannelState>,
+    //
+    number_of_listener_tx: watch::Sender<i32>,
+    number_of_relay_tx: watch::Sender<i32>,
+
+    //
     updated_at_tx: watch::Sender<chrono::DateTime<chrono::Utc>>,
     viewed_at_tx: watch::Sender<chrono::DateTime<chrono::Utc>>,
 }

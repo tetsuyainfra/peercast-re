@@ -11,26 +11,40 @@ use crate::{IndexInfo, model::RootChannel2};
 //-------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonChannel {
+    /// チャンネルID
     pub id: GnuId,
+    /// チャンネル名
     pub name: String,
+    /// 配信者アドレス(もしくは接続先アドレス)
     pub tracker_addr: Option<SocketAddr>,
+    /// 連絡先URL
     pub contact_url: String,
+    /// ジャンル
     pub genre: String,
-    pub raw_genre: String, // namespace, listener_hideable, PortLimitを含むgenre
+    /// 生のジャンル文字列(namespace, listener_hideableなどの指定を含む)
+    pub raw_genre: String,
+    /// 説明文
     pub desc: String,
+    /// コメント
     pub comment: String,
-    /// MIME
+    /// MIME(例: video/x-flv)
     pub stream_type: String,
-    /// 拡張子
+    /// 拡張子(例: .flv)
     pub stream_ext: String,
+    /// ビットレート(kbps単位)
     pub bitrate: i32,
     // filetype: String,
     // status: String,
+    /// リスナー数
     pub number_of_listener: i32,
+    /// リレー数
     pub number_of_relay: i32,
+    /// 作成日時
     pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
+    /// トラック情報
     pub track: JsonTrack,
 
+    /// WMV, FLVなどのタイプ
     #[serde(rename = "type")]
     pub typee: String,
 }
@@ -46,38 +60,36 @@ pub struct JsonTrack {
 
 impl From<&RootChannel2> for JsonChannel {
     fn from(ch: &RootChannel2) -> Self {
-        // let ChannelInfo {
-        //     typ,
-        //     name,
-        //     genre,
-        //     desc,
-        //     comment,
-        //     url,
-        //     stream_type,
-        //     stream_ext,
-        //     bitrate,
-        // } = ch.channel_info();
+        let ChannelInfo {
+            typ,
+            name,
+            genre,
+            desc,
+            comment,
+            url,
+            stream_type,
+            stream_ext,
+            bitrate,
+        } = ch.channel_info().unwrap_or_default();
 
-        // JsonChannel {
-        //     id: ch.id(),
-        //     name,
-        //     tracker_addr: ch.tracker_addr(),
-        //     contact_url: url,
-        //     genre: genre.clone(),
-        //     raw_genre: genre,
-        //     desc,
-        //     comment,
-        //     typee: typ,
-        //     stream_type,
-        //     stream_ext,
-        //     bitrate,
-        //     number_of_listener: ch.number_of_listener(),
-        //     number_of_relay: ch.number_of_relay(),
-        //     created_at: ch.created_at(),
-        //     track: ch.track_info().into(),
-        // }
-
-        todo!()
+        JsonChannel {
+            id: ch.cid(),
+            name,
+            tracker_addr: ch.tracker_address(),
+            contact_url: url,
+            genre: genre.clone(),
+            raw_genre: genre,
+            desc,
+            comment,
+            typee: typ,
+            stream_type,
+            stream_ext,
+            bitrate,
+            number_of_listener: ch.number_of_listener(),
+            number_of_relay: ch.number_of_relay(),
+            created_at: ch.created_at(),
+            track: ch.track_info().unwrap_or_default().into()
+        }
     }
 }
 
