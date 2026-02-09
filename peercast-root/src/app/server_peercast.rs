@@ -18,7 +18,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::app::ArcState;
-use peercast_root::{model::RootConfig2, prelude::*};
+use peercast_root::{model::RootConfig, prelude::*};
 
 pub async fn serve(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
     // スレッドの終了を検知するためのチャンネル
@@ -191,7 +191,7 @@ async fn serve_root(
     let channel_info = channel_info.as_ref().map(|i| i.into());
     let track_info = track_info.as_ref().map(|t| t.into());
     //
-    let config = RootConfig2 {
+    let config = RootConfig {
         // tracker_host,
     };
 

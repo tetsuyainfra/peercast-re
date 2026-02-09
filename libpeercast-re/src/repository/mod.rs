@@ -12,6 +12,7 @@ pub use local_repository::LocalRepository;
 pub use shared_repository::SharedRepository;
 
 /// チャンネルの状態を表す列挙型
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChannelState {
     /// 未使用の状態
     Idle,
