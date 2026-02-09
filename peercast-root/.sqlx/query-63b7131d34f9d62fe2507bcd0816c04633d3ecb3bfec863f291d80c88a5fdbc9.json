@@ -1,0 +1,44 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, created_at as `created_at: DateTime<Utc>` FROM checked_hosts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "ip_address: DbIpAddr",
+        "ordinal": 1,
+        "type_info": "Blob"
+      },
+      {
+        "name": "port!:u16",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "speed!:i32",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at: DateTime<Utc>",
+        "ordinal": 4,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "63b7131d34f9d62fe2507bcd0816c04633d3ecb3bfec863f291d80c88a5fdbc9"
+}

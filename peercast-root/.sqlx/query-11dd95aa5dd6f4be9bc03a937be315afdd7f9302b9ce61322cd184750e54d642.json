@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT INTO checked_hosts (ip_address, port, speed) VALUES ($1, $2, $3)\n                ON CONFLICT(ip_address, port)\n                    DO UPDATE SET created_at = CURRENT_TIMESTAMP;\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "11dd95aa5dd6f4be9bc03a937be315afdd7f9302b9ce61322cd184750e54d642"
+}
