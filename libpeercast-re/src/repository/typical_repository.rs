@@ -82,15 +82,15 @@ where
 #[cfg(test)]
 pub(crate) async fn test_repository<C: Channel>(mut repo: impl Repository<C>) {
     // TODO: channel_info, track_info, config を使ったテストも追加する
-    let id = GnuId::new();
-    let channel = repo.create_or_get(id.clone(), None, None, None).await;
-    assert_eq!(channel.id(), id);
+    let cid = GnuId::new();
+    let channel = repo.create_or_get(cid.clone(), None, None, None).await;
+    assert_eq!(channel.cid(), cid);
 
-    let fetched_channel = repo.get(id.clone());
+    let fetched_channel = repo.get(cid.clone());
     assert!(fetched_channel.is_some());
     assert_eq!(channel, fetched_channel.unwrap());
 
-    let (channel_be_cloned, is_created) = repo.create(id, None, None, None);
+    let (channel_be_cloned, is_created) = repo.create(cid, None, None, None);
     assert_eq!(channel_be_cloned, channel);
     assert_eq!(is_created, false);
 
@@ -102,22 +102,22 @@ pub(crate) async fn test_repository<C: Channel>(mut repo: impl Repository<C>) {
     let all_channels = repo.get_all();
     assert_eq!(all_channels.len(), 3);
 
-    let filter_channels = repo.filter_collect(|i, c| c.id() == channel.id());
+    let filter_channels = repo.filter_collect(|i, c| c.cid() == channel.cid());
     assert_eq!(filter_channels.len(), 1);
 
     let mapped_channels = repo.map_collect(|i, c| i.clone());
     assert_eq!(mapped_channels.len(), 3);
 
-    let filter_mapped_channels = repo.filter_map_collect(|i, c| c.id() == channel.id(), |i, c| i.clone());
+    let filter_mapped_channels = repo.filter_map_collect(|i, c| c.cid() == channel.cid(), |i, c| i.clone());
     assert_eq!(filter_mapped_channels.len(), 1);
-    assert_eq!(filter_mapped_channels[0], channel.id());
+    assert_eq!(filter_mapped_channels[0], channel.cid());
 
-    let deleted = repo.delete_channel(id.clone());
+    let deleted = repo.delete_channel(cid.clone());
     assert!(deleted);
     let all_channels = repo.get_all();
     assert_eq!(all_channels.len(), 2);
 
-    let fetched_channel_after_delete = repo.get(id);
+    let fetched_channel_after_delete = repo.get(cid);
     assert!(fetched_channel_after_delete.is_none());
 
     let deleted = repo.delete_all();

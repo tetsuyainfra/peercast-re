@@ -42,7 +42,7 @@ impl Channel for DummyChannel {
         }
     }
 
-    fn id(&self) -> GnuId {
+    fn cid(&self) -> GnuId {
         self.id
     }
 

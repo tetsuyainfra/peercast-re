@@ -52,7 +52,7 @@ pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 's
     /// This method is called BEFORE deleting the channel FROM Repository.
     fn before_delete(&mut self) {}
 
-    fn id(&self) -> GnuId { unimplemented!() }
+    fn cid(&self) -> GnuId { unimplemented!() }
     fn state(&self) -> ChannelState{ unimplemented!() }
     fn channel_type(&self) -> ChannelType { unimplemented!() }
 
