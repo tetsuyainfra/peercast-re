@@ -1,11 +1,11 @@
 use std::future::Future;
 
-use crate::pcp::GnuId;
+use crate::pcp::{ChannelInfo, GnuId, TrackInfo};
 
-pub(self) mod dummy_channel;
-pub(self) mod inner_repository;
+pub mod dummy_channel;
 pub mod local_repository;
 pub mod shared_repository;
+pub(self) mod typical_repository;
 
 /// チャンネルの状態を表す列挙型
 pub enum ChannelState {
@@ -35,7 +35,12 @@ pub enum ChannelType {
 pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 'static{
     type Config ;
 
-    fn new(id: GnuId, config: Option<Self::Config>) -> Self;
+    fn new(
+        id: GnuId,
+        channel_info: Option<ChannelInfo>,
+        track_info: Option<TrackInfo>,
+        config: Option<Self::Config>
+    ) -> Self;
 
     /// if use create_or_get method, after_create will be called after creation.
     fn after_create(&mut self) -> impl Future<Output=()> + Send {async {}}
@@ -50,8 +55,8 @@ pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 's
     fn config(&self) -> Option<&Self::Config> { unimplemented!() }
     fn update_config(&mut self, config: Self::Config) { unimplemented!() }
 
-    fn channel_info(&self) -> Option<String> { unimplemented!()}
-    fn track_info(&self) -> Option<String> { unimplemented!()}
+    fn channel_info(&self) -> Option<ChannelInfo> { unimplemented!()}
+    fn track_info(&self) -> Option<TrackInfo> { unimplemented!()}
 
     fn created_at(&self) -> chrono::DateTime<chrono::Utc> { unimplemented!() }
     fn updated_at(&self) -> chrono::DateTime<chrono::Utc> { unimplemented!() }
@@ -69,11 +74,23 @@ pub trait Repository<C: Channel> {
     fn get(&self, id: GnuId) -> Option<C>;
     fn get_all(&self) -> Vec<C>;
 
-    fn create(&mut self, id: GnuId, config: Option<C::Config>) -> (C, bool);
-    fn create_or_get(&mut self, id: GnuId, config: Option<C::Config>) -> impl Future<Output = C> + Send;
-    fn delete_channel(&mut self, id: GnuId) -> bool;
+    fn create(
+        &self,
+        id: GnuId,
+        channel_info: Option<ChannelInfo>,
+        track_info: Option<TrackInfo>,
+        config: Option<C::Config>,
+    ) -> (C, bool);
+    fn create_or_get(
+        &self,
+        id: GnuId,
+        channel_info: Option<ChannelInfo>,
+        track_info: Option<TrackInfo>,
+        config: Option<C::Config>,
+    ) -> impl Future<Output = C> + Send;
 
-    fn delete_all(&mut self);
+    fn delete_channel(& self, id: GnuId) -> bool;
+    fn delete_all(& self);
 
     fn filter_map_collect<F, G, R>(&self, f: F, g: G) -> Vec<R>
     where
@@ -96,5 +113,4 @@ pub trait Repository<C: Channel> {
     {
         self.filter_map_collect(|_, _| true, g)
     }
-
 }

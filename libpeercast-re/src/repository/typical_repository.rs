@@ -1,44 +1,51 @@
 use std::{collections::HashMap, future::Future};
 
 use crate::{
-    pcp::GnuId,
+    pcp::{ChannelInfo, GnuId, TrackInfo},
     repository::{Channel, Repository},
 };
 
-pub(super) struct InnerRepository<C> {
+#[derive(Debug)]
+pub(super) struct TypicalRepository<C> {
     channels: HashMap<GnuId, C>,
 }
 
-impl<C> InnerRepository<C>
+impl<C> TypicalRepository<C>
 where
     C: Channel,
 {
     pub fn new() -> Self {
-        InnerRepository {
+        Self {
             channels: HashMap::new(),
         }
     }
 }
 
-impl<C> Repository<C> for InnerRepository<C>
+impl<C> TypicalRepository<C>
 where
     C: Channel,
 {
-    fn get(&self, id: crate::pcp::GnuId) -> Option<C> {
+    pub fn get(&self, id: crate::pcp::GnuId) -> Option<C> {
         self.channels.get(&id).cloned()
     }
 
-    fn get_all(&self) -> Vec<C> {
+    pub fn get_all(&self) -> Vec<C> {
         self.channels.values().cloned().collect()
     }
 
-    fn create(&mut self, id: GnuId, config: Option<<C as Channel>::Config>) -> (C, bool) {
+    pub fn create(
+        &mut self,
+        id: GnuId,
+        channel_info: Option<ChannelInfo>,
+        track_info: Option<TrackInfo>,
+        config: Option<<C as Channel>::Config>,
+    ) -> (C, bool) {
         match self.channels.get(&id) {
             Some(ch) => (ch.clone(), false),
             None => {
                 // let ch =
                 // C::new(self.session_id.clone(), id.clone(), channel_info, track_info, rtmp_stream_manager, config);
-                let ch: C = C::new(id.clone(), config);
+                let ch: C = C::new(id.clone(), channel_info, track_info, config);
                 tracing::info!("Created new channel: {:?}", ch);
                 self.channels.insert(id, ch.clone());
                 (ch, true)
@@ -46,12 +53,7 @@ where
         }
     }
 
-    /// This method is only used internally. Use create() method instead.
-    fn create_or_get(&mut self, id: GnuId, config: Option<C::Config>) -> impl Future<Output = C> + Send {
-        async { unimplemented!("Use create() method instead") }
-    }
-
-    fn delete_channel(&mut self, id: crate::pcp::GnuId) -> bool {
+    pub fn delete_channel(&mut self, id: crate::pcp::GnuId) -> bool {
         if let Some(mut ch) = self.channels.remove(&id) {
             ch.before_delete();
             tracing::info!("Deleted channel: {:?}", ch);
@@ -61,14 +63,14 @@ where
         }
     }
 
-    fn delete_all(&mut self) {
+    pub fn delete_all(&mut self) {
         let keys_to_remove: Vec<GnuId> = self.channels.iter().map(|(k, _)| *k).collect();
         for id in keys_to_remove {
             self.delete_channel(id);
         }
     }
 
-    fn filter_map_collect<F, G, R>(&self, mut f: F, mut g: G) -> Vec<R>
+    pub fn filter_map_collect<F, G, R>(&self, mut f: F, mut g: G) -> Vec<R>
     where
         F: FnMut(&GnuId, &C) -> bool,
         G: FnMut(&GnuId, &C) -> R,
@@ -79,23 +81,24 @@ where
 
 #[cfg(test)]
 pub(crate) async fn test_repository<C: Channel>(mut repo: impl Repository<C>) {
+    // TODO: channel_info, track_info, config を使ったテストも追加する
     let id = GnuId::new();
-    let channel = repo.create_or_get(id.clone(), None).await;
+    let channel = repo.create_or_get(id.clone(), None, None, None).await;
     assert_eq!(channel.id(), id);
 
     let fetched_channel = repo.get(id.clone());
     assert!(fetched_channel.is_some());
     assert_eq!(channel, fetched_channel.unwrap());
 
-    let (channel_be_cloned, is_created) = repo.create(id, None);
+    let (channel_be_cloned, is_created) = repo.create(id, None, None, None);
     assert_eq!(channel_be_cloned, channel);
     assert_eq!(is_created, false);
 
     let all_channels = repo.get_all();
     assert_eq!(all_channels.len(), 1);
 
-    let _ = repo.create_or_get(GnuId::new(), None).await;
-    let _ = repo.create_or_get(GnuId::new(), None).await;
+    let _ = repo.create_or_get(GnuId::new(), None, None, None).await;
+    let _ = repo.create_or_get(GnuId::new(), None, None, None).await;
     let all_channels = repo.get_all();
     assert_eq!(all_channels.len(), 3);
 

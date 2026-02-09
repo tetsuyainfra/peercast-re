@@ -1,41 +1,58 @@
 use std::{
     future::Future,
+    ops::Deref,
     sync::{Arc, Mutex},
 };
 use tracing::debug;
 
 use crate::{
+    pcp::GnuId,
+    repository::{typical_repository::TypicalRepository, Channel, Repository},
     util::mutex_poisoned,
-    {
-        pcp::GnuId,
-        repository::{inner_repository::InnerRepository, Channel, Repository},
-    },
 };
+
+/// 非公開の内部リポジトリ構造体
+/// SharedRepository はこの構造体を Arc<Mutex<InnerRepository<C>> で保護します。
+#[derive(Debug)]
+struct InnerRepository<C> {
+    repo: TypicalRepository<C>,
+}
 
 /// SharedRepository は マルチスレッドで共有されるリポジトリ実装です。
 /// このリポジトリは Send(スレッド間の移動禁止) Sync(スレッド間の共有禁止)を実装しているため
 /// 複数のスレッド間で安全に共有および移動されることを意図しています。
-pub struct SharedRepository<C> {
-    impl_: Arc<Mutex<InnerRepository<C>>>,
-    deleter_task: DeleterTask,
-}
+#[derive(Debug, Clone)]
+pub struct SharedRepository<C>(Arc<Mutex<InnerRepository<C>>>);
 
-impl<C: Channel> SharedRepository<C> {
+impl<C> SharedRepository<C>
+where
+    C: Channel,
+{
     const DELETE_WAIT_MINITES: u64 = 1; // TODO: 設定化, デフォルト値
 
-    pub fn new() -> Self {
-        let impl_ = Arc::new(Mutex::new(InnerRepository::<C>::new()));
-        let deleter_task = DeleterTask::new();
-        deleter_task.start(impl_.clone(), Self::DELETE_WAIT_MINITES);
+    /// 新しい SharedRepository インスタンスを作成します。
+    /// initialize_task 引数は、リポジトリの初期化時に呼び出される非同期タスクを指定します。
+    pub async fn new<I, IFut>(initialize_task: I) -> Self
+    where
+        Self: Clone,
+        I: FnOnce(SharedRepository<C>) -> IFut,
+        IFut: Future<Output = ()> + Send + Sync,
+    {
+        let inner = InnerRepository {
+            repo: TypicalRepository::<C>::new(),
+        };
+        let self_ = SharedRepository(Arc::new(Mutex::new(inner)));
 
-        SharedRepository {
-            impl_,
-            deleter_task,
-        }
+        initialize_task(self_.clone()).await;
+        self_
     }
 
-    fn lock_impl(&self) -> std::sync::MutexGuard<'_, InnerRepository<C>> {
-        self.impl_.lock().unwrap_or_else(mutex_poisoned)
+    fn lock_impl<F, R>(&self, f: F) -> R
+    where
+        F: for<'a> FnOnce(&mut TypicalRepository<C>) -> R,
+    {
+        let mut guard = self.0.lock().unwrap_or_else(mutex_poisoned);
+        f(&mut guard.repo)
     }
 }
 
@@ -44,19 +61,31 @@ where
     C: Channel,
 {
     fn get(&self, id: crate::pcp::GnuId) -> Option<C> {
-        self.lock_impl().get(id)
+        self.lock_impl(|repo| repo.get(id))
     }
 
     fn get_all(&self) -> Vec<C> {
-        self.lock_impl().get_all()
+        self.lock_impl(|repo| repo.get_all())
     }
 
-    fn create(&mut self, id: GnuId, config: Option<<C as Channel>::Config>) -> (C, bool) {
-        self.lock_impl().create(id, config)
+    fn create(
+        &self,
+        id: GnuId,
+        channel_info: Option<crate::pcp::ChannelInfo>,
+        track_info: Option<crate::pcp::TrackInfo>,
+        config: Option<<C as Channel>::Config>,
+    ) -> (C, bool) {
+        self.lock_impl(|repo| repo.create(id, channel_info, track_info, config))
     }
 
-    fn create_or_get(&mut self, id: crate::pcp::GnuId, config: Option<C::Config>) -> impl Future<Output = C> + Send {
-        let (mut ch, is_create) = { self.lock_impl().create(id, config) };
+    fn create_or_get(
+        &self,
+        id: crate::pcp::GnuId,
+        channel_info: Option<crate::pcp::ChannelInfo>,
+        track_info: Option<crate::pcp::TrackInfo>,
+        config: Option<C::Config>,
+    ) -> impl Future<Output = C> + Send {
+        let (mut ch, is_create) = { self.lock_impl(|repo| repo.create(id, channel_info, track_info, config)) };
         async move {
             if is_create {
                 ch.after_create().await;
@@ -65,11 +94,11 @@ where
         }
     }
 
-    fn delete_channel(&mut self, id: crate::pcp::GnuId) -> bool {
-        self.lock_impl().delete_channel(id)
+    fn delete_channel(&self, id: crate::pcp::GnuId) -> bool {
+        self.lock_impl(|repo| repo.delete_channel(id))
     }
-    fn delete_all(&mut self) {
-        self.lock_impl().delete_all();
+    fn delete_all(&self) {
+        self.lock_impl(|repo| repo.delete_all());
     }
 
     fn filter_map_collect<F, G, R>(&self, f: F, g: G) -> Vec<R>
@@ -77,10 +106,12 @@ where
         F: FnMut(&GnuId, &C) -> bool,
         G: FnMut(&GnuId, &C) -> R,
     {
-        self.lock_impl().filter_map_collect(f, g)
+        self.lock_impl(|repo| repo.filter_map_collect(f, g))
     }
 }
 
+/*
+/// 非同期で動作するチャンネルの削除タスクを管理する構造体
 struct DeleterTask {
     handle: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
@@ -128,6 +159,7 @@ async fn deleter_task<C: Channel>(repo: Arc<Mutex<InnerRepository<C>>>, delete_w
         }
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {
@@ -135,24 +167,30 @@ mod tests {
 
     use super::*;
     use crate::{
-        repository::{dummy_channel::DummyChannel, inner_repository::test_repository},
+        repository::{dummy_channel::DummyChannel, typical_repository::test_repository},
         test_helper::{assert_send, assert_sync},
     };
 
     fn test_have_send_trait() {
+        type DummyInit = std::pin::Pin<Box<dyn Future<Output = ()> + Send>>;
+
         assert_send::<SharedRepository<DummyChannel>>();
-        assert_sync::<SharedRepository<DummyChannel>>()
+        assert_sync::<SharedRepository<DummyChannel>>();
     }
 
     #[tokio::test]
     async fn test_shared_repository() {
-        let mut repo: SharedRepository<DummyChannel> = SharedRepository::new();
+        let mut repo: SharedRepository<DummyChannel> = SharedRepository::new(|s| async {}).await;
         test_repository(repo).await;
     }
 
     #[ignore = "not implemented yet"]
     #[tokio::test]
     async fn test_shared_repository_deleter_task() {
-        let mut repo: SharedRepository<DummyChannel> = SharedRepository::new();
+        let mut repo: SharedRepository<DummyChannel> = SharedRepository::new(|s| async move {
+            s.get(GnuId::zero()).is_none();
+            ()
+        })
+        .await;
     }
 }
