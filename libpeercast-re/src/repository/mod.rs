@@ -2,10 +2,14 @@ use std::future::Future;
 
 use crate::pcp::{ChannelInfo, GnuId, TrackInfo};
 
-pub mod dummy_channel;
-pub mod local_repository;
-pub mod shared_repository;
+mod dummy_channel;
+mod local_repository;
+mod shared_repository;
 pub(self) mod typical_repository;
+
+pub use dummy_channel::DummyChannel;
+pub use local_repository::LocalRepository;
+pub use shared_repository::SharedRepository;
 
 /// チャンネルの状態を表す列挙型
 pub enum ChannelState {
