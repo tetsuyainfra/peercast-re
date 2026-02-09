@@ -1,4 +1,4 @@
-use peercast_root::{IndexInfo, channel::json_model::JsonChannel};
+use peercast_root::{IndexInfo, model::JsonChannel};
 
 #[derive(Debug)]
 pub struct YellowPage {

@@ -1,17 +1,13 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
-use hyper_util::server::graceful;
 use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo, connection::PcpConnection},
-    repository::{Channel, shared_repository::SharedRepository},
+    repository::Channel,
 };
 use tokio::sync::watch;
 
-use crate::channel::json_model::JsonChannel;
-
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct RootConfig2 {}
-pub type RootRepository2 = SharedRepository<RootChannel2>;
 
 #[derive(Debug)]
 pub struct RootChannel2(Arc<ImplChannel>);
@@ -90,45 +86,41 @@ impl RootChannel2 {
     // ) {
     //     todo!()
     // }
+
 }
 
-impl From<&RootChannel2> for JsonChannel {
-    fn from(ch: &RootChannel2) -> Self {
-        JsonChannel {
-            id: todo!(),
-            name: todo!(),
-            tracker_addr: todo!(),
-            contact_url: todo!(),
-            genre: todo!(),
-            raw_genre: todo!(),
-            desc: todo!(),
-            comment: todo!(),
-            stream_type: todo!(),
-            stream_ext: todo!(),
-            bitrate: todo!(),
-            number_of_listener: todo!(),
-            number_of_relay: todo!(),
-            created_at: todo!(),
-            track: todo!(),
-            typee: todo!(),
-        }
-    }
-}
+// impl From<&RootChannel2> for JsonChannel {
+//     fn from(ch: &RootChannel2) -> Self {
+//         JsonChannel {
+//             id: todo!(),
+//             name: todo!(),
+//             tracker_addr: todo!(),
+//             contact_url: todo!(),
+//             genre: todo!(),
+//             raw_genre: todo!(),
+//             desc: todo!(),
+//             comment: todo!(),
+//             stream_type: todo!(),
+//             stream_ext: todo!(),
+//             bitrate: todo!(),
+//             number_of_listener: todo!(),
+//             number_of_relay: todo!(),
+//             created_at: todo!(),
+//             track: todo!(),
+//             typee: todo!(),
+//         }
+//     }
+// }
 
 pub struct AttachTaskFuture;
 
 impl Future for AttachTaskFuture {
     type Output = ();
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         std::task::Poll::Ready(())
     }
-
 }
-
 
 #[derive(Debug)]
 struct ImplChannel {

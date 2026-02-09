@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use libpeercast_re::pcp::PcpConnectionFactory;
-use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository, repository2::RootRepository2};
+use peercast_root::{ IndexInfo, RestrictPortLevel, repository::RootRepository2};
 
 pub mod cli;
 pub mod handler;

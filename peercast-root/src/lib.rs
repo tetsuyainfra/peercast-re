@@ -4,14 +4,13 @@ use clap::ValueEnum;
 pub use index_info::{FooterToml, IndexInfo};
 use thiserror::Error;
 
-pub mod channel;
 pub mod config;
 pub mod db;
 pub mod service;
 pub mod filter;
 pub mod prelude;
 pub mod repository;
-pub mod repository2;
+pub mod model;
 pub mod test_helper;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？

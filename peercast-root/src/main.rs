@@ -7,8 +7,8 @@ use clap::Parser;
 use libpeercast_re::pcp::repository;
 use libpeercast_re::pcp::{ChannelInfo, GnuId, PcpConnectionFactory};
 use libpeercast_re::repository::Repository;
-use peercast_root::repository2::{RootConfig2, RootRepository2};
-use peercast_root::{ExitCode, FooterToml, IndexInfo, channel::RootConfig, repository::ChannelRepository};
+use peercast_root::repository::RootRepository2;
+use peercast_root::{ExitCode, FooterToml, IndexInfo};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 

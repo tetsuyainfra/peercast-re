@@ -1,4 +1,3 @@
-use std::time::Duration;
 
 use axum::{
     Json,
@@ -11,9 +10,7 @@ use futures_util::FutureExt;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
 use peercast_root::{
-    PortLevel,
-    channel::json_model::JsonChannel,
-    filter::filter_channels,
+    PortLevel, model::JsonChannel, filter::filter_channels
 };
 use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
@@ -190,7 +187,7 @@ pub async fn index_json(
     let port = params.Host.as_ref().map(|(_host, port)| *port);
     let own_level = check_host_port_level(&state.db_pool, ip, port).await;
 
-    let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch| ch.into());
+    let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch|  ch.into());
     let config = &state.0.config;
 
     let mut channels: Vec<JsonChannel> = filter_channels(

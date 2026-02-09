@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
-use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
+use libpeercast_re::{pcp::{ChannelInfo, GnuId, TrackInfo}, repository::Channel};
 use serde::Serialize;
 
-use crate::{IndexInfo, channel::RootChannel};
+use crate::{IndexInfo, model::RootChannel2};
 
 //-------------------------------------------------------------------------------
 // Response structs
@@ -44,38 +44,40 @@ pub struct JsonTrack {
     pub genre: String,
 }
 
-impl From<&RootChannel> for JsonChannel {
-    fn from(ch: &RootChannel) -> Self {
-        let ChannelInfo {
-            typ,
-            name,
-            genre,
-            desc,
-            comment,
-            url,
-            stream_type,
-            stream_ext,
-            bitrate,
-        } = ch.channel_info();
+impl From<&RootChannel2> for JsonChannel {
+    fn from(ch: &RootChannel2) -> Self {
+        // let ChannelInfo {
+        //     typ,
+        //     name,
+        //     genre,
+        //     desc,
+        //     comment,
+        //     url,
+        //     stream_type,
+        //     stream_ext,
+        //     bitrate,
+        // } = ch.channel_info();
 
-        JsonChannel {
-            id: ch.id(),
-            name,
-            tracker_addr: ch.tracker_addr(),
-            contact_url: url,
-            genre: genre.clone(),
-            raw_genre: genre,
-            desc,
-            comment,
-            typee: typ,
-            stream_type,
-            stream_ext,
-            bitrate,
-            number_of_listener: ch.number_of_listener(),
-            number_of_relay: ch.number_of_relay(),
-            created_at: ch.created_at(),
-            track: ch.track_info().into(),
-        }
+        // JsonChannel {
+        //     id: ch.id(),
+        //     name,
+        //     tracker_addr: ch.tracker_addr(),
+        //     contact_url: url,
+        //     genre: genre.clone(),
+        //     raw_genre: genre,
+        //     desc,
+        //     comment,
+        //     typee: typ,
+        //     stream_type,
+        //     stream_ext,
+        //     bitrate,
+        //     number_of_listener: ch.number_of_listener(),
+        //     number_of_relay: ch.number_of_relay(),
+        //     created_at: ch.created_at(),
+        //     track: ch.track_info().into(),
+        // }
+
+        todo!()
     }
 }
 

@@ -2,10 +2,13 @@ use std::net::SocketAddr;
 
 use bytes::BytesMut;
 use libpeercast_re::{
-    ConnectionNo, pcp::{
+    ConnectionNo,
+    pcp::{
         builder::RootBuilder,
         decode::{PcpBroadcast, PcpChannel},
-    }, repository::Repository, util::{ConnectionProtocol, identify_protocol}
+    },
+    repository::Repository,
+    util::{ConnectionProtocol, identify_protocol},
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -15,10 +18,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::app::ArcState;
-use peercast_root::{
-    channel::{RootConfig, get_tracker_addr},
-    prelude::*, repository2::RootConfig2,
-};
+use peercast_root::{model::RootConfig2, prelude::*};
 
 pub async fn serve(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
     // スレッドの終了を検知するためのチャンネル
@@ -202,4 +202,14 @@ async fn serve_root(
     // Channelにコネクションを接続
     let attach_task = ch.attach_connection(conn, graceful_shutdown, closed_send);
     attach_task.await;
+}
+
+fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Option<SocketAddr> {
+    // // Hostの接続先を確定
+    // // TODO: firewall checkが必要
+    // let host = addresses.iter().find(|addr| addr.ip() == remote_addr.ip());
+    // let tracker_host = host.map(|h| h.clone());
+
+    // tracker_host
+    todo!()
 }
