@@ -4,12 +4,14 @@ use libpeercast_re::pcp::PcpConnectionFactory;
 use peercast_root::{ IndexInfo, RestrictPortLevel, repository::RootRepository2};
 
 pub mod cli;
-pub mod handler;
 pub mod logging;
 pub mod portcheck;
-pub mod server_http;
-pub mod server_peercast;
+pub mod http;
+pub mod peercast;
 pub mod yp;
+
+pub use http::server_http;
+pub use peercast::server_peercast;
 
 #[derive(Debug)]
 pub struct ApiConfig {

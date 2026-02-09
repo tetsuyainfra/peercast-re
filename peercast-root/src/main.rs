@@ -1,16 +1,13 @@
 use std::{net::SocketAddr, process::exit, sync::Arc, time::Duration};
 
 use anyhow::Context;
-use bb8::Pool;
-use bb8_redis::RedisConnectionManager;
 use clap::Parser;
-use libpeercast_re::pcp::repository;
 use libpeercast_re::pcp::{ChannelInfo, GnuId, PcpConnectionFactory};
 use libpeercast_re::repository::Repository;
+use peercast_root::prelude::*;
 use peercast_root::repository::RootRepository2;
 use peercast_root::{ExitCode, FooterToml, IndexInfo};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
 
 // App modules
 mod app;
@@ -38,16 +35,12 @@ async fn main() -> anyhow::Result<()> {
 
     let cancell_token = CancellationToken::new();
     let mut set = tokio::task::JoinSet::new();
-    set.build_task().name("ApiServer").spawn(server_http::serve(
+    set.build_task().name("ApiServer").spawn(server_http(
         arc_state.clone(),
         listener_http,
         cancell_token.child_token(),
     ))?;
-    set.build_task().name("RootServer").spawn(server_peercast::serve(
-        arc_state,
-        listener_pcp,
-        cancell_token.child_token(),
-    ))?;
+    set.build_task().name("RootServer").spawn(server_peercast(arc_state, listener_pcp, cancell_token.child_token()))?;
     set.build_task().name("WaitShutdownSig").spawn(async move {
         tokio::signal::ctrl_c().await.expect("failed to listen for event");
         cancell_token.cancel();
@@ -109,9 +102,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr)
             genre: "Various".to_string(),
         };
 
-        repository2
-            .create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None)
-            .await;
+        repository2.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
     }
 
     let api_config = ApiConfig {

@@ -7,10 +7,12 @@ use tokio_util::sync::CancellationToken;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tower_http::{cors::CorsLayer, services::ServeDir, set_header::SetResponseHeaderLayer};
 
-use crate::app::{ArcState, handler};
+use crate::app::{ArcState};
 use peercast_root::prelude::*;
 
-pub async fn serve(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
+pub mod handler;
+
+pub async fn server_http(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
     let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
     info!("asset_dir: {:?}", &assets_dir);
 
