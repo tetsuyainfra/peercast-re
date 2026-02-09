@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use bb8_redis::RedisConnectionManager;
 use libpeercast_re::pcp::PcpConnectionFactory;
-use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository};
+use peercast_root::{IndexInfo, RestrictPortLevel, channel::RootChannel, repository::ChannelRepository, repository2::RootRepository2};
 
 pub mod cli;
 pub mod handler;
@@ -10,6 +9,7 @@ pub mod logging;
 pub mod portcheck;
 pub mod server_http;
 pub mod server_peercast;
+pub mod yp;
 
 #[derive(Debug)]
 pub struct ApiConfig {
@@ -33,9 +33,9 @@ pub struct ApiConfig {
 pub struct AppState {
     pub config: Arc<ApiConfig>,
     pub index_txt_footer: Vec<IndexInfo>,
-    pub redis_master_key: String,
-    pub db_pool: bb8::Pool<RedisConnectionManager>,
-    pub repository: ChannelRepository<RootChannel>,
+    pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
+    pub yellow_page: Arc<yp::YellowPage>,
+    pub repository2: RootRepository2,
     pub conn_factory: PcpConnectionFactory,
 }
 
@@ -45,5 +45,12 @@ pub struct ArcState(pub Arc<AppState>);
 impl Clone for ArcState {
     fn clone(&self) -> Self {
         ArcState(Arc::clone(&self.0))
+    }
+}
+
+impl std::ops::Deref for ArcState {
+    type Target = AppState;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

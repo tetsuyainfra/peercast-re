@@ -9,18 +9,18 @@ use axum::{
 use axum_client_ip::ClientIp;
 use futures_util::FutureExt;
 use hyper::StatusCode;
+use libpeercast_re::repository::Repository;
 use peercast_root::{
     PortLevel,
     channel::json_model::JsonChannel,
-    db::{ConnectionPool, DatabaseConnection},
     filter::filter_channels,
 };
 use serde::Deserialize;
+use sqlx::{Pool, Sqlite};
 use tokio::time::timeout;
-use tracing::error;
 
 
-use crate::app::{ArcState, portcheck::get_portcheck_level};
+use crate::app::{ArcState};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -173,31 +173,24 @@ fn shutdown_signal(graceful_shutdown: CancellationToken) -> BoxFuture<'static, (
 pub async fn index_txt(
     client_ip: ClientIp,
     query_params: Query<IndexTextParams>,
-    conn: DatabaseConnection,
     state: State<ArcState>,
 ) -> Result<String, ApiError> {
-    let channels = index_json(client_ip, query_params, conn, state).await?;
-    let channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
+    // let channels = index_json(client_ip, query_params, conn, state).await?;
+    // let channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
-    Ok(itertools::join(channels, "\n"))
+    // Ok(itertools::join(channels, "\n"))
+    Ok(String::new())
 }
 
 pub async fn index_json(
     ClientIp(ip): ClientIp,
     Query(params): Query<IndexTextParams>,
-    mut conn: DatabaseConnection,
     State(state): State<ArcState>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
-    let own_level = if let Some(host) = &params.Host {
-        get_portcheck_level(&state.0.redis_master_key, &mut conn, ip, host.1).await.unwrap_or_else(|e| {
-            error!("Failed to get_portcheck_level for {}:{} -> {}", host.0, host.1, e);
-            PortLevel::None
-        })
-    } else {
-        PortLevel::None
-    };
+    let port = params.Host.as_ref().map(|(_host, port)| *port);
+    let own_level = check_host_port_level(&state.db_pool, ip, port).await;
 
-    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|(_id, ch)| ch.into());
+    let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch| ch.into());
     let config = &state.0.config;
 
     let mut channels: Vec<JsonChannel> = filter_channels(
@@ -215,6 +208,11 @@ pub async fn index_json(
     channels.extend(state.0.index_txt_footer.iter().map(|e| e.into()));
 
     Ok(channels.into())
+}
+
+async fn check_host_port_level(db: &Pool<Sqlite>, ip: std::net::IpAddr, port: Option<u16>) -> PortLevel {
+    // HostCheckService::do_host_check().await.unwrap_or(PortLevel::None)
+    PortLevel::None
 }
 
 // fn merged_channels(state: ArcState) -> Vec<JsonChannel> {
@@ -238,22 +236,22 @@ pub async fn index_json(
 //-------------------------------------------------------------------------------
 // Database mapper
 //-------------------------------------------------------------------------------
-impl FromRequestParts<ArcState> for DatabaseConnection {
-    type Rejection = (StatusCode, String);
+// impl FromRequestParts<ArcState> for DatabaseConnection {
+//     type Rejection = (StatusCode, String);
 
-    async fn from_request_parts(
-        _parts: &mut axum::http::request::Parts,
-        state: &ArcState,
-    ) -> Result<Self, Self::Rejection> {
-        let pool = ConnectionPool::from_ref(&state.0.db_pool);
+//     async fn from_request_parts(
+//         _parts: &mut axum::http::request::Parts,
+//         state: &ArcState,
+//     ) -> Result<Self, Self::Rejection> {
+//         let pool = ConnectionPool::from_ref(&state.0.db_pool);
 
-        // let conn = pool.get_owned().await.map_err(internal_error)?;
-        let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned()).await.map_err(internal_error)?;
-        let conn = ret_conn.map_err(internal_error)?;
+//         // let conn = pool.get_owned().await.map_err(internal_error)?;
+//         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned()).await.map_err(internal_error)?;
+//         let conn = ret_conn.map_err(internal_error)?;
 
-        Ok(Self(conn))
-    }
-}
+//         Ok(Self(conn))
+//     }
+// }
 
 /// Utility function for mapping any error into a `500 Internal Server Error`
 /// response.

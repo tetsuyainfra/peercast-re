@@ -2,12 +2,10 @@ use std::net::SocketAddr;
 
 use bytes::BytesMut;
 use libpeercast_re::{
-    ConnectionNo,
-    pcp::{
+    ConnectionNo, pcp::{
         builder::RootBuilder,
         decode::{PcpBroadcast, PcpChannel},
-    },
-    util::{ConnectionProtocol, identify_protocol},
+    }, repository::Repository, util::{ConnectionProtocol, identify_protocol}
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -19,7 +17,7 @@ use tokio_util::sync::CancellationToken;
 use crate::app::ArcState;
 use peercast_root::{
     channel::{RootConfig, get_tracker_addr},
-    prelude::*,
+    prelude::*, repository2::RootConfig2,
 };
 
 pub async fn serve(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
@@ -193,13 +191,13 @@ async fn serve_root(
     let channel_info = channel_info.as_ref().map(|i| i.into());
     let track_info = track_info.as_ref().map(|t| t.into());
     //
-    let config = RootConfig {
-        tracker_host,
+    let config = RootConfig2 {
+        // tracker_host,
     };
 
     // 対象チャンネルを取得
-    let repo = &state.0.repository;
-    let ch = repo.create_or_get(*channel_id_in_bcst, channel_info, track_info, Some(config));
+    let mut repo = &state.0.repository2;
+    let ch = repo.create_or_get(*channel_id_in_bcst, channel_info, track_info, Some(config)).await;
 
     // Channelにコネクションを接続
     let attach_task = ch.attach_connection(conn, graceful_shutdown, closed_send);

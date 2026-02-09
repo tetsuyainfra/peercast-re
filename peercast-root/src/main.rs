@@ -4,7 +4,10 @@ use anyhow::Context;
 use bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use clap::Parser;
+use libpeercast_re::pcp::repository;
 use libpeercast_re::pcp::{ChannelInfo, GnuId, PcpConnectionFactory};
+use libpeercast_re::repository::Repository;
+use peercast_root::repository2::{RootConfig2, RootRepository2};
 use peercast_root::{ExitCode, FooterToml, IndexInfo, channel::RootConfig, repository::ChannelRepository};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
@@ -25,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     cli::version_print(&args)?;
 
     logging::init(&args)?;
-    let arc_state = init(&args, GnuId::new(), (args.bind, args.port).into()).await;
+    let arc_state = init(&args, GnuId::new(), (args.bind, args.port).into()).await?;
 
     // Init Socket
     let listener_pcp = tokio::net::TcpListener::bind((args.bind, args.port)).await?;
@@ -59,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> ArcState {
+async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> anyhow::Result<ArcState> {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     let conn_factory = PcpConnectionFactory::new(self_session_id, self_socket);
 
@@ -76,28 +79,39 @@ async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr)
         index_txt_footer.append(&mut infos);
     }
 
-    let repository = ChannelRepository::new(&self_session_id);
+    let mut repository2 = RootRepository2::new(|_| async {}).await;
+
     if args.create_dummy_channel {
-        let mut chinfo = ChannelInfo::new();
         let level_fmt = match args.yp_restrict_port_level {
             peercast_root::RestrictPortLevel::None => "",
             peercast_root::RestrictPortLevel::PortCheck => "@",
             peercast_root::RestrictPortLevel::BroadcastSpeed => "@@",
             peercast_root::RestrictPortLevel::RestrictSpeed => "@@@",
-            v => {
-                error!("Invalid port check level: {:?}", v);
-                exit(ExitCode::Failure as i32);
-            }
         };
-        chinfo.name = "ダミーチャンネル".into();
-        chinfo.genre = format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into();
-        chinfo.comment = "ダミーチャンネルはおおよそ5分後に消えます".into();
-        chinfo.url = "https://yp-dev.007144.xyz/".into();
-        chinfo.typ = "RAW".into();
-        let config = RootConfig {
-            tracker_host: Some("127.0.0.1:7144".parse().unwrap()),
+
+        let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
+        let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
+            name: "Dummyチャンネル名".to_string(),
+            url: "http://example.com".to_string(),
+            genre: format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into(),
+            desc: "This is a dummy channel desc".to_string(),
+            comment: "No comments.".to_string(),
+            stream_type: "video/x-flv".to_string(),
+            stream_ext: ".flv".to_string(),
+            bitrate: 128,
+            typ: "FLV".to_string(),
         };
-        repository.create_or_get(GnuId::new(), Some(chinfo), None, Some(config));
+        let dummy_track_info = libpeercast_re::pcp::TrackInfo {
+            title: "Dummy Track".to_string(),
+            creator: "Dummy Artist".to_string(),
+            url: "http://example.com/track".to_string(),
+            album: "Dummy Album".to_string(),
+            genre: "Various".to_string(),
+        };
+
+        repository2
+            .create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None)
+            .await;
     }
 
     let api_config = ApiConfig {
@@ -110,73 +124,26 @@ async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr)
         client_ip_source: args.ip_source.clone(),
     };
 
-    let db_pool = init_db(args).await;
+    let db_pool = init_db(args).await?;
+
+    let yellow_page = app::yp::YellowPage::new(&args.yp_name_space).add_footer_channels(index_txt_footer.clone());
+    let yellow_page = Arc::new(yellow_page);
 
     let app_sate = AppState {
         config: Arc::new(api_config),
         index_txt_footer,
-        redis_master_key: args.redis_master_key.clone(),
-        db_pool: db_pool,
-        repository,
+        db_pool,
+        yellow_page,
+        repository2,
         conn_factory,
     };
 
-    ArcState(Arc::new(app_sate))
+    Ok(ArcState(Arc::new(app_sate)))
 }
 
-async fn init_db(args: &cli::Args) -> Pool<RedisConnectionManager> {
-    use redis::AsyncCommands;
-    use tokio::time::timeout;
-
-    debug!("connecting to redis: {}", args.redis_url);
-    let manager = RedisConnectionManager::new(args.redis_url.clone()).unwrap();
-    let pool = bb8::Pool::builder().build(manager).await.unwrap();
-    {
-        // let mut conn = pool.get().await.unwrap();
-        let mut conn = match tokio::time::timeout(Duration::from_millis(2000), pool.get()).await {
-            Ok(Ok(conn)) => conn,
-            Ok(Err(e)) => {
-                error!("redis connect failed :{}", e);
-                std::process::exit(ExitCode::Failure as i32);
-            }
-            Err(e) => {
-                error!("redis connect timeout: {}", e);
-                std::process::exit(ExitCode::Failure as i32);
-            }
-        };
-
-        let key = format!("{}:CHECK", args.redis_master_key);
-        // conn.set::<&str, &str, ()>(&key, "CHECK_ME").await;
-        match timeout(Duration::from_millis(2000), conn.set::<&str, &str, ()>(&key, "CHECK_ME")).await {
-            Ok(Ok(())) => {
-                debug!("redis connect SET COMMAND success");
-            }
-            Ok(Err(e)) => {
-                error!("redis connect SET COMMAND failed: {}", e);
-                std::process::exit(ExitCode::Failure as i32);
-            }
-            Err(_) => {
-                error!("redis connect SET COMMAND timeout");
-                std::process::exit(ExitCode::Failure as i32);
-            }
-        };
-
-        match timeout(Duration::from_millis(1000), conn.get::<_, String>(&key)).await {
-            Ok(Ok(r)) => {
-                debug!("redis connect GET COMMAND success: {}", r);
-                assert_eq!(r, "CHECK_ME");
-            }
-            Ok(Err(e)) => {
-                error!("redis connect GET COMMAND failed: {}", e);
-                std::process::exit(ExitCode::Failure as i32);
-            }
-            Err(_) => {
-                error!("redis connect GET COMMAND timeout");
-                std::process::exit(ExitCode::Failure as i32);
-            }
-        };
-    }
-    tracing::debug!("successfully connected to redis and pinged it");
-
-    pool
+async fn init_db(args: &cli::Args) -> anyhow::Result<sqlx::Pool<sqlx::sqlite::Sqlite>> {
+    use sqlx::sqlite::SqlitePoolOptions;
+    info!("Connecting to database at {}", args.database_url.as_str());
+    let pool = SqlitePoolOptions::new().connect(args.database_url.as_str()).await?;
+    Ok(pool)
 }

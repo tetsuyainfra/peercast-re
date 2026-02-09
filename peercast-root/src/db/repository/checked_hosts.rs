@@ -136,7 +136,7 @@ mod tests {
         let repo = prepare_sqlite_repo().await;
 
         let all = repo.all().await.unwrap();
-        assert_eq!(all.len(), 3);
+        assert_eq!(all.len(), 7);
 
         let ip: IpAddr = "255.0.0.2".parse().unwrap();
         let r = repo.find_all_by_ip(ip).await;

@@ -2,6 +2,7 @@ use std::process::exit;
 
 use clap::{Parser, Subcommand};
 use peercast_root::RestrictPortLevel;
+use url::Url;
 
 /// Simple Daemon Program
 #[derive(Parser, Debug, Clone)]
@@ -65,19 +66,8 @@ pub struct Args {
          value_parser = clap::value_parser!(u32).range(peercast_root::YP_LIMIT_SPEED_MIN as i64..))]
     pub yp_limit_speed: u32,
 
-    /// redisに使用するnamespace
-    #[arg(long, default_value = "yproot")]
-    pub redis_master_key: String,
-
-    /// 接続先のredis_url(DEBUG MODEのみ)
-    #[cfg(not(debug_assertions))]
-    #[arg(long, default_value = "redis://127.0.0.1:6379")]
-    pub redis_url: String,
-
-    /// 接続先のredis_url(DEBUG MODE)
-    #[cfg(debug_assertions)]
-    #[arg(long, default_value = "redis://yproot:ypbared@127.0.0.1:6379")]
-    pub redis_url: String,
+    #[arg(short, long, env, value_parser = clap::builder::ValueParser::new(Url::parse), default_value="sqlite::memory:")]
+    pub database_url: Url,
 
     // TODO: TIMEZONEの実装
     // pub timezone: u16,
@@ -169,6 +159,16 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         json: bool,
     },
+    DB {
+        #[command(subcommand)]
+        command: DbCommands,
+    },
+}
+
+#[derive(Debug, Subcommand, Clone)]
+pub enum DbCommands {
+    /// DBのマイグレーションを実行する
+    Prepare,
 }
 
 pub fn version_print(args: &Args) -> anyhow::Result<()> {
@@ -182,6 +182,17 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
             })?;
             exit(0)
         }
+        Some(Commands::DB {
+            ref command,
+        }) => match command {
+            DbCommands::Prepare => {
+                // let database_url = args.database_url.to_string();
+                // let pool = SqlitePool::connect(&database_url).await?;
+                // let repo = SqliteCheckedHostRepository::new(pool);
+                // repo.migrate().await?;
+                // println!("Database migration completed successfully.");
+            }
+        },
         _ => {}
     }
 

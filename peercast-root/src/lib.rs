@@ -11,6 +11,7 @@ pub mod service;
 pub mod filter;
 pub mod prelude;
 pub mod repository;
+pub mod repository2;
 pub mod test_helper;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？
