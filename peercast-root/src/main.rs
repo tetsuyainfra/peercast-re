@@ -74,7 +74,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
         index_txt_footer.append(&mut infos);
     }
 
-    let repository2 = RootRepository2::new(|_| async {}).await;
+    let repository = RootRepository2::new(|_| async {}).await;
 
     if args.create_dummy_channel {
         let level_fmt = match args.yp_restrict_port_level {
@@ -104,7 +104,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
             genre: "Various".to_string(),
         };
 
-        repository2.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
+        repository.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
     }
 
     let api_config = ApiConfig {
@@ -127,7 +127,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
         index_txt_footer,
         db_pool,
         yellow_page,
-        repository2,
+        repository,
         connection_factory,
         connection_manager,
     };

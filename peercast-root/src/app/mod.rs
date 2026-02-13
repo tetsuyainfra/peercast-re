@@ -39,7 +39,7 @@ pub struct AppState {
     pub index_txt_footer: Vec<IndexInfo>,
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
     pub yellow_page: Arc<yp::YellowPage>,
-    pub repository2: RootRepository2,
+    pub repository: RootRepository2,
     pub connection_factory: SharedConnectionFactory,
     pub connection_manager: Arc<SharedConnectionManager>,
 }

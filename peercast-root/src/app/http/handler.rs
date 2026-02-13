@@ -42,7 +42,7 @@ pub async fn index_txt(
     Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<String, ApiError> {
-    let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch| ch.into());
+    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|_id, ch| ch.into());
     let string_channels = state.0.yellow_page.to_index_txt(&FilterConfig {}, channels);
 
     Ok(itertools::join(string_channels, "\n"))
@@ -56,7 +56,7 @@ pub async fn index_json(
     // let port = params.Host.as_ref().map(|(_host, port)| *port);
     // let own_level = check_host_port_level(&state.db_pool, ip, port).await;
 
-    let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch| ch.into());
+    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|_id, ch| ch.into());
     let json_channels = state.0.yellow_page.to_index_json(&FilterConfig {}, channels);
 
     Ok(json_channels)
