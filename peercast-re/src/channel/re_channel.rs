@@ -6,14 +6,13 @@ use std::{
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use futures_core::Stream;
 use http::Uri;
 use libpeercast_re::{
     ConnectionNo,
     pcp::{ChannelInfo, GnuId, TrackInfo},
-    util::{mutex_poisoned, util_mpsc::mpsc_send},
+    util::mutex_poisoned,
 };
-use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use super::manager;
 use super::stream;

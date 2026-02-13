@@ -29,11 +29,12 @@ pub mod error;
 pub mod http;
 /// Peercast Protocol
 pub mod pcp;
+pub mod prelude;
 pub mod repository;
 pub mod rtmp;
 
 pub mod app {
-    pub mod cui;
+    // pub mod cui;
     mod cui_dl;
 
     pub use cui_dl::CuiDL;

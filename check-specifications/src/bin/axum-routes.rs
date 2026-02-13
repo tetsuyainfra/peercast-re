@@ -3,6 +3,7 @@ use tower_http::normalize_path::NormalizePathLayer;
 #[tokio::main]
 async fn main() {}
 
+#[allow(dead_code)]
 fn router() -> axum::Router {
     use axum::{
         Router,

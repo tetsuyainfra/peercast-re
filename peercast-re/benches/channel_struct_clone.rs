@@ -1,3 +1,4 @@
+#![allow(unused)]
 use criterion::{Criterion, criterion_group, criterion_main};
 use libpeercast_re::pcp::{ChannelInfo, TrackInfo};
 use std::{

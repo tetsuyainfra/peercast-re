@@ -1,3 +1,4 @@
+#![allow(unused)]
 use std::{
     hint::black_box,
     sync::{Arc, Mutex},
