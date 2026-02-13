@@ -4,7 +4,7 @@ CREATE TABLE checked_hosts(
     ip_address BLOB NOT NULL,
     port INTEGER NOT NULL,
     speed INTEGER DEFAULT 0, -- 0: closed, 1~: open and speed
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- CHECK (created_at GLOB '____-__-__T__:*Z')
     CHECK (length(ip_address) == 4 OR length(ip_address) == 16),-- Ensure IPv4/IPv6 length
     CHECK (port >= 0 AND port <= 65535),

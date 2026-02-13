@@ -1,23 +1,26 @@
 use std::net::IpAddr;
 
 use async_trait::async_trait;
-use sqlx::SqlitePool;
 use chrono::{DateTime, Utc};
+use sqlx::SqlitePool;
 
-use crate::prelude::*;
 use crate::db::model::CheckedHost;
 use crate::db::model::DbIpAddr;
+use crate::prelude::*;
 
 #[async_trait]
 pub trait CheckedHostRepository {
-    async fn migrate(&self) -> Result<(), sqlx::Error> ;
+    async fn migrate(&self) -> Result<(), sqlx::Error>;
     // async fn add_checked_host(&self, host: &str) -> Result<(), String>;
     // async fn remove_checked_host(&self, host: &str) -> Result<(), String>;
-    async fn all(&self) -> Result<Vec<CheckedHost>, sqlx::Error> ;
+    async fn all(&self) -> Result<Vec<CheckedHost>, sqlx::Error>;
     async fn find_by_id(&self, id: i64) -> Result<Option<CheckedHost>, sqlx::Error>;
     async fn find_by_ip_port(&self, ip: IpAddr, port: u16) -> Result<Option<CheckedHost>, sqlx::Error>;
     async fn find_all_by_ip(&self, ip: IpAddr) -> Result<Vec<CheckedHost>, sqlx::Error>;
-    async fn add(&self, ip: IpAddr, port: u16, speed: i32) -> Result<(), sqlx::Error>;
+    /// 新規にレコードを追加し、そのIDを返す
+    async fn insert(&self, ip: IpAddr, port: u16, speed: i32) -> Result<i64, sqlx::Error>;
+    async fn update(&self, host: &CheckedHost) -> Result<(), sqlx::Error>;
+    async fn delete(&self, id: i64) -> Result<(), sqlx::Error>;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -44,7 +47,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
     async fn all(&self) -> Result<Vec<CheckedHost>, sqlx::Error> {
         let hosts = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, created_at as `created_at: DateTime<Utc>`FROM checked_hosts"
+            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, updated_at as `updated_at: DateTime<Utc>`FROM checked_hosts"
         )
         .fetch_all(&self.pool)
         .await?;
@@ -55,7 +58,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
     async fn find_by_id(&self, id: i64) -> Result<Option<CheckedHost>, sqlx::Error> {
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, created_at as `created_at: DateTime<Utc>` FROM checked_hosts WHERE id = $1",
+            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE id = $1",
             id
         )
         .fetch_optional(&self.pool)
@@ -64,12 +67,11 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         Ok(host)
     }
 
-
     async fn find_by_ip_port(&self, ip: IpAddr, port: u16) -> Result<Option<CheckedHost>, sqlx::Error> {
         let ip = DbIpAddr(ip);
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, created_at `created_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1 AND port = $2",
+            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1 AND port = $2",
             ip,
             port
         )
@@ -79,11 +81,12 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         Ok(host)
     }
 
+    /// ポート指定なしでIPアドレスのみで検索
     async fn find_all_by_ip(&self, ip: IpAddr) -> Result<Vec<CheckedHost>, sqlx::Error> {
         let ip = DbIpAddr(ip);
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, created_at `created_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1",
+            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1",
             ip
         )
         .fetch_all(&self.pool)
@@ -92,20 +95,44 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         Ok(host)
     }
 
-    async fn add(&self, ip: IpAddr, port: u16, speed: i32) -> Result<(), sqlx::Error> {
+    async fn insert(&self, ip: IpAddr, port: u16, speed: i32) -> Result<i64, sqlx::Error> {
         let ip = DbIpAddr(ip);
-        sqlx::query_scalar!(
+        let id = sqlx::query_scalar!(
             r#"
             INSERT INTO checked_hosts (ip_address, port, speed) VALUES ($1, $2, $3)
-                ON CONFLICT(ip_address, port)
-                    DO UPDATE SET created_at = CURRENT_TIMESTAMP;
+                RETURNING id
             "#,
             ip,
             port,
             speed
         )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(id)
+    }
+
+    async fn update(&self, host: &CheckedHost) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            r#"UPDATE checked_hosts
+                SET ip_address = $1, port = $2, speed = $3, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $4
+            "#,
+            // set
+            host.ip_address,
+            host.port,
+            host.speed,
+            // where
+            host.id
+        )
         .execute(&self.pool)
         .await?;
+
+        Ok(())
+    }
+
+    async fn delete(&self, id: i64) -> Result<(), sqlx::Error> {
+        sqlx::query!("DELETE FROM checked_hosts WHERE id = $1", id).execute(&self.pool).await?;
 
         Ok(())
     }
@@ -116,7 +143,6 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
 // pub struct PgCheckedHostRepository{
 //     pool: PgPool,
 // }
-
 
 #[cfg(test)]
 mod tests {
@@ -131,15 +157,70 @@ mod tests {
         SqliteCheckedHostRepository::new(pool)
     }
 
-    #[tokio::test]
-    async fn test_add_checked_host()  {
+    async fn prepare_sqlite_repo_zero() -> SqliteCheckedHostRepository {
         let repo = prepare_sqlite_repo().await;
-
         let all = repo.all().await.unwrap();
-        assert_eq!(all.len(), 7);
+        for host in all {
+            repo.delete(host.id.unwrap()).await.unwrap()
+        }
+        assert_eq!(repo.all().await.unwrap().len(), 0);
+        repo
+    }
 
-        let ip: IpAddr = "255.0.0.2".parse().unwrap();
-        let r = repo.find_all_by_ip(ip).await;
-        assert!(r.ok().is_some());
+
+    mod add_checked_host {
+        use super::*;
+        #[tokio::test]
+        async fn test_all() {
+            let repo = prepare_sqlite_repo().await;
+            let all = repo.all().await.unwrap();
+            assert_eq!(all.len(), 7);
+        }
+
+        #[tokio::test]
+        async fn test_insert() {
+            let repo = prepare_sqlite_repo_zero().await;
+
+            let ip = "127.0.0.1".parse::<IpAddr>().unwrap();
+            let port = 8080;
+            let speed = 100;
+
+            let id = repo.insert(ip, port, speed).await.unwrap();
+            let hosts = repo.find_all_by_ip(ip).await.unwrap();
+            assert_eq!(hosts.len(), 1);
+            assert_eq!(hosts[0].ip_address, DbIpAddr(ip));
+            assert_eq!(hosts[0].port, port);
+            assert_eq!(hosts[0].speed, speed);
+
+            assert!(repo.insert(ip, port, speed).await.is_err());
+
+            let r = repo.find_by_id(id).await.unwrap().unwrap();
+            assert_eq!(r.ip_address, DbIpAddr(ip));
+            assert_eq!(r.port, port);
+            assert_eq!(r.speed, speed);
+
+        }
+        #[tokio::test]
+        async fn test_update() {
+            let repo = prepare_sqlite_repo_zero().await;
+
+            let ip = "127.0.0.1".parse::<IpAddr>().unwrap();
+            let port = 8080;
+            let speed = 100;
+
+            let id = repo.insert(ip, port, speed).await.unwrap();
+            let mut host = repo.find_by_id(id).await.unwrap().unwrap();
+            host.ip_address = DbIpAddr("127.0.0.2".parse::<IpAddr>().unwrap());
+            host.port = 8081;
+            host.speed = 200;
+            repo.update(&host).await.unwrap();
+
+            let diff_host = repo.find_by_id(id).await.unwrap().unwrap();
+            assert_eq!(diff_host.id, host.id);
+            assert_eq!(diff_host.ip_address, host.ip_address);
+            assert_eq!(diff_host.port, host.port);
+            assert_eq!(diff_host.speed, host.speed);
+        }
+
     }
 }

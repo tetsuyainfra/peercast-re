@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 
 use clap::Parser;
-use peercast_root::db::{CheckedHostRepository,  checked_hosts::SqliteCheckedHostRepository};
+use peercast_root::db::{CheckedHostRepository, checked_hosts::SqliteCheckedHostRepository};
 use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 
@@ -22,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
                     host.ip_address.0,
                     host.port,
                     host.speed,
-                    host.created_at
+                    host.updated_at
                 );
             });
         }
@@ -47,7 +47,7 @@ async fn main() -> anyhow::Result<()> {
                         host.ip_address.0,
                         host.port,
                         host.speed,
-                        host.created_at
+                        host.updated_at
                     );
                 }
             }
@@ -58,12 +58,12 @@ async fn main() -> anyhow::Result<()> {
             let host = repo.find_by_id(id).await?;
             if let Some(host) = host {
                 println!(
-                    "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                    "ID: {}, IP: {}, port: {}, speed: {}, updated_at: {:?}",
                     host.id.unwrap(),
                     host.ip_address.0,
                     host.port,
                     host.speed,
-                    host.created_at
+                    host.updated_at
                 );
             } else {
                 println!("Host with ID {} not found.", id);
@@ -74,12 +74,12 @@ async fn main() -> anyhow::Result<()> {
             port,
             speed,
         } => {
-            repo.add(ip, port, speed).await?;
-            let host = repo.find_by_ip_port(ip, port).await?;
+            let id = repo.insert(ip, port, speed).await?;
+            let host = repo.find_by_id(id).await?;
             if let Some(h) = host {
                 println!(
-                    "Added host with IP: {}, port: {}, speed: {}, created_at: {:?}",
-                    *h.ip_address, h.port, h.speed, h.created_at
+                    "Added host with IP: {}, port: {}, speed: {}, updated_at: {:?}",
+                    *h.ip_address, h.port, h.speed, h.updated_at
                 );
             } else {
                 println!("Failed to add host with IP: {}, port: {}", ip, port);

@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use sqlx::{Sqlite, sqlite::SqliteTypeInfo};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DbIpAddr(pub IpAddr);
 
 // 便利にするためのDeref実装（DbIpAddrをIpAddrのように扱える）
