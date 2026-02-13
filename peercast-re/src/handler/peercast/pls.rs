@@ -1,7 +1,6 @@
 use std::{net::SocketAddr, str::FromStr};
 
 use axum::extract::{Path, Query, State};
-use axum_extra::extract::Host;
 use http::StatusCode;
 use libpeercast_re::pcp::GnuId;
 use serde::Deserialize;
@@ -43,12 +42,11 @@ where
 ////////////////////////////////////////////////////////////////////
 /// /pls/{channel_id} handler
 pub(super) async fn pls_handler(
-    Host(host): Host,
     Path(channel_id): Path<GnuId>,
     Query(params): Query<PlsParams>,
     State(state): State<AppState>,
 ) -> impl axum::response::IntoResponse {
-    info!("Request Host: {}", host);
+    info!("PLS request for channel_id: {}", channel_id);
     // requestからhostをとりだす
     let ch = state
         .repository
@@ -67,14 +65,15 @@ pub(super) async fn pls_handler(
         //
         StatusCode::OK,
         [(http::header::CONTENT_TYPE, "audio/x-mpegurl")],
-        create_m3u_playlist(&host, ch.id()),
+        create_m3u_playlist(ch.id()),
     )
 }
 
 ////////////////////////////////////////////////////////////////////
 /// for misc functions
 //
-fn create_m3u_playlist(host: &String, channel_id: GnuId) -> String {
+// fn create_m3u_playlist(host: &String, channel_id: GnuId) -> String {
+fn create_m3u_playlist(channel_id: GnuId) -> String {
     // Create M3U playlist content like below:
     // #EXTM3U
     // #EXTINF:-1,
@@ -83,7 +82,8 @@ fn create_m3u_playlist(host: &String, channel_id: GnuId) -> String {
         //
         "#EXTM3U",
         "#EXTINF:-1,",
-        format!("http://{}/stream/{}.flv", host, channel_id).as_str(),
+        // format!("http://{}/stream/{}.flv", host, channel_id).as_str(),
+        format!("/stream/{}.flv", channel_id).as_str(),
         "",
     ]
     .join("\n")
@@ -101,10 +101,10 @@ mod tests {
 
     #[test]
     fn test_create_m3u_playlist() {
-        let host = "localhost:61744".to_string();
+        // let host = "localhost:61744".to_string();
         let channel_id = GnuId::from_str("9E5AF27AC8F66604C50C415C1217933A").unwrap();
-        let playlist = create_m3u_playlist(&host, channel_id);
-        let expected = "#EXTM3U\n#EXTINF:-1,\nhttp://localhost:61744/stream/9E5AF27AC8F66604C50C415C1217933A.flv\n";
+        let playlist = create_m3u_playlist(channel_id);
+        let expected = "#EXTM3U\n#EXTINF:-1,\n/stream/9E5AF27AC8F66604C50C415C1217933A.flv\n";
         assert_eq!(playlist, expected);
     }
 }
