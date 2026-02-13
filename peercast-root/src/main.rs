@@ -114,7 +114,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
         name_space: args.yp_name_space.clone(),
         allow_cors: args.allow_cors.clone(),
         cache_max_age: args.cache_max_age,
-        client_ip_source: args.ip_source.clone(),
+        client_ip_source: args.client_ip_source.clone(),
     };
 
     let db_pool = init_db(args).await?;

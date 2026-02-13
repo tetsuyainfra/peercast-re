@@ -6,11 +6,11 @@ use thiserror::Error;
 
 pub mod config;
 pub mod db;
-pub mod service;
 pub mod filter;
+pub mod model;
 pub mod prelude;
 pub mod repository;
-pub mod model;
+pub mod service;
 pub mod test_helper;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？

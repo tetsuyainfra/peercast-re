@@ -23,7 +23,7 @@ pub struct ApiConfig {
     pub cache_max_age: u32,
 
     /// クライアントIPの取得元
-    pub client_ip_source: axum_client_ip::ClientIpSource,
+    pub client_ip_source: cli::ClientIpSourceArg,
 
     /// PortCheckの制限速度
     pub restrict_speed: u32,

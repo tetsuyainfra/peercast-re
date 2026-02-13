@@ -1,3 +1,5 @@
+use std::net::{IpAddr, SocketAddr};
+
 use axum::{
     Json,
     extract::{Query, State},
@@ -8,9 +10,10 @@ use axum_client_ip::ClientIp;
 // use futures_util::FutureExt;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
-use peercast_root::{PortLevel, model::JsonChannel};
+use peercast_root::{PortLevel, model::JsonChannel, service::HostCheckService};
 use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
+use tracing_subscriber::layer::Filter;
 
 use crate::app::{ArcState, yp::FilterConfig};
 
@@ -36,36 +39,38 @@ where
 //-------------------------------------------------------------------------------
 // Api Handlers
 //-------------------------------------------------------------------------------
-
 pub async fn index_txt(
-    _client_ip: ClientIp,
-    Query(_params): Query<IndexTextParams>,
+    ClientIp(client_ip): ClientIp,
+    Query(params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<String, ApiError> {
-    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|_id, ch| ch.into());
-    let string_channels = state.0.yellow_page.to_index_txt(&FilterConfig {}, channels);
+    let ip_addr: IpAddr = client_ip.to_canonical();
+
+    // Hostヘッダの有無で処理を分岐
+    // Hostヘッダがある場合はそちらを優先する。ただし接続元IPアドレスはハンドラーで取得したものを使う。
+    let (target_ip, target_port) = match params.Host {
+        Some((host, port)) => (ip_addr, port),
+        None => (ip_addr, 7144),
+    };
+
+    let x = HostCheckService::do_host_check(&state.db_pool, target_ip, target_port).await?;
+
+    let filter_config = FilterConfig {};
+    let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
+    let string_channels = state.yellow_page.to_index_txt(&filter_config, channels);
 
     Ok(itertools::join(string_channels, "\n"))
 }
 
 pub async fn index_json(
-    ClientIp(_client_ip): ClientIp,
+    ClientIp(client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
-    // let port = params.Host.as_ref().map(|(_host, port)| *port);
-    // let own_level = check_host_port_level(&state.db_pool, ip, port).await;
-
-    let channels: Vec<JsonChannel> = state.0.repository.map_collect(|_id, ch| ch.into());
-    let json_channels = state.0.yellow_page.to_index_json(&FilterConfig {}, channels);
+    let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
+    let json_channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
 
     Ok(json_channels)
-}
-
-#[allow(dead_code)]
-async fn check_host_port_level(_db: &Pool<Sqlite>, _ip: std::net::IpAddr, _port: Option<u16>) -> PortLevel {
-    // HostCheckService::do_host_check().await.unwrap_or(PortLevel::None)
-    PortLevel::None
 }
 
 //-------------------------------------------------------------------------------

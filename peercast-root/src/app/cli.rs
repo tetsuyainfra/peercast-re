@@ -1,5 +1,6 @@
 use std::process::exit;
 
+use axum_client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
 use peercast_root::RestrictPortLevel;
 use url::Url;
@@ -143,14 +144,45 @@ pub struct Args {
     #[arg(long, value_parser, default_value_t = 0)]
     pub cache_max_age: u32,
 
-    #[arg(long, default_value = "ConnectInfo")]
-    pub ip_source: axum_client_ip::ClientIpSource,
+    // #[arg(long, default_value = "ConnectInfo")]
+    // pub ip_source: axum_client_ip::ClientIpSource,
+    #[arg(long, value_enum, default_value_t = ClientIpSourceArg::ConnectInfo)]
+    pub client_ip_source: ClientIpSourceArg,
 
     #[command(flatten)]
     pub verbose: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+pub enum ClientIpSourceArg {
+    /// use ConnectInfo(raw socket address)
+    ConnectInfo,
+    // /// use Forwarded header (RFC7239)
+    // RightmostForwarded,
+    /// use X-Forwarded-For header(Nginx, Apache, HAProxy, CDNs, LBs, )
+    RightmostXForwardedFor,
+    /// use X-Real-Ip header(Nginx)
+    XRealIp,
+    /// use CF-Connecting-IP (Cloudflare)
+    CfConnectingIp,
+    /// use True-Client-IP (Cloudflare, Akamai)
+    TrueClientIp,
+}
+
+impl From<ClientIpSourceArg> for ClientIpSource {
+    fn from(v: ClientIpSourceArg) -> Self {
+        match v {
+            ClientIpSourceArg::ConnectInfo => ClientIpSource::ConnectInfo,
+            // ClientIpSourceArg::RightmostForwarded => ClientIpSource::RightmostForwarded,
+            ClientIpSourceArg::RightmostXForwardedFor => ClientIpSource::RightmostXForwardedFor,
+            ClientIpSourceArg::XRealIp => ClientIpSource::XRealIp,
+            ClientIpSourceArg::CfConnectingIp => ClientIpSource::CfConnectingIp,
+            ClientIpSourceArg::TrueClientIp => ClientIpSource::TrueClientIp,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand, Clone)]

@@ -1,7 +1,10 @@
 use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
-use libpeercast_re::{pcp::{ChannelInfo, GnuId, TrackInfo}, repository::Channel};
+use libpeercast_re::{
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+    repository::Channel,
+};
 use serde::Serialize;
 
 use crate::{IndexInfo, model::RootChannel2};
@@ -88,7 +91,7 @@ impl From<&RootChannel2> for JsonChannel {
             number_of_listener: ch.number_of_listener(),
             number_of_relay: ch.number_of_relay(),
             created_at: ch.created_at(),
-            track: ch.track_info().unwrap_or_default().into()
+            track: ch.track_info().unwrap_or_default().into(),
         }
     }
 }

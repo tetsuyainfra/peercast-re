@@ -2,7 +2,6 @@ use std::net::IpAddr;
 
 use sqlx::{Sqlite, sqlite::SqliteTypeInfo};
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DbIpAddr(pub IpAddr);
 

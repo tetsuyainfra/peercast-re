@@ -1,10 +1,7 @@
-
-
-use chrono::{DateTime,  Utc};
-use clap::{builder::TypedValueParser, Parser};
+use chrono::{DateTime, Utc};
+use clap::{Parser, builder::TypedValueParser};
 use libpeercast_re::pcp::GnuId;
 use peercast_root::{FooterToml, IndexInfo};
-
 
 fn main() {
     let args = Args::parse();
@@ -43,45 +40,44 @@ pub struct Args {
     pub name: String,
 
     #[arg(long, default_value_t=GnuId::zero())]
-    pub id : GnuId,
+    pub id: GnuId,
 
-    #[arg(long="addr")]
+    #[arg(long = "addr")]
     pub tracker_addr: Option<std::net::SocketAddr>,
 
-    #[arg(long="url", default_value="")]
+    #[arg(long = "url", default_value = "")]
     pub contact_url: String,
 
-    #[arg(long, default_value="")]
+    #[arg(long, default_value = "")]
     pub genre: String,
 
-    #[arg(long, default_value="")]
+    #[arg(long, default_value = "")]
     pub desc: String,
 
-    #[arg(long, default_value="")]
+    #[arg(long, default_value = "")]
     pub comment: String,
 
-    #[arg(long="type", default_value="")]
+    #[arg(long = "type", default_value = "")]
     pub typee: String,
 
-    #[arg(long, default_value="")]
+    #[arg(long, default_value = "")]
     pub stream_type: String,
 
-    #[arg(long, default_value="")]
+    #[arg(long, default_value = "")]
     pub stream_ext: String,
 
-    #[arg(long, default_value_t=0)]
+    #[arg(long, default_value_t = 0)]
     pub bitrate: i32,
 
-    #[arg(long, default_value_t=0)]
+    #[arg(long, default_value_t = 0)]
     pub number_of_listener: i32,
 
-    #[arg(long, default_value_t=0)]
+    #[arg(long, default_value_t = 0)]
     pub number_of_relay: i32,
 
     #[arg(long, value_parser = clap::builder::StringValueParser::new().try_map(parse_datetime),)]
     pub created_at: Option<DateTime<Utc>>,
 }
-
 
 impl From<Args> for IndexInfo {
     fn from(v: Args) -> Self {
@@ -105,20 +101,14 @@ impl From<Args> for IndexInfo {
     }
 }
 
-
 pub fn parse_datetime(value: String) -> Result<DateTime<Utc>, String> {
-        use chrono::NaiveDate;
+    use chrono::NaiveDate;
 
-        if let Ok(datetime) = value.parse::<DateTime<Utc>>() {
-            Ok(datetime)
-        } else {
-            let date = value
-                .parse::<NaiveDate>()
-                .map_err(|err| format!("valid RFC3339-formatted date or datetime: {err}"))?;
-            Ok(date
-                .and_hms_opt(0, 0, 0)
-                .unwrap()
-                .and_local_timezone(Utc)
-                .unwrap())
-        }
+    if let Ok(datetime) = value.parse::<DateTime<Utc>>() {
+        Ok(datetime)
+    } else {
+        let date =
+            value.parse::<NaiveDate>().map_err(|err| format!("valid RFC3339-formatted date or datetime: {err}"))?;
+        Ok(date.and_hms_opt(0, 0, 0).unwrap().and_local_timezone(Utc).unwrap())
+    }
 }

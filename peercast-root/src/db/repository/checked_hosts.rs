@@ -167,7 +167,6 @@ mod tests {
         repo
     }
 
-
     mod add_checked_host {
         use super::*;
         #[tokio::test]
@@ -198,7 +197,6 @@ mod tests {
             assert_eq!(r.ip_address, DbIpAddr(ip));
             assert_eq!(r.port, port);
             assert_eq!(r.speed, speed);
-
         }
         #[tokio::test]
         async fn test_update() {
@@ -221,6 +219,5 @@ mod tests {
             assert_eq!(diff_host.port, host.port);
             assert_eq!(diff_host.speed, host.speed);
         }
-
     }
 }

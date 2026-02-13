@@ -1,4 +1,3 @@
-
 mod json_model;
 mod root_channel;
 
