@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n            INSERT INTO checked_hosts (ip_address, port, speed) VALUES ($1, $2, $3)\n                RETURNING id\n            ",
+  "query": "\n            INSERT INTO checked_hosts (ip_address, port, port_level) VALUES ($1, $2, $3)\n                RETURNING id\n            ",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "447c42d716649ca8c31a2b83cc516cfffa06bc815736dc802e1053d409b71f5d"
+  "hash": "5384e604fb6a0e9bc6325d2fa37916ebf8783571998b99dc08d2a69c1d72afde"
 }

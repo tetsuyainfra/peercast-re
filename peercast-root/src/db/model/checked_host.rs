@@ -7,7 +7,7 @@ pub struct CheckedHost {
     pub id: Option<i64>,
     pub ip_address: DbIpAddr,
     pub port: u16,
-    pub speed: i32,
+    pub port_level: i32,
     pub updated_at: DateTime<Utc>,
 }
 

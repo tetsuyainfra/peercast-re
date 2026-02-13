@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , speed as `speed!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1 AND port = $2",
+  "query": "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , port_level as `port_level!:i32`, updated_at as `updated_at: DateTime<Utc>`FROM checked_hosts",
   "describe": {
     "columns": [
       {
@@ -19,7 +19,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "speed!:i32",
+        "name": "port_level!:i32",
         "ordinal": 3,
         "type_info": "Integer"
       },
@@ -30,15 +30,15 @@
       }
     ],
     "parameters": {
-      "Right": 2
+      "Right": 0
     },
     "nullable": [
-      true,
+      false,
       false,
       false,
       true,
       false
     ]
   },
-  "hash": "26910efec9a90d087594eaa222b782863189df6156dfb23b74edc3bd71677502"
+  "hash": "0d106213b18fafef38a39b21720fd951ac39036aa9b4704c293932be289cf5ea"
 }

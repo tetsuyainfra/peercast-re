@@ -2,10 +2,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use chrono::Duration;
 
-use crate::{
-    PortLevel,
-    db::{CheckedHost, CheckedHostRepository, checked_hosts::SqliteCheckedHostRepository},
-};
+use crate::db::{CheckedHost, CheckedHostRepository, PortLevel, checked_hosts::SqliteCheckedHostRepository};
 
 #[derive(thiserror::Error, Debug)]
 pub enum HostCheckServiceError {
@@ -45,6 +42,7 @@ impl HostCheckService {
         db_pool: &sqlx::Pool<sqlx::sqlite::Sqlite>,
         target_addr: IpAddr,
         target_port: u16,
+    // ) -> Result<PortLevel, HostCheckServiceError> {
     ) -> Result<PortLevel, HostCheckServiceError> {
         let checked_host_repo = SqliteCheckedHostRepository::new(db_pool.clone());
 
@@ -60,7 +58,7 @@ impl HostCheckService {
 
         let host = host.unwrap();
         let valid_duration = Duration::hours(Self::CHECK_VALID_HOURS);
-        if host.speed <= 0 {
+        if host.port_level <= 0 {
 
         } else {
 

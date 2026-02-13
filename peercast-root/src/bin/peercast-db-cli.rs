@@ -17,11 +17,11 @@ async fn main() -> anyhow::Result<()> {
         SubCommand::List => {
             repo.all().await?.iter().for_each(|host| {
                 println!(
-                    "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                    "ID: {}, IP: {}, port: {}, port_level: {}, created_at: {:?}",
                     host.id.unwrap(),
                     host.ip_address.0,
                     host.port,
-                    host.speed,
+                    host.port_level,
                     host.updated_at
                 );
             });
@@ -42,11 +42,11 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 for host in hosts {
                     println!(
-                        "ID: {}, IP: {}, port: {}, speed: {}, created_at: {:?}",
+                        "ID: {}, IP: {}, port: {}, port_level: {}, created_at: {:?}",
                         host.id.unwrap(),
                         host.ip_address.0,
                         host.port,
-                        host.speed,
+                        host.port_level,
                         host.updated_at
                     );
                 }
@@ -58,11 +58,11 @@ async fn main() -> anyhow::Result<()> {
             let host = repo.find_by_id(id).await?;
             if let Some(host) = host {
                 println!(
-                    "ID: {}, IP: {}, port: {}, speed: {}, updated_at: {:?}",
+                    "ID: {}, IP: {}, port: {}, port_level: {}, updated_at: {:?}",
                     host.id.unwrap(),
                     host.ip_address.0,
                     host.port,
-                    host.speed,
+                    host.port_level,
                     host.updated_at
                 );
             } else {
@@ -72,14 +72,14 @@ async fn main() -> anyhow::Result<()> {
         SubCommand::Add {
             ip,
             port,
-            speed,
+            port_level,
         } => {
-            let id = repo.insert(ip, port, speed).await?;
+            let id = repo.insert(ip, port, port_level).await?;
             let host = repo.find_by_id(id).await?;
             if let Some(h) = host {
                 println!(
-                    "Added host with IP: {}, port: {}, speed: {}, updated_at: {:?}",
-                    *h.ip_address, h.port, h.speed, h.updated_at
+                    "Added host with IP: {}, port: {}, port_level: {}, updated_at: {:?}",
+                    *h.ip_address, h.port, h.port_level, h.updated_at
                 );
             } else {
                 println!("Failed to add host with IP: {}, port: {}", ip, port);
@@ -133,6 +133,6 @@ pub enum SubCommand {
     Add {
         ip: IpAddr,
         port: u16,
-        speed: i32,
+        port_level: i32,
     },
 }

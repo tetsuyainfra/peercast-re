@@ -1,6 +1,5 @@
 use std::net::IpAddr;
 
-use peercast_root::PortLevel;
 // use redis::AsyncCommands;
 // use tokio::time::timeout;
 
@@ -17,7 +16,7 @@ pub async fn get_portcheck_level(
     // DatabaseConnection(conn): &mut DatabaseConnection,
     _host: IpAddr,
     _port: u16,
-) -> anyhow::Result<PortLevel> {
+) -> anyhow::Result<()> {
     // let key = portcheck_key(redis_master_key, host, port);
     // // DBに結果を問い合わせ
     // if let Some::<String>(port_level) = timeout(Duration::from_secs(1), conn.get(&key)).await?? {
@@ -41,7 +40,8 @@ pub async fn get_portcheck_level(
     //     let _: Option<String> = timeout(Duration::from_secs(1), conn.set(&key, "true")).await??;
     //     Ok(port_level)
     // }
-    Ok(PortLevel::None)
+    // Ok(PortLevel::None)
+    Ok(())
 }
 
 // pub async fn portcheck(

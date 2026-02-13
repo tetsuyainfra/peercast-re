@@ -2,7 +2,7 @@ use std::i32;
 
 // use peercast_root::{PortLevel, RestrictPortLevel};
 
-use crate::{PortLevel, RestrictPortLevel, model::JsonChannel};
+use crate::{RestrictPortLevel, db::PortLevel, model::JsonChannel};
 
 /// Vec<JsonChannel>を条件についてフィルタリングす
 /// @param namespace: YPの名前空間

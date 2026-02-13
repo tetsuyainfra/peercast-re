@@ -10,7 +10,7 @@ use axum_client_ip::ClientIp;
 // use futures_util::FutureExt;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
-use peercast_root::{PortLevel, model::JsonChannel, service::HostCheckService};
+use peercast_root::{model::JsonChannel, service::HostCheckService};
 use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
 use tracing_subscriber::layer::Filter;
