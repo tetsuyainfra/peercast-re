@@ -1,12 +1,8 @@
-use std::{
-    net::{Shutdown, SocketAddr},
-    sync::{Arc, Mutex},
-};
+use std::{net::SocketAddr, sync::Arc};
 
 use libpeercast_re::{
     pcp::{ChannelInfo, GnuId, TrackInfo, connection::PcpConnection},
     repository::{Channel, ChannelState, ChannelType},
-    util::mutex_poisoned,
 };
 use tokio::sync::{
     mpsc::{self, UnboundedSender},
@@ -71,7 +67,7 @@ impl Channel for RootChannel2 {
     fn config(&self) -> Option<&Self::Config> {
         self.0.config()
     }
-    fn update_config(&mut self, config: Self::Config) {
+    fn update_config(&mut self, _config: Self::Config) {
         todo!()
     }
 
@@ -100,16 +96,14 @@ impl Channel for RootChannel2 {
     fn viewed_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.0.viewed_at()
     }
-
-
 }
 
 impl RootChannel2 {
     pub fn attach_connection(
         self,
-        pcp_connection: PcpConnection,
-        graceful_shutdown: tokio_util::sync::CancellationToken,
-        closed_send: watch::Receiver<()>,
+        _pcp_connection: PcpConnection,
+        _graceful_shutdown: tokio_util::sync::CancellationToken,
+        _closed_send: watch::Receiver<()>,
     ) -> AttachTaskFuture {
         todo!()
     }
@@ -123,7 +117,7 @@ pub struct AttachTaskFuture;
 impl Future for AttachTaskFuture {
     type Output = ();
 
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+    fn poll(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
         std::task::Poll::Ready(())
     }
 }
@@ -189,9 +183,7 @@ impl ImplChannel {
             },
         };
 
-        let _handle = tokio::task::Builder::new()
-            .name(&task_name)
-            .spawn(worker.run());
+        let _handle = tokio::task::Builder::new().name(&task_name).spawn(worker.run());
 
         Self {
             cid,
@@ -256,12 +248,15 @@ impl ImplChannel {
         self.viewed_at_rx.borrow().clone()
     }
 }
+
+#[allow(dead_code)]
 enum ChMainMessage {
     ConnectionAttached(),
     ConnectionClosed(),
     ShutdownRequest,
 }
 
+#[allow(dead_code)]
 struct InfoChannels {
     tracker_addr_tx: watch::Sender<Option<SocketAddr>>,
     channel_info_tx: watch::Sender<Option<ChannelInfo>>,
@@ -280,6 +275,7 @@ struct ControlChannels {
     message: mpsc::UnboundedReceiver<ChMainMessage>,
 }
 
+#[allow(dead_code)]
 struct ChannelMainTask {
     task_name: String,
     cid: GnuId,
@@ -312,5 +308,4 @@ impl ChannelMainTask {
         }
         info!("{}: Channel task ended", self.task_name);
     }
-
 }

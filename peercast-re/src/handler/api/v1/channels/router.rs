@@ -7,7 +7,7 @@ use libpeercast_re::pcp::GnuId;
 use serde_json::json;
 use utoipa::OpenApi;
 
-use super::{JsonChannel, JsonTrack};
+use super::JsonChannel;
 use crate::AppState;
 use crate::prelude::*; // for instrument
 
@@ -38,7 +38,7 @@ pub fn router() -> axum::Router<AppState> {
 )]
 #[instrument(skip(store))]
 async fn list_channels(State(store): State<AppState>) -> impl axum::response::IntoResponse {
-    let json_channels = store.repository.map_collect(|id, ch| JsonChannel::from(ch));
+    let json_channels = store.repository.map_collect(|_id, ch| JsonChannel::from(ch));
 
     axum::Json(json_channels)
 }
@@ -52,7 +52,7 @@ async fn list_channels(State(store): State<AppState>) -> impl axum::response::In
 )]
 #[instrument(skip(store))]
 async fn create_channel(State(store): State<AppState>) -> impl axum::response::IntoResponse {
-    let channels = store.repository.get_channels();
+    let _channels = store.repository.get_channels();
     // Repository()
     //     .create_or_get(id, channel_info, track_info, config)
     "create channel"
@@ -102,7 +102,12 @@ async fn update_channel(State(store): State<AppState>, Path(path): Path<String>)
     };
 
     // TODO: inplement update logic here
-    return (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"})));
+    if let Some(_ch) = store.repository.get(&channel_id) {
+        // TODO: update channel fields
+        (StatusCode::OK, Json(json!({"message": "channel updated"})))
+    } else {
+        (StatusCode::NOT_FOUND, Json(json!({"error": "channel not found"})))
+    }
 }
 
 #[utoipa::path(

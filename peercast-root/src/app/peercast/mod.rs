@@ -1,33 +1,32 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, time::Duration};
 
 use bytes::BytesMut;
 use libpeercast_re::{
     ConnectionNo,
-    pcp::{
-        builder::RootBuilder,
-        decode::{PcpBroadcast, PcpChannel},
-    },
-    repository::Repository,
-    util::{ConnectionProtocol, identify_protocol},
+    util::identify2::{ConnectionProtocol, identify_protocol},
 };
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::watch,
+    time::timeout,
 };
 use tokio_util::sync::CancellationToken;
 
 use crate::app::ArcState;
-use peercast_root::{model::RootConfig, prelude::*};
+use peercast_root::prelude::*;
 
-pub async fn server_peercast(state: ArcState, listener: TcpListener, graceful_shutdown: CancellationToken) -> anyhow::Result<()> {
+pub async fn server_peercast(
+    state: ArcState,
+    listener: TcpListener,
+    graceful_shutdown: CancellationToken,
+) -> anyhow::Result<()> {
     // スレッドの終了を検知するためのチャンネル
     let (closed_tx, closed_rx) = tokio::sync::watch::channel(());
     let tracker = tokio_util::task::TaskTracker::new();
     info!("START PCP SERVER");
 
     'accept: loop {
-        println!("loop start");
         let cid = ConnectionNo::new();
         let name = format!("tcp({})", cid);
         let spawner = tokio::task::Builder::new().name(&name);
@@ -44,7 +43,6 @@ pub async fn server_peercast(state: ArcState, listener: TcpListener, graceful_sh
                     Ok((stream, addr)) => {
                         println!("{}: accept connection from {}", &name, &addr);
                         let _handle = spawner.spawn(tracker.track_future(serve_peercast(state, cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
-                        // let _handle = spawner.spawn(serve_peercast( cid, stream, addr, child_graceful_shutdown, closed_rx));
                     }
                     Err(e) => {
                         error!(?e, "something is occured in listener.accept()");
@@ -71,44 +69,98 @@ pub async fn server_peercast(state: ArcState, listener: TcpListener, graceful_sh
     Ok(())
 }
 
-#[inline]
+async fn check_protocol(
+    cno: ConnectionNo,
+    mut stream: TcpStream,
+    remote: SocketAddr,
+) -> Result<(TcpStream, BytesMut, ConnectionProtocol), ()> {
+    const MAX_READ_SIZE: usize = 8192;
+    let mut read_buff = BytesMut::with_capacity(MAX_READ_SIZE);
+
+    let mut sum = 0;
+    loop {
+        if sum > MAX_READ_SIZE {
+            error!(?cno, ?remote, "Read Buffer reach MAX_READ_SIZE");
+            return Err(());
+        }
+
+        match stream.read_buf(&mut read_buff).await {
+            Err(e) => {
+                error!(?cno, ?remote, "Failed: read_buf: {}", e);
+                return Err(());
+            }
+            Ok(0) => {
+                info!(?cno, ?remote, "STREAM is closed");
+                return Err(());
+            }
+            Ok(read_num) => {
+                sum = sum + read_num;
+            }
+        };
+
+        match identify_protocol(&read_buff[..]) {
+            Some(protocol) => return Ok((stream, read_buff, protocol)),
+            None => continue,
+        }
+    }
+}
+
+#[allow(unused)]
 async fn serve_peercast(
     state: ArcState,
-    cid: ConnectionNo,
-    mut stream: TcpStream,
+    cno: ConnectionNo,
+    stream: TcpStream,
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
     closed_send: watch::Receiver<()>,
 ) {
-    info!(?cid, ?remote, "SPAWN SERVE");
-    match identify_protocol(&stream).await {
-        Ok(ConnectionProtocol::PeerCast) => {
-            serve_root(state, cid, stream, remote, graceful_shutdown, closed_send).await
+    info!(?cno, ?remote, "SPAWN SERVE");
+
+    let (mut stream, buff, protocol) = match timeout(Duration::from_secs(5), check_protocol(cno, stream, remote)).await
+    {
+        Err(e) => {
+            error!(?cno, ?remote, "Failed: timeout: {}", e);
+            // MEMO: stream.shutdown().await; は runtimeに任せる
+            return;
         }
-        Ok(ConnectionProtocol::PeerCastHttp) => {
+        Ok(Err(_e)) => {
+            error!(?cno, ?remote, "Failed: check_protocol()");
+            // MEMO: stream.shutdown().await; は runtimeに任せる
+            return;
+        }
+        Ok(Ok(val)) => val,
+    };
+
+    match protocol {
+        ConnectionProtocol::Pcp => {
+            info!(?cno, ?remote, "STREAM is PeerCast Protocol");
+            // let conn = factory.create_accepted_connection(cno, stream, remote, BytesMut::new(), buff);
+            let _handle = tokio::spawn(serve_root());
+        }
+        ConnectionProtocol::HttpPcp => {
             error!("PeerCastHttp is not allowed");
             let _ = stream.shutdown().await;
         }
-        Ok(ConnectionProtocol::Http) => {
-            warn!(?cid, ?remote, "STREAM is HTTP Protocol");
-            // serve_http(cid, stream, remote, graceful_shutdown, force_shutdown).await
+        ConnectionProtocol::Http => {
+            warn!(?cno, ?remote, "STREAM is HTTP Protocol");
+            // serve_http(cno, stream, remote, graceful_shutdown, force_shutdown).await
             let _ = stream.shutdown().await;
         }
-        Ok(ConnectionProtocol::Unknown) => {
-            warn!(?cid, ?remote, "STREAM is Unkwon Protocol");
+        ConnectionProtocol::Unknown => {
+            warn!(?cno, ?remote, "STREAM is Unkwon Protocol");
             let _ = stream.shutdown().await;
         }
-        Err(e) => {
-            error!(?cid, ?remote, "Failed: identify_protocol: {}", e);
-            let _ = stream.shutdown().await;
-        }
-    }
+    };
 }
 
 //-------------------------------------------------------------------------------
 // PCP
 //-------------------------------------------------------------------------------
+#[inline]
+async fn serve_root() {}
 
+/*
+#[inline]
 async fn serve_root(
     state: ArcState,
     cid: ConnectionNo,
@@ -213,3 +265,4 @@ fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Op
     // tracker_host
     todo!()
 }
+ */

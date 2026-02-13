@@ -3,6 +3,7 @@ use peercast_root::{IndexInfo, model::JsonChannel};
 
 #[derive(Debug)]
 pub struct YellowPage {
+    #[allow(unused)]
     yp_name_space: String,
     footer_channels: Vec<IndexInfo>,
 }

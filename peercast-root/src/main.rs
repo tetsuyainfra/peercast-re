@@ -1,12 +1,14 @@
-use std::{net::SocketAddr, process::exit, sync::Arc, time::Duration};
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 use anyhow::Context;
 use clap::Parser;
-use libpeercast_re::pcp::{ChannelInfo, GnuId, PcpConnectionFactory};
+use libpeercast_re::pcp::GnuId;
+use libpeercast_re::pcp::connection2::shared_connection_factory;
 use libpeercast_re::repository::Repository;
 use peercast_root::prelude::*;
 use peercast_root::repository::RootRepository2;
-use peercast_root::{ExitCode, FooterToml, IndexInfo};
+use peercast_root::{FooterToml, IndexInfo};
 use tokio_util::sync::CancellationToken;
 
 // App modules
@@ -55,9 +57,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr) -> anyhow::Result<ArcState> {
+async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
-    let conn_factory = PcpConnectionFactory::new(self_session_id, self_socket);
+    let (connection_factory, connection_manager) = shared_connection_factory();
 
     let mut index_txt_footer = vec![];
     if let Some(ref path) = args.index_txt_footer {
@@ -72,7 +74,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr)
         index_txt_footer.append(&mut infos);
     }
 
-    let mut repository2 = RootRepository2::new(|_| async {}).await;
+    let repository2 = RootRepository2::new(|_| async {}).await;
 
     if args.create_dummy_channel {
         let level_fmt = match args.yp_restrict_port_level {
@@ -126,7 +128,8 @@ async fn init(args: &cli::Args, self_session_id: GnuId, self_socket: SocketAddr)
         db_pool,
         yellow_page,
         repository2,
-        conn_factory,
+        connection_factory,
+        connection_manager,
     };
 
     Ok(ArcState(Arc::new(app_sate)))

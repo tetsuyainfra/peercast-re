@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
-use byteorder::{BigEndian, WriteBytesExt};
 use bytes::{BufMut, Bytes};
-use rml_rtmp::{rml_amf0::Amf0Value, sessions::StreamMetadata, time::RtmpTimestamp};
+use rml_rtmp::{sessions::StreamMetadata, time::RtmpTimestamp};
 
 pub struct Rtmp2Flv {
     metadata: StreamMetadata,
@@ -86,6 +83,7 @@ impl FLVHeader {
 enum TagType {
     Audio = 8,
     Video = 9,
+    #[allow(dead_code)]
     ScriptData = 18,
 }
 

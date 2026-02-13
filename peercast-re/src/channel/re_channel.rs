@@ -115,7 +115,7 @@ impl ReChannel {
 
     // 操作関係
     // チャンネルにTrackerIPを通知する
-    pub async fn notify_tracker_ip(&self, tracker_ip: SocketAddr) -> anyhow::Result<()> {
+    pub async fn notify_tracker_ip(&self, _tracker_ip: SocketAddr) -> anyhow::Result<()> {
         unimplemented!()
     }
 
@@ -137,6 +137,7 @@ impl ReChannel {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct ImplReChannel {
     cid: GnuId,
@@ -178,7 +179,7 @@ impl ImplReChannel {
         track_info: Option<TrackInfo>,
         config: Option<ReConfig>,
     ) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             cid: channel_id,

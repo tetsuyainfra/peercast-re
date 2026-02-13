@@ -29,7 +29,6 @@ pub async fn server_http(state: ArcState, listener: TcpListener, graceful_shutdo
     let app = Router::new()
         .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .route("/index.txt", routing::get(handler::index_txt))
-        .route("/index.json", routing::get(handler::index_json))
         .route("/api/index.json", routing::get(handler::index_json))
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
         .layer(CorsLayer::new().allow_origin(cor_origins).allow_methods([Method::GET]))

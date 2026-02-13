@@ -5,7 +5,7 @@ use axum::{
 };
 
 use axum_client_ip::ClientIp;
-use futures_util::FutureExt;
+// use futures_util::FutureExt;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
 use peercast_root::{PortLevel, model::JsonChannel};
@@ -39,7 +39,7 @@ where
 
 pub async fn index_txt(
     _client_ip: ClientIp,
-    Query(params): Query<IndexTextParams>,
+    Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<String, ApiError> {
     let channels: Vec<JsonChannel> = state.0.repository2.map_collect(|_id, ch| ch.into());
@@ -62,7 +62,8 @@ pub async fn index_json(
     Ok(json_channels)
 }
 
-async fn check_host_port_level(db: &Pool<Sqlite>, ip: std::net::IpAddr, port: Option<u16>) -> PortLevel {
+#[allow(dead_code)]
+async fn check_host_port_level(_db: &Pool<Sqlite>, _ip: std::net::IpAddr, _port: Option<u16>) -> PortLevel {
     // HostCheckService::do_host_check().await.unwrap_or(PortLevel::None)
     PortLevel::None
 }
@@ -97,8 +98,8 @@ async fn check_host_port_level(db: &Pool<Sqlite>, ip: std::net::IpAddr, port: Op
 //     }
 // }
 
-/// Utility function for mapping any error into a `500 Internal Server Error`
-/// response.
+/// Utility function for mapping any error into a `500 Internal Server Error` response.
+#[allow(dead_code)]
 fn internal_error<E>(err: E) -> (StatusCode, String)
 where
     E: std::error::Error,
@@ -110,10 +111,11 @@ where
 // Header/Query Mapper
 //-------------------------------------------------------------------------------
 /// index.txtに対するクエリ型
-#[allow(non_snake_case)]
+#[allow(non_snake_case, unused)]
 #[derive(Debug, Deserialize)]
 pub struct IndexTextParams {
     #[serde(default, deserialize_with = "empty_string_as_none", alias = "host")]
+    #[allow(non_snake_case, unused)]
     pub Host: Option<(String, u16)>,
 }
 

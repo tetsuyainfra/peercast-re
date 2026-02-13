@@ -1,13 +1,9 @@
-use axum::{extract::State, routing};
-use chrono::{DateTime, Utc};
-use libpeercast_re::pcp::{ChannelInfo, GnuId, TrackInfo};
+use libpeercast_re::pcp::{ChannelInfo, TrackInfo};
 use serde::Serialize;
-use utoipa::{OpenApi, ToSchema};
+use utoipa::ToSchema;
 
 use crate::{
-    AppState,
     channel::ReChannel,
-    prelude::*,
     repository::{Channel, ChannelType},
 };
 

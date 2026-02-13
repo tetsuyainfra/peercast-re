@@ -1,24 +1,22 @@
-use std::{net::IpAddr, time::Duration};
+use std::net::IpAddr;
 
-use anyhow::Ok;
-use bb8_redis::RedisConnectionManager;
-use peercast_root::{PortLevel};
-use redis::AsyncCommands;
-use tokio::time::timeout;
-use tracing::{debug, info};
+use peercast_root::PortLevel;
+// use redis::AsyncCommands;
+// use tokio::time::timeout;
 
-fn portcheck_key(redis_master_key: &str, host: IpAddr, port: u16) -> String {
-    format!("{}:PORTCHECK:{}:{}", redis_master_key, host, port)
-}
+// fn portcheck_key(redis_master_key: &str, host: IpAddr, port: u16) -> String {
+//     format!("{}:PORTCHECK:{}:{}", redis_master_key, host, port)
+// }
 
 //-------------------------------------------------------------------------------
 // PortCheck
 //-------------------------------------------------------------------------------
+#[allow(dead_code)]
 pub async fn get_portcheck_level(
-    redis_master_key: &str,
+    _redis_master_key: &str,
     // DatabaseConnection(conn): &mut DatabaseConnection,
-    host: IpAddr,
-    port: u16,
+    _host: IpAddr,
+    _port: u16,
 ) -> anyhow::Result<PortLevel> {
     // let key = portcheck_key(redis_master_key, host, port);
     // // DBに結果を問い合わせ

@@ -1,4 +1,4 @@
-use axum::{extract::State, routing};
+use axum::routing;
 use utoipa::OpenApi;
 
 use crate::AppState;

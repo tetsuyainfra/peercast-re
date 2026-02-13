@@ -1,4 +1,4 @@
-use axum::{Router, routing};
+use axum::routing;
 
 // src/handler/api/mod.rs
 // API handler

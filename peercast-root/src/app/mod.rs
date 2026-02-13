@@ -1,18 +1,19 @@
 use std::sync::Arc;
 
-use libpeercast_re::pcp::PcpConnectionFactory;
-use peercast_root::{ IndexInfo, RestrictPortLevel, repository::RootRepository2};
+use libpeercast_re::pcp::connection2::{SharedConnectionFactory, SharedConnectionManager};
+use peercast_root::{IndexInfo, RestrictPortLevel, repository::RootRepository2};
 
 pub mod cli;
-pub mod logging;
-pub mod portcheck;
 pub mod http;
+pub mod logging;
 pub mod peercast;
+pub mod portcheck;
 pub mod yp;
 
 pub use http::server_http;
 pub use peercast::server_peercast;
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ApiConfig {
     /// CORS許可リスト
@@ -31,6 +32,7 @@ pub struct ApiConfig {
     pub name_space: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct AppState {
     pub config: Arc<ApiConfig>,
@@ -38,7 +40,8 @@ pub struct AppState {
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
     pub yellow_page: Arc<yp::YellowPage>,
     pub repository2: RootRepository2,
-    pub conn_factory: PcpConnectionFactory,
+    pub connection_factory: SharedConnectionFactory,
+    pub connection_manager: Arc<SharedConnectionManager>,
 }
 
 #[derive(Debug)]

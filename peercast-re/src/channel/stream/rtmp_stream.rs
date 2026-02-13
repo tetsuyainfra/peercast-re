@@ -1,10 +1,7 @@
-use std::task::{Poll, Waker};
+use std::task::Poll;
 
-use bytes::{BufMut, BytesMut};
 use futures_core::Stream;
-use http::Request;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tracing_subscriber::field::debug;
 
 use crate::{channel::stream::rtmp2flv::Rtmp2Flv, prelude::*};
 use libpeercast_re::{
@@ -138,11 +135,13 @@ impl RtmpStream {
                 // Poll::Ready(Some(Ok(newdata.freeze())))
             }
             ConnectionMessage::RequestAccepted {
+                #[allow(unused)]
                 request_id,
             } => {
                 unimplemented!()
             }
             ConnectionMessage::RequestDenied {
+                #[allow(unused)]
                 request_id,
             } => {
                 unimplemented!()
