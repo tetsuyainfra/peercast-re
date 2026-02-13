@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
-use crate::db::model::CheckedHost;
-use crate::db::model::DbIpAddr;
+use crate::model::CheckedHost;
+use crate::model::DbIpAddr;
 use crate::prelude::*;
 
 #[async_trait]

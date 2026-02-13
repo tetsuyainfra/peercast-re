@@ -1,7 +1,8 @@
 use std::net::IpAddr;
 
 use clap::Parser;
-use peercast_root::db::{CheckedHostRepository, checked_hosts::SqliteCheckedHostRepository};
+use peercast_root::db::{CheckedHostRepository, SqliteCheckedHostRepository};
+use peercast_root::model::CheckedHost;
 use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 

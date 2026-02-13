@@ -1,5 +1,3 @@
-mod model;
-mod repository;
+mod checked_hosts;
 
-pub use model::*;
-pub use repository::*;
+pub use checked_hosts::*;

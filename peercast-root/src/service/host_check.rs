@@ -2,7 +2,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use chrono::Duration;
 
-use crate::db::{CheckedHost, CheckedHostRepository, PortLevel, checked_hosts::SqliteCheckedHostRepository};
+use crate::{db::{CheckedHostRepository,  SqliteCheckedHostRepository}, model::PortLevel};
 
 #[derive(thiserror::Error, Debug)]
 pub enum HostCheckServiceError {
