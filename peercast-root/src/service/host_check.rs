@@ -58,11 +58,11 @@ impl HostCheckService {
 
         let host = host.unwrap();
         let valid_duration = Duration::hours(Self::CHECK_VALID_HOURS);
-        if host.port_level <= 0 {
+        // if host.port_level as i16 <= 0  {
 
-        } else {
+        // } else {
 
-        }
+        // }
 
         // ポートチェックを実施
         todo!()

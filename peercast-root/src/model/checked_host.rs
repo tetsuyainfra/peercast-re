@@ -1,5 +1,7 @@
 use chrono::{DateTime, Utc};
 
+use crate::model::PortLevel;
+
 use super::DbIpAddr;
 
 #[derive(Debug)]
@@ -7,7 +9,7 @@ pub struct CheckedHost {
     pub id: Option<i64>,
     pub ip_address: DbIpAddr,
     pub port: u16,
-    pub port_level: i32,
+    pub port_level: PortLevel,
     pub updated_at: DateTime<Utc>,
 }
 

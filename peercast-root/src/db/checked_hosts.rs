@@ -6,6 +6,7 @@ use sqlx::SqlitePool;
 
 use crate::model::CheckedHost;
 use crate::model::DbIpAddr;
+use crate::model::PortLevel;
 use crate::prelude::*;
 
 #[async_trait]
@@ -18,7 +19,7 @@ pub trait CheckedHostRepository {
     async fn find_by_ip_port(&self, ip: IpAddr, port: u16) -> Result<Option<CheckedHost>, sqlx::Error>;
     async fn find_all_by_ip(&self, ip: IpAddr) -> Result<Vec<CheckedHost>, sqlx::Error>;
     /// 新規にレコードを追加し、そのIDを返す
-    async fn insert(&self, ip: IpAddr, port: u16, speed: i32) -> Result<i64, sqlx::Error>;
+    async fn insert(&self, ip: IpAddr, port: u16, speed: PortLevel) -> Result<i64, sqlx::Error>;
     async fn update(&self, host: &CheckedHost) -> Result<(), sqlx::Error>;
     async fn delete(&self, id: i64) -> Result<(), sqlx::Error>;
 }
@@ -47,7 +48,13 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
     async fn all(&self) -> Result<Vec<CheckedHost>, sqlx::Error> {
         let hosts = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , port_level as `port_level!:i32`, updated_at as `updated_at: DateTime<Utc>`FROM checked_hosts"
+            r#"SELECT id,
+                ip_address AS `ip_address: DbIpAddr`,
+                port as `port!:u16` ,
+                port_level as `port_level: PortLevel`,
+                updated_at as `updated_at: DateTime<Utc>`
+                    FROM checked_hosts
+            "#
         )
         .fetch_all(&self.pool)
         .await?;
@@ -58,7 +65,12 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
     async fn find_by_id(&self, id: i64) -> Result<Option<CheckedHost>, sqlx::Error> {
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , port_level as `port_level!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE id = $1",
+            r#"SELECT id,
+                ip_address AS `ip_address: DbIpAddr`,
+                port as `port!:u16` ,
+                port_level as `port_level: PortLevel`,
+                updated_at as `updated_at: DateTime<Utc>`
+               FROM checked_hosts WHERE id = $1"#,
             id
         )
         .fetch_optional(&self.pool)
@@ -71,7 +83,14 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         let ip = DbIpAddr(ip);
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , port_level as `port_level!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1 AND port = $2",
+            r#"SELECT id,
+                ip_address AS `ip_address: DbIpAddr`,
+                port as `port!:u16`,
+                port_level as `port_level: PortLevel`,
+                updated_at as `updated_at: DateTime<Utc>`
+                    FROM checked_hosts
+                    WHERE ip_address = $1 AND port = $2
+            "#,
             ip,
             port
         )
@@ -86,7 +105,13 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         let ip = DbIpAddr(ip);
         let host = sqlx::query_as!(
             CheckedHost,
-            "SELECT id, ip_address AS `ip_address: DbIpAddr`, port as `port!:u16` , port_level as `port_level!:i32`, updated_at as `updated_at: DateTime<Utc>` FROM checked_hosts WHERE ip_address = $1",
+            r#"SELECT id,
+                ip_address AS `ip_address: DbIpAddr`,
+                port as `port!:u16` ,
+                port_level as `port_level: PortLevel`,
+                updated_at as `updated_at: DateTime<Utc>`
+                    FROM checked_hosts WHERE ip_address = $1
+            "#,
             ip
         )
         .fetch_all(&self.pool)
@@ -95,7 +120,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         Ok(host)
     }
 
-    async fn insert(&self, ip: IpAddr, port: u16, port_level: i32) -> Result<i64, sqlx::Error> {
+    async fn insert(&self, ip: IpAddr, port: u16, port_level: PortLevel) -> Result<i64, sqlx::Error> {
         let ip = DbIpAddr(ip);
         let id = sqlx::query_scalar!(
             r#"
@@ -132,7 +157,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
     }
 
     async fn delete(&self, id: i64) -> Result<(), sqlx::Error> {
-        sqlx::query!("DELETE FROM checked_hosts WHERE id = $1", id).execute(&self.pool).await?;
+        sqlx::query!(r#"DELETE FROM checked_hosts WHERE id = $1"#, id).execute(&self.pool).await?;
 
         Ok(())
     }
@@ -182,7 +207,7 @@ mod tests {
 
             let ip = "127.0.0.1".parse::<IpAddr>().unwrap();
             let port = 8080;
-            let port_level = 100;
+            let port_level = PortLevel::WelldoneWithSpeed(100);
 
             let id = repo.insert(ip, port, port_level).await.unwrap();
             let hosts = repo.find_all_by_ip(ip).await.unwrap();
@@ -204,13 +229,13 @@ mod tests {
 
             let ip = "127.0.0.1".parse::<IpAddr>().unwrap();
             let port = 8080;
-            let port_level = 100;
+            let port_level = PortLevel::Incomplete;
 
             let id = repo.insert(ip, port, port_level).await.unwrap();
             let mut host = repo.find_by_id(id).await.unwrap().unwrap();
             host.ip_address = DbIpAddr("127.0.0.2".parse::<IpAddr>().unwrap());
             host.port = 8081;
-            host.port_level = 200;
+            host.port_level = PortLevel::WelldoneWithSpeed(200);
             repo.update(&host).await.unwrap();
 
             let diff_host = repo.find_by_id(id).await.unwrap().unwrap();

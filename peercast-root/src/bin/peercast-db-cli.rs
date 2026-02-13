@@ -75,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
             port,
             port_level,
         } => {
+            let port_level = port_level.into();
             let id = repo.insert(ip, port, port_level).await?;
             let host = repo.find_by_id(id).await?;
             if let Some(h) = host {
@@ -134,6 +135,6 @@ pub enum SubCommand {
     Add {
         ip: IpAddr,
         port: u16,
-        port_level: i32,
+        port_level: i16,
     },
 }
