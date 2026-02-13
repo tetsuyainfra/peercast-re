@@ -208,8 +208,8 @@ tracing-subscriber = { version = "0.3.22", features = [
 
 # Buildtime generate info
 # vergen = { version = "9.0.4", features = ["build", "cargo", "rustc", "si"] }
-vergen = { version = "9.0.4", features = ["build", "cargo", "rustc"] }
-vergen-git2 = { version = "1.0.5" }
+vergen = { version = "9.1.0", features = ["build", "cargo", "rustc"] }
+vergen-git2 = { version = "9.1.0" }
 # vergen = { version = "9.0.0", features = ["build"] }
 
 [features]
