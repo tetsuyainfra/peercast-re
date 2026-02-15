@@ -1,12 +1,12 @@
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::pcp::atom2::{parser::ParseError, Atom2};
+use crate::pcp::atom2::{atom_mut::AtomMut, parser::ParseError, Atom2};
 
-struct AtomCodec;
+pub struct AtomCodec;
 
 impl AtomCodec {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {}
     }
 }
@@ -36,6 +36,17 @@ impl Encoder<Atom2> for AtomCodec {
 
     fn encode(&mut self, item: Atom2, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // HACKME: 実装未完
+        let x = item.write_buf(dst);
+        Ok(())
+    }
+}
+
+impl Encoder<AtomMut> for AtomCodec {
+    type Error = std::io::Error;
+
+    fn encode(&mut self, item: AtomMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        // HACKME: 実装未完
+        let x = item.write(dst);
         Ok(())
     }
 }

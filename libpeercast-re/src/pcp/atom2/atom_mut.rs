@@ -1,10 +1,12 @@
+use std::fmt;
+
 use bytes::{BufMut, Bytes, BytesMut};
 use daemonize::Parent;
 use nom::combinator::into;
 
 use crate::pcp::{
     atom2::{Atom2, Atom2Kind, AtomView, ChildView, Kind, ParentView},
-    Id4,
+    GnuId, Id4,
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -14,21 +16,30 @@ pub struct AtomMut {
     data: AtomDataMut,
 }
 
-enum AtomDataMut {
-    Parent(Vec<AtomMut>),
-    Child(BytesMut),
+impl fmt::Debug for AtomMut {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AtomMut")
+            .field("id", &self.id)
+            .field("payload", &self.data())
+            //
+            .finish()
+    }
 }
 
 impl AtomMut {
     /// Atomのバイト長を取得する(ヘッダ部分を除く)
-    fn payload_length_byte(&self) -> u32 {
+    pub fn payload_length_byte(&self) -> u32 {
         match &self.data {
             AtomDataMut::Child(payload) => payload.len() as u32,
             AtomDataMut::Parent(children) => children.iter().fold(0, |acc, c| acc + c.payload_length_byte()),
         }
     }
 
-    fn write(&self, buf: &mut BytesMut) {
+    pub fn data(&self) -> &AtomDataMut {
+        &self.data
+    }
+
+    pub fn write(&self, buf: &mut BytesMut) {
         // IDを書き込む
         buf.put_u32(self.id.0);
         // buf.put_u32_le(enable_msb_1(self.childs.len() as u32));
@@ -60,6 +71,12 @@ impl From<AtomMut> for Atom2 {
             raw: buf.freeze(),
         }
     }
+}
+
+#[derive(Debug)]
+enum AtomDataMut {
+    Parent(Vec<AtomMut>),
+    Child(BytesMut),
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -97,13 +114,13 @@ impl From<(Id4, ())> for AtomMut {
 }
 
 pub struct EmptyPayload;
-
 /// (Id4, ())とどちらの方がわかりやすいかな？
 impl From<(Id4, EmptyPayload)> for AtomMut {
     fn from(value: (Id4, EmptyPayload)) -> Self {
         AtomMut::from((value.0, ()))
     }
 }
+
 ////////////////////////////////////////////////////////////////////////////////
 /// From<Atom2> for AtomMut の実装
 ///
@@ -141,6 +158,71 @@ impl From<ParentView<'_>> for AtomMut {
         AtomMut {
             id: value.id(),
             data: AtomDataMut::Parent(children_mut),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// 各データ型からAtomMutへの変換の実装
+//
+
+impl From<(Id4, GnuId)> for AtomMut {
+    fn from((id, value): (Id4, GnuId)) -> Self {
+        assert_eq!(std::mem::size_of::<GnuId>(), 16);
+        let mut payload = BytesMut::with_capacity(16);
+        payload.put_slice(&value.0.to_be_bytes()[..]); // BE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+impl From<(Id4, u8)> for AtomMut {
+    fn from((id, value): (Id4, u8)) -> Self {
+        let mut payload = BytesMut::with_capacity(1);
+        payload.put_u8(value); // LE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+impl From<(Id4, u16)> for AtomMut {
+    fn from((id, value): (Id4, u16)) -> Self {
+        let mut payload = BytesMut::with_capacity(2);
+        payload.put_u16_le(value); // LE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+impl From<(Id4, u32)> for AtomMut {
+    fn from((id, value): (Id4, u32)) -> Self {
+        let mut payload = BytesMut::with_capacity(4);
+        payload.put_u32_le(value); // LE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+impl From<(Id4, i32)> for AtomMut {
+    fn from((id, value): (Id4, i32)) -> Self {
+        let mut payload = BytesMut::with_capacity(4);
+        payload.put_i32_le(value); // LE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
         }
     }
 }

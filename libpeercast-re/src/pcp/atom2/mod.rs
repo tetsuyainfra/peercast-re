@@ -93,6 +93,19 @@ impl Atom2 {
             }),
         }
     }
+
+    pub fn write_buf(&self, buf: &mut BytesMut) {
+        buf.extend_from_slice(&self.raw);
+    }
+
+    pub fn write(&self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        let raw = self.raw();
+        if buf.len() < raw.len() {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Buffer too small"));
+        }
+        buf[..raw.len()].copy_from_slice(raw);
+        Ok(raw.len())
+    }
 }
 
 impl AtomView for Atom2 {
@@ -103,13 +116,18 @@ impl AtomView for Atom2 {
 
 impl fmt::Debug for Atom2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Atom2 {{ id: {:?}, length: {}, kind: {:?} }}", self.id(), self.length(), self.kind())
+        f.debug_struct("Atom2")
+            .field("id", &self.id())
+            .field("length", &self.length())
+            .field("length", &self.view())
+            .finish()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Atom2Kind
 ///
+#[derive(Debug)]
 enum Atom2Kind<'a> {
     Parent(ParentView<'a>),
     Child(ChildView<'a>),
@@ -135,6 +153,18 @@ impl ChildView<'_> {
     }
 }
 
+impl fmt::Debug for ChildView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChildView")
+            //
+            .field("id", &self.id())
+            .field("len", &self.length())
+            .field("data", &self.data())
+            //
+            .finish()
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// ParentView
 ///
@@ -155,6 +185,18 @@ impl ParentView<'_> {
             // buf: self.payload(),
             buf: &self.buf[8..],
         }
+    }
+}
+
+impl fmt::Debug for ParentView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let childrens: Vec<Atom2Kind<'_>> = self.children().collect();
+        f.debug_struct("ParentView")
+            .field("id", &self.id())
+            .field("length", &self.length())
+            .field("children", &childrens)
+            //
+            .finish()
     }
 }
 

@@ -2,6 +2,7 @@
 name = "peercast-utils"
 version = "0.1.0"
 edition = "2024"
+default-run = "ping"
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
