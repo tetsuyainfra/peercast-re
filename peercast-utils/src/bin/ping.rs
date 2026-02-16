@@ -45,12 +45,14 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn server(self_session_id: GnuId, bind: TcpListener) -> anyhow::Result<()> {
+async fn server(_self_session_id: GnuId, bind: TcpListener) -> anyhow::Result<()> {
     loop {
-        let (stream, remote) = bind.accept().await?;
+        let (stream, _remote) = bind.accept().await?;
 
         let mut framed = Framed::new(stream, AtomCodec::new());
         let atom = framed.next().await;
         dbg!(atom);
+
+        // TODO: return Oleh
     }
 }
