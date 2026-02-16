@@ -16,7 +16,7 @@ pub mod codec;
 pub mod parser;
 
 #[derive(Debug, PartialEq, Eq)]
-enum Kind {
+pub enum Kind {
     Parent,
     Child,
 }
@@ -26,7 +26,7 @@ const ATOM_HEADER_POS_ID: Range<usize> = 0..4;
 const ATOM_HEADER_POS_ENCODE_LENGTH: Range<usize> = 4..8;
 const ATOM_HEADER_POS_START_PAYLOAD: usize = 8;
 
-trait AtomView {
+pub trait AtomView {
     fn raw(&self) -> &[u8];
 
     /// id
@@ -82,8 +82,7 @@ impl Atom2 {
 }
 
 impl Atom2 {
-    // view()のほうがいいか？
-    fn view(&self) -> Atom2Kind<'_> {
+    pub fn view(&self) -> Atom2Kind<'_> {
         match self.kind() {
             Kind::Parent => Atom2Kind::Parent(ParentView {
                 buf: &self.raw,
@@ -128,7 +127,7 @@ impl fmt::Debug for Atom2 {
 /// Atom2Kind
 ///
 #[derive(Debug)]
-enum Atom2Kind<'a> {
+pub enum Atom2Kind<'a> {
     Parent(ParentView<'a>),
     Child(ChildView<'a>),
 }
@@ -136,7 +135,7 @@ enum Atom2Kind<'a> {
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildView
 ///
-struct ChildView<'a> {
+pub struct ChildView<'a> {
     buf: &'a [u8],
 }
 
@@ -147,7 +146,7 @@ impl AtomView for ChildView<'_> {
 }
 
 impl ChildView<'_> {
-    fn data(&self) -> &[u8] {
+    pub fn data(&self) -> &[u8] {
         debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
         &self.buf[8..]
     }
@@ -168,7 +167,7 @@ impl fmt::Debug for ChildView<'_> {
 ////////////////////////////////////////////////////////////////////////////////
 /// ParentView
 ///
-struct ParentView<'a> {
+pub struct ParentView<'a> {
     buf: &'a [u8],
 }
 
@@ -180,7 +179,7 @@ impl AtomView for ParentView<'_> {
 
 impl ParentView<'_> {
     /// 子Atomのイテレータを返す
-    fn children(&self) -> ChildIter<'_> {
+    pub fn children(&self) -> ChildIter<'_> {
         ChildIter {
             // buf: self.payload(),
             buf: &self.buf[8..],
@@ -203,7 +202,7 @@ impl fmt::Debug for ParentView<'_> {
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildIter
 ///
-struct ChildIter<'a> {
+pub struct ChildIter<'a> {
     buf: &'a [u8],
 }
 

@@ -35,7 +35,6 @@ impl Encoder<Atom2> for AtomCodec {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: Atom2, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // HACKME: 実装未完
         let x = item.write_buf(dst);
         Ok(())
     }
@@ -45,7 +44,6 @@ impl Encoder<AtomMut> for AtomCodec {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: AtomMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // HACKME: 実装未完
         let x = item.write(dst);
         Ok(())
     }

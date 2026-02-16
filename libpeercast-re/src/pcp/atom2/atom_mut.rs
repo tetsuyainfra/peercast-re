@@ -74,7 +74,7 @@ impl From<AtomMut> for Atom2 {
 }
 
 #[derive(Debug)]
-enum AtomDataMut {
+pub enum AtomDataMut {
     Parent(Vec<AtomMut>),
     Child(BytesMut),
 }

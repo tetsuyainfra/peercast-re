@@ -8,21 +8,25 @@ use tokio::{
     net::TcpStream,
 };
 use tokio_util::codec::{Framed, FramedParts};
+use tower_http::follow_redirect::policy::PolicyExt;
 use tracing::debug;
 
 use crate::pcp::{
     atom2::{codec::AtomCodec, Atom2},
-    builder2::PingBuilder2,
+    builder2::{OlehInfo, PingBuilder2},
     GnuId,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum HandshakeError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    #[error("failed")]
+    Failed,
 
     #[error(transparent)]
     AtomParseError(#[from] crate::error::AtomParseError),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 pub struct OutgoingPcpHandshake {
@@ -50,12 +54,26 @@ impl OutgoingPcpHandshake {
         (stream, remote, read_buf)
     }
 
+    pub async fn is_ping(
+        mut self,
+        self_session_id: GnuId,
+        remote_session_id: GnuId,
+        port: Option<u16>,
+        port_check: Option<u16>,
+    ) -> bool {
+        let Ok((oleh, _)) = self.ping(self_session_id, port, port_check).await else {
+            return false;
+        };
+        return oleh.session_id == remote_session_id;
+    }
+
     pub async fn ping(
         mut self,
         self_session_id: GnuId,
+        // remote_session_id: Option<GnuId>,
         port: Option<u16>,
         port_check: Option<u16>,
-    ) -> Result<(Atom2, HandshakeResult), HandshakeError> {
+    ) -> Result<(OlehInfo, HandshakeResult), HandshakeError> {
         let Self {
             stream,
             remote,
@@ -70,11 +88,13 @@ impl OutgoingPcpHandshake {
         }
 
         let mut atom = framed.next().await;
-        let oleh = match atom {
+        let oleh_candidate = match atom {
             None => todo!(),
             Some(Err(e)) => todo!(),
             Some(Ok(a)) => a,
         };
+
+        let oleh = OlehInfo::try_from(oleh_candidate).map_err(|_| HandshakeError::Failed)?;
 
         let FramedParts {
             io,

@@ -1,9 +1,12 @@
+mod io;
+
 /// Atom Packet Sturct
 mod atom;
 mod atom2;
 
 /// atom packet Builder
 pub mod builder;
+pub mod builder2;
 
 /// Channel Struct
 mod channel;
@@ -24,6 +27,7 @@ mod tracker_channel;
 mod util;
 
 pub use atom::{decode, encode, read_atom, Atom, ChildAtom, ParentAtom};
+pub use atom2::*;
 pub use channel::*;
 pub use connection::PcpConnectionFactory;
 pub use gnuid::{GnuId, GnuIdParseError};
