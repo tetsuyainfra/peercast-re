@@ -27,7 +27,7 @@ mod tracker_channel;
 mod util;
 
 pub use atom::{decode, encode, read_atom, Atom, ChildAtom, ParentAtom};
-pub use atom2::*;
+pub use atom2::{atom_mut::AtomMut, codec::AtomCodec, Atom2};
 pub use channel::*;
 pub use connection::PcpConnectionFactory;
 pub use gnuid::{GnuId, GnuIdParseError};
