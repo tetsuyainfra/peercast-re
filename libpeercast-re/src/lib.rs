@@ -27,6 +27,8 @@ pub use conn::ConnectionNo;
 pub mod codec;
 pub mod error;
 pub mod http;
+pub mod io;
+pub mod net;
 /// Peercast Protocol
 pub mod pcp;
 pub mod prelude;
