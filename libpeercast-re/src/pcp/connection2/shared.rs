@@ -7,13 +7,26 @@ use std::{
 };
 
 use bytes::BytesMut;
-use tokio::sync::mpsc;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+    sync::mpsc,
+};
 
 use crate::{
-    pcp::connection2::{Connection, ConnectionFactory, ConnectionHandle, ConnectionManager, ConnectionStats, Io},
+    pcp::{
+        atom2::Atom2,
+        connection2::{Connection, ConnectionFactory, ConnectionHandle, ConnectionManager, ConnectionStats, Io},
+    },
     util::mutex_poisoned,
     ConnectionNo,
 };
+
+#[derive(Debug, thiserror::Error)]
+enum SharedConnectionError {
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // utility for Connection
@@ -77,18 +90,19 @@ impl ConnectionHandle for SharedConnectionHandle {
     }
 }
 
-pub struct SharedConnection {
+pub struct SharedConnection<S: Io> {
     cno: ConnectionNo,
     write_buf: BytesMut,
     read_buf: BytesMut,
-    tx: mpsc::Sender<Command>,
-    tr: mpsc::Receiver<Command>,
+    own_handle_tx: mpsc::Sender<Command>,
+    own_handle_tr: mpsc::Receiver<Command>,
+    stream: Option<S>,
     stats: Arc<ConnectionStats>,
     owner: Weak<SharedConnectionManager>,
 }
 
 #[async_trait::async_trait]
-impl Connection for SharedConnection {
+impl<S: Io> Connection for SharedConnection<S> {
     type Handle = SharedConnectionHandle;
     type Manager = SharedConnectionManager;
 
@@ -98,7 +112,7 @@ impl Connection for SharedConnection {
     fn handle(&self) -> Self::Handle {
         SharedConnectionHandle {
             cno: self.cno,
-            tx: self.tx.clone(),
+            tx: self.own_handle_tx.clone(),
             stats: self.stats.clone(),
         }
     }
@@ -109,28 +123,117 @@ impl Connection for SharedConnection {
         &self.owner
     }
 
-    async fn run(self) {
-        todo!()
+    fn on_drop(&self) {
+        // streamが存在する場合はrun()を実行していない状態なので、マネージャーから削除する必要がある
+        if self.stream.is_some() {
+            if let Some(manager) = self.owner().upgrade() {
+                manager.remove(&self.cno());
+            }
+        }
+    }
+
+    async fn run(mut self) {
+        let mut buff = BytesMut::with_capacity(4096);
+        let (mut reader, mut writer) = tokio::io::split(self.stream.take().unwrap());
+
+        // loop {
+        //     tokio::select! {
+        //         res = self.stream.read(&mut buf) => {
+        //             match res {
+        //                 Ok(0) => {
+        //                     // EOF
+        //                     break;
+        //                 }
+        //                 Ok(n) => {
+        //                     println!("Read {} bytes: {:?}", n, &buf[..n]);
+        //                     self.stats.add_bytes_received(n);
+        //                 }
+        //                 Err(e) => {
+        //                     eprintln!("Error reading from stream: {}", e);
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //         cmd = self.own_handle_tr.recv() => {
+        //             match cmd {
+        //                 Some(cmd) => {
+        //                     println!("Received command: {:?}", cmd);
+        //                 }
+        //                 None => {
+        //                     // Channel closed
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
-impl SharedConnection {
-    fn new(cno: ConnectionNo, write_buf: BytesMut, read_buf: BytesMut, owner: &Arc<SharedConnectionManager>) -> Self {
+
+impl<S: Io> SharedConnection<S> {
+    fn new(
+        cno: ConnectionNo,
+        stream: S,
+        write_buf: BytesMut,
+        read_buf: BytesMut,
+        owner: &Arc<SharedConnectionManager>,
+    ) -> Self {
         let (tx, tr) = mpsc::channel(1);
         let stats = Arc::new(ConnectionStats::new());
 
         Self {
             cno,
+            stream: Some(stream),
             write_buf,
             read_buf,
-            tx,
-            tr,
+            own_handle_tr: tr,
+            own_handle_tx: tx,
             stats,
             owner: Arc::downgrade(owner),
         }
     }
+
+    async fn send(&mut self, atom: Atom2) -> Result<(), SharedConnectionError> {
+        if let Some(ref mut stream) = self.stream {
+            // 送信処理
+            atom.write_buf(&mut self.write_buf);
+            stream.write_all(&self.write_buf).await?;
+            self.write_buf.clear();
+            Ok(())
+        } else {
+            return Err(SharedConnectionError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "Connection is not active",
+            )));
+        }
+    }
+
+    async fn read(&mut self) -> Result<Atom2, SharedConnectionError> {
+        if let Some(ref mut stream) = self.stream {
+            // 読み取り処理
+            let n = stream.read_buf(&mut self.read_buf).await?;
+            if n == 0 {
+                // EOF
+                return Err(SharedConnectionError::Io(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "Connection closed by peer",
+                )));
+            }
+
+            // let atom = Atom2::from_buf(&self.read_buf[..n])?;
+            // self.read_buf.advance(n);
+            // Ok(atom)
+            todo!()
+        } else {
+            return Err(SharedConnectionError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotConnected,
+                "Connection is not active",
+            )));
+        }
+    }
 }
 
-impl Drop for SharedConnection {
+impl<S: Io> Drop for SharedConnection<S> {
     fn drop(&mut self) {
         self.on_drop();
     }
@@ -154,12 +257,16 @@ impl SharedConnectionFactory {
     }
 }
 
-impl ConnectionFactory for SharedConnectionFactory {
-    type Conn = SharedConnection;
+impl<S: Io> ConnectionFactory<S> for SharedConnectionFactory {
+    type Conn = SharedConnection<S>;
     type Handle = SharedConnectionHandle;
     type Manager = SharedConnectionManager;
 
-    fn create_accepted_connection<S: Io>(
+    fn manager(&self) -> &Self::Manager {
+        &self.manager
+    }
+
+    fn create_accepted_connection(
         &self,
         cno: ConnectionNo,
         stream: S,
@@ -167,26 +274,17 @@ impl ConnectionFactory for SharedConnectionFactory {
         write_buf: BytesMut,
         read_buf: BytesMut,
     ) -> Self::Conn {
-        let conn = SharedConnection::new(cno, write_buf, read_buf, &self.manager);
+        let conn = SharedConnection::new(cno, stream, write_buf, read_buf, &self.manager);
         let handle = conn.handle();
         self.manager.insert(handle);
         conn
     }
 
-    fn create_outgoing_connection<S: Io>(
-        &self,
-        cno: ConnectionNo,
-        stream: S,
-        remote: std::net::SocketAddr,
-    ) -> Self::Conn {
-        let conn = SharedConnection::new(cno, BytesMut::new(), BytesMut::new(), &self.manager);
+    fn create_outgoing_connection(&self, cno: ConnectionNo, stream: S, remote: std::net::SocketAddr) -> Self::Conn {
+        let conn = SharedConnection::new(cno, stream, BytesMut::new(), BytesMut::new(), &self.manager);
         let handle = conn.handle();
         self.manager.insert(handle);
         conn
-    }
-
-    fn manager(&self) -> &Self::Manager {
-        &self.manager
     }
 }
 
@@ -217,6 +315,7 @@ mod t {
             factory.create_accepted_connection(cno1, server, client_addr, BytesMut::new(), BytesMut::new());
         let conn_client = factory.create_outgoing_connection(cno2, client, server_addr);
 
+        // conn_server.run().await;
         ()
     }
 
@@ -233,6 +332,7 @@ mod t {
         let server_port = listener_server.local_addr().unwrap().port();
 
         let mut stream_local = TcpStream::connect(("127.0.0.1", server_port)).await.unwrap();
+        stream_local.split();
 
         let (mut stream_server, remote) = listener_server.accept().await.unwrap();
         println!("remote: {:?}", &remote);

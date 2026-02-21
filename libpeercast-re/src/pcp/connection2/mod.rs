@@ -3,14 +3,18 @@ use std::{
     time::Instant,
 };
 
-use crate::ConnectionNo;
+use crate::{
+    io::Io,
+    pcp::{atom2::Atom2, Atom},
+    ConnectionNo,
+};
 
 use bytes::BytesMut;
 use hyper_util::client::legacy::connect::Connect;
-use tokio::io::{AsyncRead, AsyncWrite};
-
-pub trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
-impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::mpsc,
+};
 
 //コネクションを管理するモジュール
 pub trait ConnectionManager<Handle: ConnectionHandle>: Send + Sync {
@@ -40,11 +44,7 @@ pub trait Connection: Sized {
     fn owner(&self) -> &Weak<Self::Manager>;
 
     /// このトレイトを実装する場合、Dropトレイトを実装し、このメソッド呼び出すこと
-    fn on_drop(&self) {
-        if let Some(manager) = self.owner().upgrade() {
-            manager.remove(&self.cno());
-        }
-    }
+    fn on_drop(&self);
 
     async fn run(self);
 }
@@ -68,14 +68,14 @@ impl ConnectionStats {
 }
 
 /// コネクションを生成するためのファクトリ
-pub trait ConnectionFactory {
+pub trait ConnectionFactory<S: Io> {
     type Conn: Connection;
     type Handle: ConnectionHandle;
     type Manager: ConnectionManager<Self::Handle>;
 
     fn manager(&self) -> &Self::Manager;
 
-    fn create_accepted_connection<S: Io>(
+    fn create_accepted_connection(
         &self,
         cno: ConnectionNo,
         stream: S,
@@ -84,13 +84,36 @@ pub trait ConnectionFactory {
         read_buf: BytesMut,
     ) -> Self::Conn;
 
-    fn create_outgoing_connection<S: Io>(
-        &self,
-        cno: ConnectionNo,
-        stream: S,
-        remote: std::net::SocketAddr,
-    ) -> Self::Conn;
+    fn create_outgoing_connection(&self, cno: ConnectionNo, stream: S, remote: std::net::SocketAddr) -> Self::Conn;
 }
 
 mod shared;
 pub use shared::*;
+
+/*
+//  run()内でtokio::io::splitしてるけど、Ioトレイトにsplit()を追加してもいいかも
+pub trait SplittableIo: AsyncRead + AsyncWrite + Unpin + Send {
+    type Reader: AsyncRead + Unpin + Send;
+    type Writer: AsyncWrite + Unpin + Send;
+
+    fn split(self) -> (Self::Reader, Self::Writer);
+}
+
+impl SplittableIo for tokio::net::TcpStream {
+    type Reader = tokio::net::tcp::OwnedReadHalf;
+    type Writer = tokio::net::tcp::OwnedWriteHalf;
+
+    fn split(self) -> (Self::Reader, Self::Writer) {
+        self.into_split()
+    }
+}
+
+impl SplittableIo for tokio::io::DuplexStream {
+    type Reader = tokio::io::ReadHalf<Self>;
+    type Writer = tokio::io::WriteHalf<Self>;
+
+    fn split(self) -> (Self::Reader, Self::Writer) {
+        tokio::io::split(self)
+    }
+}
+*/
