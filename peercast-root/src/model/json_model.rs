@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
-    pcp::{ChannelInfo, GnuId, TrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
     repository::Channel,
 };
 use serde::Serialize;
@@ -63,8 +63,8 @@ pub struct JsonTrack {
 
 impl From<&RootChannel2> for JsonChannel {
     fn from(ch: &RootChannel2) -> Self {
-        let ChannelInfo {
-            typ,
+        let ValidChannelInfo {
+            typee,
             name,
             genre,
             desc,
@@ -84,7 +84,7 @@ impl From<&RootChannel2> for JsonChannel {
             raw_genre: genre,
             desc,
             comment,
-            typee: typ,
+            typee,
             stream_type,
             stream_ext,
             bitrate,
@@ -96,8 +96,8 @@ impl From<&RootChannel2> for JsonChannel {
     }
 }
 
-impl From<TrackInfo> for JsonTrack {
-    fn from(t: TrackInfo) -> Self {
+impl From<ValidTrackInfo> for JsonTrack {
+    fn from(t: ValidTrackInfo) -> Self {
         JsonTrack {
             title: t.title,
             creator: t.creator,

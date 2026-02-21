@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE checked_hosts\n                SET\n                    ip_address = $1,\n                    port = $2,\n                    port_level = $3,\n                    port_speed = $4,\n                    updated_at = CURRENT_TIMESTAMP\n                WHERE id = $5\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": []
+  },
+  "hash": "8461383c8fb2d874de105086787b6ead0984d4d6c3c8b5a066152f41a136eccf"
+}

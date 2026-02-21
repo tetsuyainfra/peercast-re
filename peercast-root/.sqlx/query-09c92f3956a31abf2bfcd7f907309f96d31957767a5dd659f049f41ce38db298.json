@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "\n            INSERT\n                INTO checked_hosts (ip_address, port, port_level, port_speed)\n                VALUES ($1, $2, $3, $4)\n                RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 4
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "09c92f3956a31abf2bfcd7f907309f96d31957767a5dd659f049f41ce38db298"
+}

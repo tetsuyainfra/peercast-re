@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use libpeercast_re::pcp::connection2::{SharedConnectionFactory, SharedConnectionManager};
+use libpeercast_re::pcp::{
+    GnuId,
+    connection2::{SharedConnectionFactory, SharedConnectionManager},
+};
 use peercast_root::{IndexInfo, RestrictPortLevel, repository::RootRepository2};
 
 pub mod cli;
@@ -35,6 +38,7 @@ pub struct ApiConfig {
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct AppState {
+    pub self_session_id: GnuId,
     pub config: Arc<ApiConfig>,
     pub index_txt_footer: Vec<IndexInfo>,
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,

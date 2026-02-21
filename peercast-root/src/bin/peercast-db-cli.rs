@@ -1,8 +1,9 @@
 use std::net::IpAddr;
 
+use anyhow::Context;
 use clap::Parser;
 use peercast_root::db::{CheckedHostRepository, SqliteCheckedHostRepository};
-use peercast_root::model::CheckedHost;
+use peercast_root::model::PortLevel;
 use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 
@@ -18,11 +19,12 @@ async fn main() -> anyhow::Result<()> {
         SubCommand::List => {
             repo.all().await?.iter().for_each(|host| {
                 println!(
-                    "ID: {}, IP: {}, port: {}, port_level: {}, created_at: {:?}",
+                    "ID: {}, IP: {}, port: {}, port_level: {}, port_speed: {:?}, updated_at: {:?}",
                     host.id.unwrap(),
                     host.ip_address.0,
                     host.port,
                     host.port_level,
+                    host.port_speed,
                     host.updated_at
                 );
             });
@@ -74,9 +76,19 @@ async fn main() -> anyhow::Result<()> {
             ip,
             port,
             port_level,
+            port_speed,
         } => {
-            let port_level = port_level.into();
-            let id = repo.insert(ip, port, port_level).await?;
+            let port_level = port_level.try_into().context("Invalid port_level value")?;
+            if let Some(speed) = port_speed {
+                if port_level != PortLevel::WelldoneWithSpeed {
+                    anyhow::bail!("port_speed can be set only when port_level is WelldoneWithSpeed");
+                }
+                if speed > 1000 {
+                    anyhow::bail!("port_speed must be between 0 and 1000");
+                }
+            }
+
+            let id = repo.insert(ip, port, port_level, port_speed).await?;
             let host = repo.find_by_id(id).await?;
             if let Some(h) = host {
                 println!(
@@ -135,6 +147,7 @@ pub enum SubCommand {
     Add {
         ip: IpAddr,
         port: u16,
-        port_level: i16,
+        port_level: i8,
+        port_speed: Option<u16>,
     },
 }

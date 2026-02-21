@@ -7,7 +7,6 @@ use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tower_http::{cors::CorsLayer, services::ServeDir, set_header::SetResponseHeaderLayer};
-use utoipa::openapi::info;
 
 use crate::app::ArcState;
 use peercast_root::prelude::*;

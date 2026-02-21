@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use libpeercast_re::{
-    pcp::{ChannelInfo, GnuId, TrackInfo, connection::PcpConnection},
+    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo, connection::PcpConnection},
     repository::{Channel, ChannelState, ChannelType},
 };
 use tokio::sync::{
@@ -40,8 +40,8 @@ impl Channel for RootChannel2 {
 
     fn new(
         id: libpeercast_re::pcp::GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<Self::Config>,
     ) -> Self {
         Self(Arc::new(ImplChannel::new(id, channel_info, track_info, config)))
@@ -74,10 +74,10 @@ impl Channel for RootChannel2 {
     fn tracker_address(&self) -> Option<std::net::SocketAddr> {
         self.0.tracker_address()
     }
-    fn channel_info(&self) -> Option<ChannelInfo> {
+    fn channel_info(&self) -> Option<ValidChannelInfo> {
         self.0.channel_info()
     }
-    fn track_info(&self) -> Option<TrackInfo> {
+    fn track_info(&self) -> Option<ValidTrackInfo> {
         self.0.track_info()
     }
     fn number_of_listener(&self) -> i32 {
@@ -133,8 +133,8 @@ struct ImplChannel {
     ch_task_sender: UnboundedSender<ChMainMessage>,
     //
     tracker_addr_rx: watch::Receiver<Option<SocketAddr>>,
-    channel_info_rx: watch::Receiver<Option<ChannelInfo>>,
-    track_info_rx: watch::Receiver<Option<TrackInfo>>,
+    channel_info_rx: watch::Receiver<Option<ValidChannelInfo>>,
+    track_info_rx: watch::Receiver<Option<ValidTrackInfo>>,
     status_rx: watch::Receiver<ChannelState>,
     number_of_listener_rx: watch::Receiver<i32>,
     number_of_relay_rx: watch::Receiver<i32>,
@@ -147,8 +147,8 @@ struct ImplChannel {
 impl ImplChannel {
     fn new(
         cid: libpeercast_re::pcp::GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<RootConfig>,
     ) -> Self {
         let config = config.unwrap_or_default();
@@ -225,10 +225,10 @@ impl ImplChannel {
     fn tracker_address(&self) -> Option<std::net::SocketAddr> {
         self.tracker_addr_rx.borrow().clone()
     }
-    fn channel_info(&self) -> Option<ChannelInfo> {
+    fn channel_info(&self) -> Option<ValidChannelInfo> {
         self.channel_info_rx.borrow().clone()
     }
-    fn track_info(&self) -> Option<TrackInfo> {
+    fn track_info(&self) -> Option<ValidTrackInfo> {
         self.track_info_rx.borrow().clone()
     }
     fn number_of_listener(&self) -> i32 {
@@ -259,8 +259,8 @@ enum ChMainMessage {
 #[allow(dead_code)]
 struct InfoChannels {
     tracker_addr_tx: watch::Sender<Option<SocketAddr>>,
-    channel_info_tx: watch::Sender<Option<ChannelInfo>>,
-    track_info_tx: watch::Sender<Option<TrackInfo>>,
+    channel_info_tx: watch::Sender<Option<ValidChannelInfo>>,
+    track_info_tx: watch::Sender<Option<ValidTrackInfo>>,
     status_tx: watch::Sender<ChannelState>,
     //
     number_of_listener_tx: watch::Sender<i32>,

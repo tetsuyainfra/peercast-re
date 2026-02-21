@@ -10,6 +10,7 @@ pub struct CheckedHost {
     pub ip_address: DbIpAddr,
     pub port: u16,
     pub port_level: PortLevel,
+    pub port_speed: Option<u16>,
     pub updated_at: DateTime<Utc>,
 }
 

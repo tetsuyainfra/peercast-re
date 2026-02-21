@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::IpAddr;
 
 use axum::{
     Json,
@@ -12,8 +12,6 @@ use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
 use peercast_root::{model::JsonChannel, service::HostCheckService};
 use serde::Deserialize;
-use sqlx::{Pool, Sqlite};
-use tracing_subscriber::layer::Filter;
 
 use crate::app::{ArcState, yp::FilterConfig};
 
@@ -42,18 +40,18 @@ where
 pub async fn index_txt(
     ClientIp(client_ip): ClientIp,
     Query(params): Query<IndexTextParams>,
-    state: State<ArcState>,
+    State(state): State<ArcState>,
 ) -> Result<String, ApiError> {
     let ip_addr: IpAddr = client_ip.to_canonical();
 
     // Hostヘッダの有無で処理を分岐
     // Hostヘッダがある場合はそちらを優先する。ただし接続元IPアドレスはハンドラーで取得したものを使う。
     let (target_ip, target_port) = match params.Host {
-        Some((host, port)) => (ip_addr, port),
+        Some((_host, port)) => (ip_addr, port),
         None => (ip_addr, 7144),
     };
 
-    let x = HostCheckService::do_host_check(&state.db_pool, target_ip, target_port).await?;
+    let _x = HostCheckService::do_host_check(&state.connection_factory, &state.db_pool, target_ip, target_port).await?;
 
     let filter_config = FilterConfig {};
     let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
@@ -63,7 +61,7 @@ pub async fn index_txt(
 }
 
 pub async fn index_json(
-    ClientIp(client_ip): ClientIp,
+    ClientIp(_client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<Json<Vec<JsonChannel>>, ApiError> {

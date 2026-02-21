@@ -1,19 +1,25 @@
-use std::{net::SocketAddr, time::Duration};
+use std::net::SocketAddr;
 
-use bytes::BytesMut;
+use anyhow::anyhow;
+use futures_util::{SinkExt, StreamExt};
 use libpeercast_re::{
     ConnectionNo,
-    util::identify2::{ConnectionProtocol, identify_protocol},
+    io::Io,
+    pcp::{
+        AtomCodec, GnuId, ValidChannelInfo, ValidTrackInfo,
+        builder2::{BroadcastInfo, OkBuilder2, RootBuilder2, TrackInfo},
+        procedure::handshake::{self, IncomingProtocolDiscriminator, IncommingType, Parts, PartsWrapFramed},
+    },
+    repository::Repository,
 };
+use sqlx::any;
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
     sync::watch,
-    time::timeout,
 };
-use tokio_util::sync::CancellationToken;
+use tokio_util::{codec::Framed, sync::CancellationToken};
 
-use crate::app::ArcState;
+use crate::app::{AppState, ArcState};
 use peercast_root::prelude::*;
 
 pub async fn server_peercast(
@@ -69,42 +75,6 @@ pub async fn server_peercast(
     Ok(())
 }
 
-async fn check_protocol(
-    cno: ConnectionNo,
-    mut stream: TcpStream,
-    remote: SocketAddr,
-) -> Result<(TcpStream, BytesMut, ConnectionProtocol), ()> {
-    const MAX_READ_SIZE: usize = 8192;
-    let mut read_buff = BytesMut::with_capacity(MAX_READ_SIZE);
-
-    let mut sum = 0;
-    loop {
-        if sum > MAX_READ_SIZE {
-            error!(?cno, ?remote, "Read Buffer reach MAX_READ_SIZE");
-            return Err(());
-        }
-
-        match stream.read_buf(&mut read_buff).await {
-            Err(e) => {
-                error!(?cno, ?remote, "Failed: read_buf: {}", e);
-                return Err(());
-            }
-            Ok(0) => {
-                info!(?cno, ?remote, "STREAM is closed");
-                return Err(());
-            }
-            Ok(read_num) => {
-                sum = sum + read_num;
-            }
-        };
-
-        match identify_protocol(&read_buff[..]) {
-            Some(protocol) => return Ok((stream, read_buff, protocol)),
-            None => continue,
-        }
-    }
-}
-
 #[allow(unused)]
 async fn serve_peercast(
     state: ArcState,
@@ -113,51 +83,132 @@ async fn serve_peercast(
     remote: SocketAddr,
     graceful_shutdown: CancellationToken,
     closed_send: watch::Receiver<()>,
-) {
+) -> anyhow::Result<()> {
     info!(?cno, ?remote, "SPAWN SERVE");
 
-    let (mut stream, buff, protocol) = match timeout(Duration::from_secs(5), check_protocol(cno, stream, remote)).await
-    {
-        Err(e) => {
-            error!(?cno, ?remote, "Failed: timeout: {}", e);
-            // MEMO: stream.shutdown().await; は runtimeに任せる
-            return;
-        }
-        Ok(Err(_e)) => {
-            error!(?cno, ?remote, "Failed: check_protocol()");
-            // MEMO: stream.shutdown().await; は runtimeに任せる
-            return;
-        }
-        Ok(Ok(val)) => val,
-    };
+    let discrimer = IncomingProtocolDiscriminator::new();
 
-    match protocol {
-        ConnectionProtocol::Pcp => {
-            info!(?cno, ?remote, "STREAM is PeerCast Protocol");
-            // let conn = factory.create_accepted_connection(cno, stream, remote, BytesMut::new(), buff);
-            let _handle = tokio::spawn(serve_root());
+    let handshake_protocol = discrimer.identify(cno, stream, remote).await?;
+    match handshake_protocol {
+        handshake::HandshakeProtocol::Pcp(incoming_pcp_handshake) => {
+            info!(?cno, ?remote, "ACCEPT PCP");
+            let mut handshaked = incoming_pcp_handshake.handshake(state.self_session_id).await?;
+            match handshaked.in_type {
+                IncommingType::Ping => {
+                    info!(?cno, ?remote, "PCP PING shutting down");
+                    handshaked.shutdown().await;
+                    Ok(())
+                }
+                IncommingType::YellowPage(broadcast_id) => {
+                    serve_root(state, graceful_shutdown, broadcast_id, handshaked.parts).await
+                }
+            }
         }
-        ConnectionProtocol::HttpPcp => {
-            error!("PeerCastHttp is not allowed");
-            let _ = stream.shutdown().await;
+        handshake::HandshakeProtocol::HttpPcp(incoming_http_pcp_handshake) => {
+            info!(?cno, ?remote, "ACCEPT HTTP_PCP");
+            incoming_http_pcp_handshake.shutdown().await;
+            Ok(())
         }
-        ConnectionProtocol::Http => {
-            warn!(?cno, ?remote, "STREAM is HTTP Protocol");
-            // serve_http(cno, stream, remote, graceful_shutdown, force_shutdown).await
-            let _ = stream.shutdown().await;
+        handshake::HandshakeProtocol::Http(incoming_http_handshake) => {
+            info!(?cno, ?remote, "ACCEPT HTTP");
+            incoming_http_handshake.shutdown().await;
+            Ok(())
         }
-        ConnectionProtocol::Unknown => {
-            warn!(?cno, ?remote, "STREAM is Unkwon Protocol");
-            let _ = stream.shutdown().await;
+        handshake::HandshakeProtocol::Unknown(incoming_unknown_handshake) => {
+            info!(?cno, ?remote, "ACCEPT Unknown");
+            incoming_unknown_handshake.shutdown().await;
+            Ok(())
         }
-    };
+    }
 }
 
 //-------------------------------------------------------------------------------
 // PCP
 //-------------------------------------------------------------------------------
-#[inline]
-async fn serve_root() {}
+async fn serve_root<S: Io>(
+    state: ArcState,
+    graceful_shutdown: CancellationToken,
+    broadcast_id: GnuId,
+    parts: PartsWrapFramed<S>,
+) -> anyhow::Result<()> {
+    info!(?parts.cno, ?parts.remote, "serve_root");
+    let PartsWrapFramed {
+        cno,
+        remote,
+        mut framed,
+    } = parts;
+    // PCP_ROOTを送る
+    // が、実際のところYTでもStでも無視してる
+    let root_atom = RootBuilder2::default().build();
+    let _ = framed.send(root_atom).await?;
+
+    // PCP_OKを送る
+    // が、実際のところYTでもStでも無視してる
+    let ok_atom = OkBuilder2::new(0).build();
+    let _ = framed.send(ok_atom).await?;
+
+    // Updateを送る
+    let root_atom = RootBuilder2::build_update_request();
+    let _ = framed.send(root_atom).await?;
+
+    // Braodcastを待つ
+    let Some(Ok(broadcast_candidate)) = framed.next().await else {
+        return Err(anyhow!("failed to receive broadcast"));
+    };
+    let broadcast = BroadcastInfo::try_from(&broadcast_candidate)?;
+    let BroadcastInfo {
+        from_session_id,
+        channel_id,
+        broadcast_group,
+        chan,
+        host,
+        ..
+    } = broadcast;
+    let Some(chan) = chan else {
+        return Err(anyhow!("failed to receive channel"));
+    };
+
+    // IDチェック
+    let Some(channel_id) = channel_id else {
+        return Err(anyhow!("failed to receive channel_id"));
+    };
+    let Some(chan_channel_id) = chan.broadcast_id else {
+        return Err(anyhow!("failed to receive channel_id"));
+    };
+    let Some(chan_broadcast_id) = chan.broadcast_id else {
+        return Err(anyhow!("failed to receive broadcast_id"));
+    };
+    if broadcast_id != chan_broadcast_id || channel_id != chan_channel_id {
+        return Err(anyhow!("Suspcious broadcast_id or channel_id"));
+    }
+
+    let Some(channel_info) = chan.channel_info else {
+        return Err(anyhow!("failed to receive channel_info"));
+    };
+    let Some(track_info) = chan.track_info else {
+        return Err(anyhow!("failed to receive track_info"));
+    };
+
+    let valid_channel_info = ValidChannelInfo::from(&channel_info);
+    let valid_track_info = ValidTrackInfo::from(&track_info);
+
+    let target_channel =
+        state.repository.create_or_get(channel_id, Some(valid_channel_info), Some(valid_track_info), None);
+
+    // ここでいよいよConnectionにしてWrapする
+    // let name = format!("PCP-{}", handshaked.parts.cno);
+    // let spawner = tokio::task::Builder::new().name(&name);
+    // let _handle = spawner.spawn(serve_root(
+    //     state,
+    //     graceful_shutdown,
+    //     name.clone(),
+    //     broadcast_id,
+    //     handshaked.parts,
+    // ))?;
+    // {}
+
+    Ok(())
+}
 
 /*
 #[inline]
@@ -265,4 +316,74 @@ fn get_tracker_addr(remote_addr: &SocketAddr, addresses: &Vec<SocketAddr>) -> Op
     // tracker_host
     todo!()
 }
+async fn check_protocol(
+    cno: ConnectionNo,
+    mut stream: TcpStream,
+    remote: SocketAddr,
+) -> Result<(TcpStream, BytesMut, ConnectionProtocol), ()> {
+    const MAX_READ_SIZE: usize = 8192;
+    let mut read_buff = BytesMut::with_capacity(MAX_READ_SIZE);
+
+    let mut sum = 0;
+    loop {
+        if sum > MAX_READ_SIZE {
+            error!(?cno, ?remote, "Read Buffer reach MAX_READ_SIZE");
+            return Err(());
+        }
+
+        match stream.read_buf(&mut read_buff).await {
+            Err(e) => {
+                error!(?cno, ?remote, "Failed: read_buf: {}", e);
+                return Err(());
+            }
+            Ok(0) => {
+                info!(?cno, ?remote, "STREAM is closed");
+                return Err(());
+            }
+            Ok(read_num) => {
+                sum = sum + read_num;
+            }
+        };
+
+        match identify_protocol(&read_buff[..]) {
+            Some(protocol) => return Ok((stream, read_buff, protocol)),
+            None => continue,
+        }
+    }
+}
+    // let (mut stream, buff, protocol) = match timeout(Duration::from_secs(5), check_protocol(cno, stream, remote)).await
+    // {
+    //     Err(e) => {
+    //         error!(?cno, ?remote, "Failed: timeout: {}", e);
+    //         // MEMO: stream.shutdown().await; は runtimeに任せる
+    //         return;
+    //     }
+    //     Ok(Err(_e)) => {
+    //         error!(?cno, ?remote, "Failed: check_protocol()");
+    //         // MEMO: stream.shutdown().await; は runtimeに任せる
+    //         return;
+    //     }
+    //     Ok(Ok(val)) => val,
+    // };
+
+    // match protocol {
+    //     ConnectionProtocol::Pcp => {
+    //         info!(?cno, ?remote, "STREAM is PeerCast Protocol");
+    //         // let conn = factory.create_accepted_connection(cno, stream, remote, BytesMut::new(), buff);
+    //         let _handle = tokio::spawn(serve_root());
+    //     }
+    //     ConnectionProtocol::HttpPcp => {
+    //         error!("PeerCastHttp is not allowed");
+    //         let _ = stream.shutdown().await;
+    //     }
+    //     ConnectionProtocol::Http => {
+    //         warn!(?cno, ?remote, "STREAM is HTTP Protocol");
+    //         // serve_http(cno, stream, remote, graceful_shutdown, force_shutdown).await
+    //         let _ = stream.shutdown().await;
+    //     }
+    //     ConnectionProtocol::Unknown => {
+    //         warn!(?cno, ?remote, "STREAM is Unkwon Protocol");
+    //         let _ = stream.shutdown().await;
+    //     }
+    // };
  */

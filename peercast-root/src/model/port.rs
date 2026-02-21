@@ -2,9 +2,11 @@ use core::fmt;
 
 use sqlx::{Sqlite, sqlite::SqliteTypeInfo};
 
-
+////////////////////////////////////////////////////////////////////////////////
+// PortLevel
+//
 /// ポートチェックされたPeerCastの疎通レベル
-#[repr(i16)]
+#[repr(i8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PortLevel {
     /// ポートチェックしたが疎通できなかった
@@ -17,7 +19,7 @@ pub enum PortLevel {
     Welldone = 1,
 
     // 疎通OK, 配信速度OK
-    WelldoneWithSpeed(i16)
+    WelldoneWithSpeed = 2,
 }
 
 impl fmt::Display for PortLevel {
@@ -26,44 +28,46 @@ impl fmt::Display for PortLevel {
             PortLevel::Incomplete => write!(f, "Incomplete"),
             PortLevel::None => write!(f, "None"),
             PortLevel::Welldone => write!(f, "Welldone"),
-            PortLevel::WelldoneWithSpeed(speed) => write!(f, "WelldoneWithSpeed({})", speed),
+            PortLevel::WelldoneWithSpeed => write!(f, "WelldoneWithSpeed"),
         }
     }
 }
 
-impl From<i16> for PortLevel {
-    fn from(value: i16) -> Self {
+impl TryFrom<i8> for PortLevel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
         match value {
-            -1 => PortLevel::Incomplete,
-            0 => PortLevel::None,
-            1 => PortLevel::Welldone,
-            v if v >= 2 => PortLevel::WelldoneWithSpeed(v),
-            _ => PortLevel::Incomplete, // デフォルト値
+            -1 => Ok(PortLevel::Incomplete),
+            0 => Ok(PortLevel::None),
+            1 => Ok(PortLevel::Welldone),
+            2 => Ok(PortLevel::WelldoneWithSpeed),
+            _ => Err(anyhow::anyhow!("Invalid PortLevel value: {}", value)),
         }
-    }
-}
-
-
-impl sqlx::Type<Sqlite> for PortLevel
-where
-    Vec<u8>: sqlx::Type<Sqlite>,
-{
-    fn type_info() -> SqliteTypeInfo {
-        <i16 as sqlx::Type<Sqlite>>::type_info()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // SQLx Encode / Decode
+impl sqlx::Type<Sqlite> for PortLevel
+where
+    Vec<u8>: sqlx::Type<Sqlite>,
+{
+    fn type_info() -> SqliteTypeInfo {
+        <i8 as sqlx::Type<Sqlite>>::type_info()
+    }
+}
+
 impl<'r> sqlx::Decode<'r, Sqlite> for PortLevel {
     fn decode(value: <Sqlite as sqlx::Database>::ValueRef<'r>) -> Result<Self, sqlx::error::BoxDynError> {
-        let int_value = <i16 as sqlx::Decode<'r, Sqlite>>::decode(value)?;
+        let int_value = <i8 as sqlx::Decode<'r, Sqlite>>::decode(value)?;
 
         match int_value {
             -1 => Ok(PortLevel::Incomplete),
             0 => Ok(PortLevel::None),
             1 => Ok(PortLevel::Welldone),
-            v if v >= 2 => Ok(PortLevel::WelldoneWithSpeed(v)),
+            2 => Ok(PortLevel::WelldoneWithSpeed),
+            // DBに不正な値が入っていた場合、エラーになっちゃうけどいい？
             _ => Err("Invalid PortLevel value".into()),
         }
     }
@@ -74,19 +78,16 @@ impl<'r> sqlx::Encode<'r, Sqlite> for PortLevel {
         &self,
         buf: &mut <Sqlite as sqlx::Database>::ArgumentBuffer<'r>,
     ) -> Result<sqlx::encode::IsNull, sqlx::error::BoxDynError> {
-        let int_value: i16 = match self {
+        let int_value: i8 = match self {
             PortLevel::Incomplete => -1,
             PortLevel::None => 0,
             PortLevel::Welldone => 1,
-            PortLevel::WelldoneWithSpeed(speed) => *speed,
+            PortLevel::WelldoneWithSpeed => 2,
         };
 
-        <i16 as sqlx::Encode<Sqlite>>::encode(int_value, buf)
+        <i8 as sqlx::Encode<Sqlite>>::encode(int_value, buf)
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -107,16 +108,16 @@ mod tests {
         assert!(PortLevel::Incomplete == PortLevel::Incomplete);
         assert!(PortLevel::Incomplete < PortLevel::None);
         assert!(PortLevel::Incomplete < PortLevel::Welldone);
-        assert!(PortLevel::Incomplete < PortLevel::WelldoneWithSpeed(0));
+        assert!(PortLevel::Incomplete < PortLevel::WelldoneWithSpeed);
         //
         assert!(PortLevel::None < PortLevel::Welldone);
-        assert!(PortLevel::None < PortLevel::WelldoneWithSpeed(0));
+        assert!(PortLevel::None < PortLevel::WelldoneWithSpeed);
         //
-        assert!(PortLevel::Welldone < PortLevel::WelldoneWithSpeed(0));
+        assert!(PortLevel::Welldone < PortLevel::WelldoneWithSpeed);
         //
-        assert!(PortLevel::WelldoneWithSpeed(0) < PortLevel::WelldoneWithSpeed(1));
-        assert!(PortLevel::WelldoneWithSpeed(1) > PortLevel::WelldoneWithSpeed(0));
-        assert!(PortLevel::WelldoneWithSpeed(1) == PortLevel::WelldoneWithSpeed(1));
-        assert!(PortLevel::WelldoneWithSpeed(0) != PortLevel::WelldoneWithSpeed(1));
+        // assert!(PortLevel::WelldoneWithSpeed(0) < PortLevel::WelldoneWithSpeed(1));
+        // assert!(PortLevel::WelldoneWithSpeed(1) > PortLevel::WelldoneWithSpeed(0));
+        // assert!(PortLevel::WelldoneWithSpeed(1) == PortLevel::WelldoneWithSpeed(1));
+        // assert!(PortLevel::WelldoneWithSpeed(0) != PortLevel::WelldoneWithSpeed(1));
     }
 }

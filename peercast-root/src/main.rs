@@ -58,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
+    let self_session_id = GnuId::new();
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     let (connection_factory, connection_manager) = shared_connection_factory();
 
@@ -85,7 +86,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
         };
 
         let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
-        let dummy_channel_info = libpeercast_re::pcp::ChannelInfo {
+        let dummy_channel_info = libpeercast_re::pcp::ValidChannelInfo {
             name: "Dummyチャンネル名".to_string(),
             url: "http://example.com".to_string(),
             genre: format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into(),
@@ -94,9 +95,9 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
             stream_type: "video/x-flv".to_string(),
             stream_ext: ".flv".to_string(),
             bitrate: 128,
-            typ: "FLV".to_string(),
+            typee: "FLV".to_string(),
         };
-        let dummy_track_info = libpeercast_re::pcp::TrackInfo {
+        let dummy_track_info = libpeercast_re::pcp::ValidTrackInfo {
             title: "Dummy Track".to_string(),
             creator: "Dummy Artist".to_string(),
             url: "http://example.com/track".to_string(),
@@ -123,6 +124,7 @@ async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAdd
     let yellow_page = Arc::new(yellow_page);
 
     let app_sate = AppState {
+        self_session_id,
         config: Arc::new(api_config),
         index_txt_footer,
         db_pool,

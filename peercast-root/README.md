@@ -28,6 +28,9 @@ cargo sqlx prepare
 ```
 
 
+### MEMO
+port_speedは0~1000の値を取る
+
 ## TODO
 - IPv4 in IPv6で最適化(DB上も16bytes固定になっていいかも？)
 
