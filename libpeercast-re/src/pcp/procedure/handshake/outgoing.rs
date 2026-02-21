@@ -11,44 +11,41 @@ use tokio_util::codec::{Framed, FramedParts};
 use tower_http::follow_redirect::policy::PolicyExt;
 use tracing::debug;
 
-use crate::pcp::{
-    atom2::{codec::AtomCodec, Atom2},
-    builder2::{OlehInfo, PingBuilder2},
-    GnuId,
+use super::HandshakeError;
+use crate::{
+    io::Io,
+    pcp::{
+        atom2::{codec::AtomCodec, Atom2},
+        builder2::{OlehInfo, PingBuilder2},
+        procedure::handshake::PartsWrapFramed,
+        GnuId,
+    },
+    ConnectionNo,
 };
 
-#[derive(Debug, thiserror::Error)]
-pub enum HandshakeError {
-    #[error("failed")]
-    Failed,
-
-    #[error(transparent)]
-    AtomParseError(#[from] crate::error::AtomParseError),
-
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-}
-
-pub struct OutgoingPcpHandshake {
-    stream: TcpStream,
+pub struct OutgoingPcpHandshake<S: Io> {
+    cno: ConnectionNo,
+    stream: S,
     remote: SocketAddr,
     read_buf: BytesMut,
 }
 
-impl OutgoingPcpHandshake {
-    pub fn new(stream: TcpStream, remote: SocketAddr, read_buf: Option<BytesMut>) -> Self {
+impl<S: Io> OutgoingPcpHandshake<S> {
+    pub fn new(stream: S, remote: SocketAddr, read_buf: Option<BytesMut>) -> Self {
         Self {
+            cno: ConnectionNo::new(),
             stream,
             remote,
             read_buf: read_buf.unwrap_or_else(|| BytesMut::with_capacity(4096)),
         }
     }
 
-    pub fn finish(self) -> (TcpStream, SocketAddr, BytesMut) {
+    pub fn finish(self) -> (S, SocketAddr, BytesMut) {
         let Self {
             stream,
             remote,
             read_buf,
+            cno,
         } = self;
 
         (stream, remote, read_buf)
@@ -73,8 +70,9 @@ impl OutgoingPcpHandshake {
         // remote_session_id: Option<GnuId>,
         port: Option<u16>,
         port_check: Option<u16>,
-    ) -> Result<(OlehInfo, HandshakeResult), HandshakeError> {
+    ) -> Result<(OlehInfo, HandshakeResult<S>), HandshakeError> {
         let Self {
+            cno,
             stream,
             remote,
             read_buf,
@@ -94,21 +92,15 @@ impl OutgoingPcpHandshake {
             Some(Ok(a)) => a,
         };
 
-        let oleh = OlehInfo::try_from(oleh_candidate).map_err(|_| HandshakeError::Failed)?;
+        let oleh = OlehInfo::try_from(&oleh_candidate).map_err(|_| HandshakeError::Failed)?;
 
-        let FramedParts {
-            io,
-            codec,
-            read_buf,
-            write_buf,
-            ..
-        } = framed.into_parts();
-
+        let parts = PartsWrapFramed {
+            cno,
+            remote,
+            framed,
+        };
         let ret = HandshakeResult {
-            stream: io,
-            remote: remote,
-            read_buf: read_buf,
-            write_buf: write_buf,
+            parts,
         };
 
         Ok((oleh, ret))
@@ -116,9 +108,6 @@ impl OutgoingPcpHandshake {
 }
 
 #[derive(Debug)]
-pub struct HandshakeResult {
-    pub stream: TcpStream,
-    pub remote: SocketAddr,
-    pub read_buf: BytesMut,
-    pub write_buf: BytesMut,
+pub struct HandshakeResult<S: Io> {
+    pub parts: PartsWrapFramed<S>,
 }

@@ -19,6 +19,8 @@ pub const PKG_SERVANT_VERSION_EX_NUMBER: Lazy<u16> = Lazy::new(|| {
     major * 100 + minor
 });
 
+pub const DEFAULT_HTTP_HEADER_ACCEPT_SIZE: usize = 8192;
+
 pub mod config;
 
 mod conn;
