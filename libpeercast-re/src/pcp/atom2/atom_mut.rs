@@ -1,11 +1,12 @@
-use std::fmt;
+use std::{fmt, net::IpAddr};
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use daemonize::Parent;
+use ipnet::IpAdd;
 use nom::combinator::into;
 
 use crate::pcp::{
-    atom2::{Atom2, Atom2Kind, AtomView, ChildView, Kind, ParentView},
+    atom2::{parser, Atom2, Atom2Kind, AtomView, ChildView, Kind, ParentView},
     GnuId, Id4,
 };
 
@@ -27,6 +28,10 @@ impl fmt::Debug for AtomMut {
 }
 
 impl AtomMut {
+    pub fn id(&self) -> Id4 {
+        self.id
+    }
+
     /// Atomのバイト長を取得する(ヘッダ部分を除く)
     pub fn payload_length_byte(&self) -> u32 {
         match &self.data {
@@ -219,6 +224,62 @@ impl From<(Id4, i32)> for AtomMut {
     fn from((id, value): (Id4, i32)) -> Self {
         let mut payload = BytesMut::with_capacity(4);
         payload.put_i32_le(value); // LE
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+/// Vec<u8>AtomMutに変換する
+/// ※文字列であれば呼び出し側が\0を最後に付加すること
+impl From<(Id4, Vec<u8>)> for AtomMut {
+    fn from((id, value): (Id4, Vec<u8>)) -> Self {
+        let mut payload = BytesMut::with_capacity(value.len());
+        payload.copy_from_slice(&value[..]);
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+/// String(内部はUTF-8)をAtomMutに変換する
+/// 自動的に文字列末尾に\0を挿入する
+impl From<(Id4, String)> for AtomMut {
+    fn from((id, value): (Id4, String)) -> Self {
+        let mut payload = BytesMut::with_capacity(value.len() + 1);
+        payload.copy_from_slice(value.as_bytes());
+        payload.put_u8(b'\0');
+
+        AtomMut {
+            id: id,
+            data: AtomDataMut::Child(payload),
+        }
+    }
+}
+
+impl From<(Id4, IpAddr)> for AtomMut {
+    fn from((id, value): (Id4, IpAddr)) -> Self {
+        let payload = match value {
+            IpAddr::V4(ip) => {
+                // LEでエンコードする
+                let mut oct = ip.octets();
+                oct.reverse();
+                let mut buf = BytesMut::with_capacity(4);
+                buf.put_slice(&oct[..]);
+                buf
+            }
+            IpAddr::V6(ip) => {
+                // BEでエンコードする
+                // let bytes = Into::<u128>::into(ip).to_be_bytes();
+                let mut buf = BytesMut::with_capacity(4);
+                buf.put_slice(&ip.octets());
+                buf
+            }
+        };
 
         AtomMut {
             id: id,

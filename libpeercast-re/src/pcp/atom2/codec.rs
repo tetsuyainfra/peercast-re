@@ -3,6 +3,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 use crate::pcp::atom2::{atom_mut::AtomMut, parser::ParseError, Atom2};
 
+#[derive(Debug)]
 pub struct AtomCodec;
 
 impl AtomCodec {

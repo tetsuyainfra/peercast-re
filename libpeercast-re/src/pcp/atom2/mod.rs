@@ -13,6 +13,7 @@ use crate::pcp::{atom2::atom_mut::AtomMut, Atom, Id4};
 
 pub mod atom_mut;
 pub mod codec;
+pub mod decode2;
 pub mod parser;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -66,6 +67,7 @@ pub trait AtomView {
 /// Atom2
 /// Atom2が作成された時点で、内部データの完全性は保証されているものとする。
 /// 例えば、lengthフィールドが実際のデータ長と一致していることなどを含む。
+#[derive(Clone)]
 pub struct Atom2 {
     raw: bytes::Bytes,
     // verified: bool, // TODO:もしこの構造体内でデータの整合性を検証するならば、このフィールドが必要になる
@@ -115,11 +117,38 @@ impl AtomView for Atom2 {
 
 impl fmt::Debug for Atom2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Atom2")
-            .field("id", &self.id())
-            .field("length", &self.length())
-            .field("length", &self.view())
-            .finish()
+        match self.view() {
+            Atom2Kind::Parent(parent_view) => {
+                //
+                f.debug_struct("Atom2")
+                    .field("id", &parent_view.id())
+                    .field("length", &parent_view.length())
+                    .field("children", &parent_view.children())
+                    .finish()
+            }
+            Atom2Kind::Child(child_view) => {
+                //
+                f.debug_struct("Atom2")
+                    .field("id", &child_view.id())
+                    .field("length", &child_view.length())
+                    .field("payload", &child_view.payload())
+                    .finish()
+            }
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for Atom2 {
+    type Error = parser::ParseError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        match parser::try_parse_atom(value) {
+            Ok(length) => {
+                let buf = bytes::Bytes::copy_from_slice(&value[0..length as usize]);
+                Ok(Atom2::new(buf))
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -132,6 +161,15 @@ pub enum Atom2Kind<'a> {
     Child(ChildView<'a>),
 }
 
+impl AtomView for Atom2Kind<'_> {
+    fn raw(&self) -> &[u8] {
+        match self {
+            Atom2Kind::Parent(parent_view) => parent_view.raw(),
+            Atom2Kind::Child(child_view) => child_view.raw(),
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildView
 ///
@@ -139,16 +177,16 @@ pub struct ChildView<'a> {
     buf: &'a [u8],
 }
 
-impl AtomView for ChildView<'_> {
-    fn raw(&self) -> &[u8] {
-        self.buf
-    }
-}
-
 impl ChildView<'_> {
     pub fn data(&self) -> &[u8] {
         debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
         &self.buf[8..]
+    }
+}
+
+impl AtomView for ChildView<'_> {
+    fn raw(&self) -> &[u8] {
+        self.buf
     }
 }
 
@@ -171,12 +209,6 @@ pub struct ParentView<'a> {
     buf: &'a [u8],
 }
 
-impl AtomView for ParentView<'_> {
-    fn raw(&self) -> &[u8] {
-        self.buf
-    }
-}
-
 impl ParentView<'_> {
     /// 子Atomのイテレータを返す
     pub fn children(&self) -> ChildIter<'_> {
@@ -184,6 +216,12 @@ impl ParentView<'_> {
             // buf: self.payload(),
             buf: &self.buf[8..],
         }
+    }
+}
+
+impl AtomView for ParentView<'_> {
+    fn raw(&self) -> &[u8] {
+        self.buf
     }
 }
 
@@ -202,6 +240,7 @@ impl fmt::Debug for ParentView<'_> {
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildIter
 ///
+#[derive(Clone)]
 pub struct ChildIter<'a> {
     buf: &'a [u8],
 }
@@ -244,6 +283,15 @@ impl<'a> Iterator for ChildIter<'a> {
                 }))
             }
         }
+    }
+}
+
+impl fmt::Debug for ChildIter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list()
+            //
+            .entries(self.clone())
+            .finish()
     }
 }
 
@@ -405,6 +453,7 @@ mod tests {
         };
         assert_eq!(pv.id(), Id4::PCP_HELO);
         assert_eq!(pv.length(), 3); // 子Atomが2つ
+        dbg!(&pv);
         let mut citr = pv.children();
 
         let v1 = citr.next().unwrap();
