@@ -1,6 +1,6 @@
 use serde::de;
 
-use crate::pcp::{ChannelInfo, GnuId, TrackInfo};
+use crate::pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo};
 
 use super::Channel;
 
@@ -21,8 +21,8 @@ impl DummyChannelConfig {
 pub struct DummyChannel {
     id: GnuId,
     config: DummyChannelConfig,
-    channel_info: Option<ChannelInfo>,
-    track_info: Option<TrackInfo>,
+    channel_info: Option<ValidChannelInfo>,
+    track_info: Option<ValidTrackInfo>,
 }
 
 impl Channel for DummyChannel {
@@ -30,8 +30,8 @@ impl Channel for DummyChannel {
 
     fn new(
         id: crate::pcp::GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<Self::Config>,
     ) -> Self {
         DummyChannel {
@@ -70,11 +70,11 @@ impl Channel for DummyChannel {
         todo!()
     }
 
-    fn channel_info(&self) -> Option<ChannelInfo> {
+    fn channel_info(&self) -> Option<ValidChannelInfo> {
         todo!()
     }
 
-    fn track_info(&self) -> Option<TrackInfo> {
+    fn track_info(&self) -> Option<ValidTrackInfo> {
         todo!()
     }
 

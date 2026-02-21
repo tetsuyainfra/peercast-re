@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, future::Future, marker::PhantomData};
 
 use crate::{
-    pcp::{ChannelInfo, GnuId, TrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
     repository::typical_repository::TypicalRepository,
 };
 
@@ -40,8 +40,8 @@ where
     fn create(
         &self,
         id: GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<<C as Channel>::Config>,
     ) -> (C, bool) {
         self.impl_.borrow_mut().create(id, channel_info, track_info, config)
@@ -50,8 +50,8 @@ where
     fn create_or_get(
         &self,
         id: crate::pcp::GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<C::Config>,
     ) -> impl Future<Output = C> {
         let (mut ch, is_create) = self.impl_.borrow_mut().create(id, channel_info, track_info, config);

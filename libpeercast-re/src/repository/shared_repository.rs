@@ -6,7 +6,7 @@ use std::{
 use tracing::debug;
 
 use crate::{
-    pcp::GnuId,
+    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo},
     repository::{typical_repository::TypicalRepository, Channel, Repository},
     util::mutex_poisoned,
 };
@@ -71,8 +71,8 @@ where
     fn create(
         &self,
         id: GnuId,
-        channel_info: Option<crate::pcp::ChannelInfo>,
-        track_info: Option<crate::pcp::TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<<C as Channel>::Config>,
     ) -> (C, bool) {
         self.lock_impl(|repo| repo.create(id, channel_info, track_info, config))
@@ -81,8 +81,8 @@ where
     fn create_or_get(
         &self,
         id: crate::pcp::GnuId,
-        channel_info: Option<crate::pcp::ChannelInfo>,
-        track_info: Option<crate::pcp::TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<C::Config>,
     ) -> impl Future<Output = C> + Send {
         let (mut ch, is_create) = { self.lock_impl(|repo| repo.create(id, channel_info, track_info, config)) };

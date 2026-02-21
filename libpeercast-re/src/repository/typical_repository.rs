@@ -1,7 +1,7 @@
 use std::{collections::HashMap, future::Future};
 
 use crate::{
-    pcp::{ChannelInfo, GnuId, TrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
     repository::{Channel, Repository},
 };
 
@@ -36,8 +36,8 @@ where
     pub fn create(
         &mut self,
         id: GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<<C as Channel>::Config>,
     ) -> (C, bool) {
         match self.channels.get(&id) {

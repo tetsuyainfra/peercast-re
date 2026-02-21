@@ -7,10 +7,45 @@ use bytes::Buf;
 
 use crate::pcp::{
     atom2::{Atom2Kind, AtomView},
-    builder2::ParseError,
-    Atom2, GnuId, Id4,
+    builder2::{self, ParseError},
+    Atom2, AtomMut, GnuId, Id4,
 };
 use crate::prelude::*;
+
+#[derive(Debug)]
+pub struct OlehBuilder2 {
+    session_id: GnuId,
+    remote_ip: IpAddr,
+    remote_port: u16,
+}
+
+impl OlehBuilder2 {
+    ///
+    /// @session_id: 送信側SessionID
+    /// @remote_ip: 送信先のIP
+    /// @remote_port: 送信先のポート(HELOで送ってきたPING_PORTをチェックした結果のポート) 0を入れても良い
+    pub fn new(session_id: GnuId, remote_ip: IpAddr, remote_port: u16) -> Self {
+        Self {
+            session_id,
+            remote_ip,
+            remote_port,
+        }
+    }
+
+    pub fn build(self) -> AtomMut {
+        let mut atoms: Vec<AtomMut> = Vec::with_capacity(6);
+        atoms.push(builder2::AGENT.clone().into());
+        atoms.push(builder2::VERSION.clone().into());
+
+        atoms.push((Id4::PCP_HELO_SESSIONID, self.session_id).into());
+
+        //
+        atoms.push((Id4::PCP_HELO_REMOTEIP, self.remote_ip).into());
+        atoms.push((Id4::PCP_HELO_PING, self.remote_port).into());
+
+        (Id4::PCP_OLEH, atoms).into()
+    }
+}
 
 #[derive(Debug)]
 pub struct OlehInfo {
@@ -18,14 +53,13 @@ pub struct OlehInfo {
     pub remote_ip: Option<IpAddr>,
     pub agent: Option<String>,
     pub port: Option<u16>,
-    pub port_check: Option<u16>,
     pub version: Option<u32>,
 }
 
-impl TryFrom<Atom2> for OlehInfo {
+impl TryFrom<&Atom2> for OlehInfo {
     type Error = ParseError;
 
-    fn try_from(atom: Atom2) -> Result<Self, Self::Error> {
+    fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
         if atom.id() != Id4::PCP_OLEH {
             return Err(ParseError::TargetNotFound);
         }
@@ -35,9 +69,11 @@ impl TryFrom<Atom2> for OlehInfo {
             Atom2Kind::Child(_) => return Err(ParseError::TargetNotFound),
         };
 
-        let (mut session_id, mut remote_ip, mut agent, mut port, mut port_check, mut version) =
-            (None, None, None, None, None, None);
-
+        let mut session_id = None;
+        let mut remote_ip = None;
+        let mut agent = None;
+        let mut port = None;
+        let mut version = None;
         for child in pv.children() {
             if let Atom2Kind::Child(cv) = child {
                 match cv.id() {
@@ -64,11 +100,6 @@ impl TryFrom<Atom2> for OlehInfo {
                             port = Some(cv.payload().get_u16_le());
                         }
                     }
-                    Id4::PCP_HELO_PING => {
-                        if cv.payload().len() >= 2 {
-                            port_check = Some(cv.payload().get_u16_le());
-                        }
-                    }
                     Id4::PCP_HELO_VERSION => {
                         if cv.payload().len() >= 4 {
                             version = Some(cv.payload().get_u32_le());
@@ -86,7 +117,6 @@ impl TryFrom<Atom2> for OlehInfo {
             remote_ip,
             agent,
             port,
-            port_check,
             version,
         })
     }

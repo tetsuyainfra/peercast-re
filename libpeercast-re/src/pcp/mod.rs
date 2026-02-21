@@ -8,6 +8,7 @@ pub mod builder2;
 
 /// Channel Struct
 mod channel;
+mod channel2;
 // mod channel2;
 mod classify;
 pub mod connection;
@@ -27,6 +28,7 @@ mod util;
 pub use atom::{decode, encode, read_atom, Atom, ChildAtom, ParentAtom};
 pub use atom2::{atom_mut::AtomMut, codec::AtomCodec, Atom2};
 pub use channel::*;
+pub use channel2::{ValidChannelInfo, ValidTrackInfo};
 pub use connection::PcpConnectionFactory;
 pub use gnuid::{GnuId, GnuIdParseError};
 pub use id4::Id4;

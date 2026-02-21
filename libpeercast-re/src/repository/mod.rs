@@ -1,6 +1,6 @@
 use std::{future::Future, net::SocketAddr};
 
-use crate::pcp::{ChannelInfo, GnuId, TrackInfo};
+use crate::pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo};
 
 mod dummy_channel;
 mod local_repository;
@@ -42,8 +42,8 @@ pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 's
 
     fn new(
         id: GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<Self::Config>
     ) -> Self;
 
@@ -61,8 +61,8 @@ pub trait Channel : Clone + Send + Sync + PartialEq + Eq + std::fmt::Debug  + 's
     fn update_config(&mut self, config: Self::Config);
 
     fn tracker_address(&self) -> Option<SocketAddr>;
-    fn channel_info(&self) -> Option<ChannelInfo>;
-    fn track_info(&self) -> Option<TrackInfo>;
+    fn channel_info(&self) -> Option<ValidChannelInfo>;
+    fn track_info(&self) -> Option<ValidTrackInfo>;
     fn number_of_listener(&self) -> i32;
     fn number_of_relay(&self) -> i32;
 
@@ -85,15 +85,15 @@ pub trait Repository<C: Channel> {
     fn create(
         &self,
         id: GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<C::Config>,
     ) -> (C, bool);
     fn create_or_get(
         &self,
         id: GnuId,
-        channel_info: Option<ChannelInfo>,
-        track_info: Option<TrackInfo>,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
         config: Option<C::Config>,
     ) -> impl Future<Output = C> + Send;
 
