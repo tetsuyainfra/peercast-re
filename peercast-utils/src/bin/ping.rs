@@ -6,7 +6,7 @@
 //  MEMO: portcheckしてもらうにはHttpでChannelIdを通知する必要がある
 use clap::Parser;
 use futures_util::StreamExt;
-use libpeercast_re::pcp::{AtomCodec, GnuId, procedure::OutgoingPcpHandshake};
+use libpeercast_re::pcp::{AtomCodec, GnuId, procedure::handshake::OutgoingPcpHandshake};
 use tokio::net::TcpListener;
 use tokio_util::codec::Framed;
 
@@ -37,10 +37,10 @@ async fn main() -> anyhow::Result<()> {
     let stream = tokio::net::TcpStream::connect(remote).await?;
     // let local_addr = stream.local_addr().unwrap();
     let handshake = OutgoingPcpHandshake::new(stream, remote, None);
-    let (oleh, handshake) = handshake.ping(self_session_id, Some(args.bind), args.check_port).await?;
+    let (oleh, mut ret) = handshake.ping(self_session_id, Some(args.bind), args.check_port).await?;
 
     dbg!(&oleh);
-    dbg!(&handshake);
+    dbg!(&ret);
 
     Ok(())
 }
