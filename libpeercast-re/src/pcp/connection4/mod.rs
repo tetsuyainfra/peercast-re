@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use crate::ConnectionNo;
+use crate::{io::Io, ConnectionNo};
 
 /// Connection型の特性を定義するtrait
 pub trait ConnectionSpec {
@@ -13,8 +13,8 @@ pub trait ConnectionSpec {
     type State: Send + Sync;
     type Stats: Send + Sync;
     //
-    type Handle: ConnectionHandle<Spec = Self> + Clone;
-    type Manager: ConnectionManager<Spec = Self> + Clone;
+    type Handle: ConnectionHandle<Spec = Self> + Clone + std::fmt::Debug;
+    type Manager: ConnectionManager<Spec = Self> + Clone + std::fmt::Debug;
     // type Factory: ConnectionFactory<Spec = Self>;
 }
 

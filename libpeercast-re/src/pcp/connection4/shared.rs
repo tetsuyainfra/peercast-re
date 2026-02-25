@@ -12,6 +12,7 @@ use crate::{
 ////////////////////////////////////////////////////////////////////////////////
 /// SharedConnectionManager
 ///
+#[derive(Debug)]
 pub struct SharedManager<S>
 where
     S: ConnectionSpec<Manager = Self>,
@@ -67,6 +68,7 @@ where
 ////////////////////////////////////////////////////////////////////////////////
 /// SharedConnectionFactory
 ///
+#[derive(Debug)]
 pub struct SharedFactory<S>
 where
     S: ConnectionSpec,
@@ -112,11 +114,10 @@ where
 // HandshakeConnection
 //
 
-//
 ////////////////////////////////////////////////////////////////////////////////
-// SharedConnection
+// connection_factory()
 //
-pub fn shared_factory<S>() -> (SharedFactory<S>, SharedManager<S>)
+pub fn connection_factory<S>() -> (SharedFactory<S>, SharedManager<S>)
 where
     S: ConnectionSpec<Manager = SharedManager<S>>,
 {

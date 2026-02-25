@@ -11,6 +11,7 @@ use crate::{
     ConnectionNo,
 };
 
+#[derive(Debug)]
 pub struct MySpec();
 impl ConnectionSpec for MySpec {
     type Handshake = MyHandshakeConnection;
@@ -97,7 +98,7 @@ impl HandshakeConnection for MyHandshakeConnection {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MyConnectionHandle {
     cno: ConnectionNo,
     remote: SocketAddr,
@@ -210,7 +211,7 @@ mod t {
 
     #[tokio::test]
     async fn test() {
-        let (factory, manager) = shared::shared_factory::<MySpec>();
+        let (factory, manager) = shared::connection_factory::<MySpec>();
 
         let cno = ConnectionNo::new();
         let remote: SocketAddr = "127.0.0.1:7144".parse().unwrap();
