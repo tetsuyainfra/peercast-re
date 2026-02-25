@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 
 use crate::ConnectionNo;
+
+/// Connection型の特性を定義するtrait
 pub trait ConnectionSpec {
     // Handshakeを行う型 .handshake()を呼び出して次のEstablishedに遷移させる
     type Handshake: HandshakeConnection<Spec = Self>;
@@ -8,7 +10,7 @@ pub trait ConnectionSpec {
 
     // 通信の管理を実現する型 .run()を呼び出して使う
     type Established: EstablishedConnection<Spec = Self>;
-    //
+    type State: Send + Sync;
     type Stats: Send + Sync;
     //
     type Handle: ConnectionHandle<Spec = Self> + Clone;
@@ -19,6 +21,7 @@ pub trait ConnectionSpec {
 #[async_trait::async_trait]
 pub trait HandshakeConnection: Sized {
     type Spec: ConnectionSpec<Handshake = Self>;
+    type Error;
 
     fn new(
         cno: ConnectionNo,
@@ -27,14 +30,18 @@ pub trait HandshakeConnection: Sized {
         manager: <Self::Spec as ConnectionSpec>::Manager,
     ) -> Self;
 
+    fn manager(&self) -> &<Self::Spec as ConnectionSpec>::Manager;
     fn cno(&self) -> ConnectionNo;
 
-    async fn handshake(self) -> <Self::Spec as ConnectionSpec>::Established;
+    /// handshake()関数はSpecに定義されたEstablishdを実装した型を返す。
+    /// その際、managerにEstablish::handle()を登録する。
+    async fn handshake(self) -> Result<<Self::Spec as ConnectionSpec>::Established, Self::Error>;
 }
 
 #[async_trait::async_trait]
 pub trait EstablishedConnection: Sized {
-    type Spec: ConnectionSpec<Established = Self>;
+    type Spec: ConnectionSpec;
+    // type Spec: ConnectionSpec<Established = Self>;
 
     fn cno(&self) -> ConnectionNo;
     fn handle(&self) -> <Self::Spec as ConnectionSpec>::Handle;
@@ -47,6 +54,7 @@ pub trait ConnectionHandle {
 
     fn cno(&self) -> ConnectionNo;
 
+    fn state(&self) -> <Self::Spec as ConnectionSpec>::State;
     fn stats(&self) -> <Self::Spec as ConnectionSpec>::Stats;
 
     fn shutdown(&self) -> ();
@@ -83,4 +91,6 @@ pub trait ConnectionFactory {
 pub mod shared;
 
 #[cfg(any(test, doc))]
-mod example;
+mod example1;
+#[cfg(any(test, doc))]
+mod example2_multiple;
