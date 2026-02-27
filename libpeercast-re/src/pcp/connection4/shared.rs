@@ -125,10 +125,11 @@ where
         &self,
         cno: ConnectionNo,
         remote: std::net::SocketAddr,
+        shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
     ) -> Self::Handshake {
         let manager = self.manager.clone();
-        Self::Handshake::new(cno, remote, config, manager)
+        Self::Handshake::new(cno, remote, shutdown_token, config, manager)
     }
 }
 

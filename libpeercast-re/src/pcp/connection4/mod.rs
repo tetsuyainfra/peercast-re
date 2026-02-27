@@ -1,5 +1,7 @@
 use std::{future::Future, net::SocketAddr};
 
+use tokio_util::sync::CancellationToken;
+
 use crate::{error::ConnectionError, io::Io, ConnectionNo};
 
 /// Connection型の特性を定義するtrait
@@ -26,6 +28,7 @@ pub trait HandshakeConnection: Sized {
     fn new(
         cno: ConnectionNo,
         remote: SocketAddr,
+        shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
         manager: <Self::Spec as ConnectionSpec>::Manager,
     ) -> Self;
@@ -83,6 +86,7 @@ pub trait ConnectionFactory {
         &self,
         cno: ConnectionNo,
         remote: std::net::SocketAddr,
+        shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
     ) -> Self::Handshake;
 }

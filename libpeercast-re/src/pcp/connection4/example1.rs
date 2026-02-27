@@ -47,6 +47,7 @@ pub struct MyHandshakeConnection {
     cno: ConnectionNo,
     remote: SocketAddr,
     config: Option<()>,
+    shutdown_token: Option<tokio_util::sync::CancellationToken>,
     manager: <MySpec as ConnectionSpec>::Manager,
     //
     command_tx: mpsc::UnboundedSender<Command>,
@@ -62,6 +63,7 @@ impl HandshakeConnection for MyHandshakeConnection {
     fn new(
         cno: ConnectionNo,
         remote: SocketAddr,
+        shutdown_token: Option<tokio_util::sync::CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
         manager: <Self::Spec as ConnectionSpec>::Manager,
     ) -> Self {
@@ -70,6 +72,7 @@ impl HandshakeConnection for MyHandshakeConnection {
             cno,
             remote,
             config,
+            shutdown_token,
             manager,
             command_tx,
             command_rx,
@@ -217,7 +220,7 @@ mod t {
 
         let cno = ConnectionNo::new();
         let remote: SocketAddr = "127.0.0.1:7144".parse().unwrap();
-        let accept = factory.create_accepted_connection(cno, remote, Some(()));
+        let accept = factory.create_accepted_connection(cno, remote, None, Some(()));
 
         let r_connection = accept.handshake().await;
         assert!(r_connection.is_ok());
