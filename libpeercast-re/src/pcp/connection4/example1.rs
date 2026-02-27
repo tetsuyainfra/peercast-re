@@ -213,7 +213,7 @@ mod t {
 
     #[tokio::test]
     async fn test() {
-        let (factory, manager) = shared::connection_factory::<MySpec>(None);
+        let (factory, manager) = shared::connection_factory::<MySpec>();
 
         let cno = ConnectionNo::new();
         let remote: SocketAddr = "127.0.0.1:7144".parse().unwrap();

@@ -47,8 +47,8 @@ impl<S> SharedManager<S>
 where
     S: ConnectionSpec<Manager = Self>,
 {
-    fn new(shutdown_token: Option<CancellationToken>) -> Self {
-        let inner = SMInner::new(shutdown_token);
+    fn new() -> Self {
+        let inner = SMInner::new();
         Self {
             inner: Arc::new(Mutex::new(inner)),
         }
@@ -69,13 +69,11 @@ where
 #[derive(Debug)]
 struct SMInner<H> {
     conns: HashMap<ConnectionNo, H>,
-    shutdown_token: CancellationToken,
 }
 impl<H> SMInner<H> {
-    fn new(shutdown_token: Option<CancellationToken>) -> Self {
+    fn new() -> Self {
         Self {
             conns: Default::default(),
-            shutdown_token: shutdown_token.unwrap_or_else(|| CancellationToken::new()), // marker: std::marker::PhantomData,
         }
     }
 
@@ -96,7 +94,6 @@ impl<H> Default for SMInner<H> {
     fn default() -> Self {
         Self {
             conns: Default::default(),
-            shutdown_token: CancellationToken::new(),
         }
     }
 }
@@ -153,11 +150,11 @@ where
 ////////////////////////////////////////////////////////////////////////////////
 // connection_factory()
 //
-pub fn connection_factory<S>(shutdown_token: Option<CancellationToken>) -> (SharedFactory<S>, SharedManager<S>)
+pub fn connection_factory<S>() -> (SharedFactory<S>, SharedManager<S>)
 where
     S: ConnectionSpec<Manager = SharedManager<S>>,
 {
-    let manager = SharedManager::<S>::new(shutdown_token);
+    let manager = SharedManager::<S>::new();
     let factory = SharedFactory::<S>::new(manager.clone());
     (factory, manager)
 }
