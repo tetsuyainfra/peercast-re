@@ -17,8 +17,8 @@ pub struct SharedManager<S>
 where
     S: ConnectionSpec<Manager = Self>,
 {
-    conns: Arc<Mutex<HashMap<ConnectionNo, <S as ConnectionSpec>::Handle>>>,
-    marker: std::marker::PhantomData<S>,
+    inner: Arc<Mutex<_SharedManagerInner<<S as ConnectionSpec>::Handle>>>,
+    // marker: std::marker::PhantomData<S>,
 }
 
 impl<S> ConnectionManager for SharedManager<S>
@@ -29,11 +29,11 @@ where
     type Spec = S;
 
     fn insert(&self, handle: <Self::Spec as ConnectionSpec>::Handle) {
-        self.conns.lock().unwrap_or_else(mutex_poisoned).insert(handle.cno(), handle);
+        self.inner.lock().unwrap_or_else(mutex_poisoned).insert(handle.cno(), handle);
     }
 
     fn remove(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle> {
-        self.conns.lock().unwrap_or_else(mutex_poisoned).remove(cno)
+        self.inner.lock().unwrap_or_else(mutex_poisoned).remove(cno)
     }
 
     fn report_metrics(&self) -> Vec<(ConnectionNo, <Self::Spec as ConnectionSpec>::Stats)> {
@@ -47,8 +47,8 @@ where
 {
     fn new() -> Self {
         Self {
-            conns: Default::default(),
-            marker: std::marker::PhantomData,
+            inner: Default::default(),
+            // marker: std::marker::PhantomData,
         }
     }
 }
@@ -59,8 +59,34 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            conns: Arc::clone(&self.conns),
-            marker: std::marker::PhantomData,
+            inner: Arc::clone(&self.inner),
+            // marker: std::marker::PhantomData,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct _SharedManagerInner<H> {
+    conns: HashMap<ConnectionNo, H>,
+}
+impl<H> _SharedManagerInner<H> {
+    fn insert(&mut self, cno: ConnectionNo, handle: H) {
+        self.conns.insert(cno, handle);
+    }
+
+    fn remove(&mut self, cno: &ConnectionNo) -> Option<H> {
+        self.conns.remove(cno)
+    }
+
+    fn report_metrics<St>(&self) -> Vec<(ConnectionNo, St)> {
+        todo!()
+    }
+}
+
+impl<H> Default for _SharedManagerInner<H> {
+    fn default() -> Self {
+        Self {
+            conns: Default::default(),
         }
     }
 }
