@@ -137,7 +137,6 @@ pub enum MyEstablishedConnection {
     B(MyInner<ProtB>),
 }
 
-#[async_trait::async_trait]
 impl EstablishedConnection for MyEstablishedConnection {
     type Spec = MySpec;
 
@@ -154,7 +153,9 @@ impl EstablishedConnection for MyEstablishedConnection {
         }
     }
     //
-    async fn run(self) {}
+    fn run(self) -> impl std::future::Future<Output = Result<(), crate::error::ConnectionError>> {
+        async move { Ok(()) }
+    }
 }
 
 pub struct ProtA {}
@@ -202,6 +203,6 @@ mod t {
         let accept = factory.create_accepted_connection(cno, remote, Some(()));
 
         let connection = accept.handshake().await.unwrap();
-        connection.run().await;
+        let _ = connection.run().await;
     }
 }

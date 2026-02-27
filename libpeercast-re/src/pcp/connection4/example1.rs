@@ -136,7 +136,6 @@ pub struct MyEstablishedConnection {
     manager: <MySpec as ConnectionSpec>::Manager,
 }
 
-#[async_trait::async_trait]
 impl EstablishedConnection for MyEstablishedConnection {
     type Spec = MySpec;
 
@@ -148,18 +147,21 @@ impl EstablishedConnection for MyEstablishedConnection {
     }
 
     //
-    async fn run(mut self) {
-        loop {
-            let now_state = self.state_tx.borrow().clone();
-            let new_state = match now_state {
-                MyState::Init => self.on_init().await,
-                // MyState::Running => self.on_running().await,
-                // MyState::ShuttingDown => self.on_shutting_down().await,
-                // MyState::Draining => self.on_draining().await,
-                _ => todo!(),
-                MyState::Closed => break,
-            };
-            self.state_tx.send(new_state).unwrap();
+    fn run(mut self) -> impl std::future::Future<Output = Result<(), crate::error::ConnectionError>> {
+        async move {
+            loop {
+                let now_state = self.state_tx.borrow().clone();
+                let new_state = match now_state {
+                    MyState::Init => self.on_init().await,
+                    // MyState::Running => self.on_running().await,
+                    // MyState::ShuttingDown => self.on_shutting_down().await,
+                    // MyState::Draining => self.on_draining().await,
+                    _ => todo!(),
+                    MyState::Closed => break,
+                };
+                self.state_tx.send(new_state).unwrap();
+            }
+            Ok(())
         }
     }
 }

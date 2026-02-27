@@ -1,6 +1,6 @@
-use std::net::SocketAddr;
+use std::{future::Future, net::SocketAddr};
 
-use crate::{io::Io, ConnectionNo};
+use crate::{error::ConnectionError, io::Io, ConnectionNo};
 
 /// Connection型の特性を定義するtrait
 pub trait ConnectionSpec {
@@ -38,7 +38,6 @@ pub trait HandshakeConnection: Sized {
     async fn handshake(self) -> Result<<Self::Spec as ConnectionSpec>::Established, Self::Error>;
 }
 
-#[async_trait::async_trait]
 pub trait EstablishedConnection: Sized {
     type Spec: ConnectionSpec;
     // type Spec: ConnectionSpec<Established = Self>;
@@ -46,7 +45,7 @@ pub trait EstablishedConnection: Sized {
     fn cno(&self) -> ConnectionNo;
     fn handle(&self) -> <Self::Spec as ConnectionSpec>::Handle;
     //
-    async fn run(self);
+    fn run(self) -> impl Future<Output = Result<(), ConnectionError>>;
 }
 
 pub trait ConnectionHandle {
