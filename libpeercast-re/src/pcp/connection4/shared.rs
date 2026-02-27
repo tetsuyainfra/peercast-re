@@ -3,6 +3,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use tokio_util::sync::CancellationToken;
+
 use crate::pcp::connection4::HandshakeConnection;
 use crate::util::mutex_poisoned;
 use crate::{
@@ -17,7 +19,7 @@ pub struct SharedManager<S>
 where
     S: ConnectionSpec<Manager = Self>,
 {
-    inner: Arc<Mutex<_SharedManagerInner<<S as ConnectionSpec>::Handle>>>,
+    inner: Arc<Mutex<SMInner<<S as ConnectionSpec>::Handle>>>,
     // marker: std::marker::PhantomData<S>,
 }
 
@@ -45,10 +47,10 @@ impl<S> SharedManager<S>
 where
     S: ConnectionSpec<Manager = Self>,
 {
-    fn new() -> Self {
+    fn new(shutdown_token: Option<CancellationToken>) -> Self {
+        let inner = SMInner::new(shutdown_token);
         Self {
-            inner: Default::default(),
-            // marker: std::marker::PhantomData,
+            inner: Arc::new(Mutex::new(inner)),
         }
     }
 }
@@ -60,16 +62,23 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: Arc::clone(&self.inner),
-            // marker: std::marker::PhantomData,
         }
     }
 }
 
 #[derive(Debug)]
-struct _SharedManagerInner<H> {
+struct SMInner<H> {
     conns: HashMap<ConnectionNo, H>,
+    shutdown_token: CancellationToken,
 }
-impl<H> _SharedManagerInner<H> {
+impl<H> SMInner<H> {
+    fn new(shutdown_token: Option<CancellationToken>) -> Self {
+        Self {
+            conns: Default::default(),
+            shutdown_token: shutdown_token.unwrap_or_else(|| CancellationToken::new()), // marker: std::marker::PhantomData,
+        }
+    }
+
     fn insert(&mut self, cno: ConnectionNo, handle: H) {
         self.conns.insert(cno, handle);
     }
@@ -83,10 +92,11 @@ impl<H> _SharedManagerInner<H> {
     }
 }
 
-impl<H> Default for _SharedManagerInner<H> {
+impl<H> Default for SMInner<H> {
     fn default() -> Self {
         Self {
             conns: Default::default(),
+            shutdown_token: CancellationToken::new(),
         }
     }
 }
@@ -143,11 +153,11 @@ where
 ////////////////////////////////////////////////////////////////////////////////
 // connection_factory()
 //
-pub fn connection_factory<S>() -> (SharedFactory<S>, SharedManager<S>)
+pub fn connection_factory<S>(shutdown_token: Option<CancellationToken>) -> (SharedFactory<S>, SharedManager<S>)
 where
     S: ConnectionSpec<Manager = SharedManager<S>>,
 {
-    let manager = SharedManager::<S>::new();
+    let manager = SharedManager::<S>::new(shutdown_token);
     let factory = SharedFactory::<S>::new(manager.clone());
     (factory, manager)
 }
