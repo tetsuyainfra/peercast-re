@@ -4,8 +4,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use libpeercast_re::ConnectionNo;
-use tokio::net::TcpStream;
 
 use crate::{
     connection::RootConnectionFactory,
@@ -89,7 +87,7 @@ impl HostCheckService {
         target_port: u16,
     ) -> anyhow::Result<(PortLevel, Option<u32>)> {
         let remote = SocketAddr::new(target_addr, target_port);
-        let stream = tokio::net::TcpStream::connect(remote).await?;
+        let _stream = tokio::net::TcpStream::connect(remote).await?;
         // let _conn = conn_factory.create_outgoing_connection(ConnectionNo::new(), stream, remote);
 
         todo!()

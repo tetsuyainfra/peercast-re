@@ -9,7 +9,6 @@ use libpeercast_re::{
     io::IoStream,
     pcp::{
         Atom2, AtomCodec, AtomMut, AtomView,
-        builder::QuitBuilder,
         builder2::{QuitBuilder2, QuitReason},
         connection5::{
             Connection, ConnectionHandle, ConnectionSpec, HandshakeConnection,
@@ -19,14 +18,8 @@ use libpeercast_re::{
     },
     util::util_mpsc::mpsc_send,
 };
-use tokio::{
-    io::{AsyncReadExt, ReadHalf, WriteHalf},
-    sync::{mpsc, watch},
-};
-use tokio_util::{
-    codec::{Framed, FramedParts},
-    io::simplex::new,
-};
+use tokio::sync::{mpsc, watch};
+use tokio_util::codec::{Framed, FramedParts};
 use tracing::{error, info};
 
 pub type RootConnectionManager = SharedManager<RootSpec>;
@@ -103,7 +96,7 @@ impl HandshakeConnection for RootHandshake {
             remote,
             stream,
             shutdown_token,
-            manager,
+            manager: _,
         } = self;
 
         let discrimer = IncomingProtocolDiscriminator::new();
@@ -153,6 +146,7 @@ pub enum RootHandshakeResult {
 //
 pub struct RootEstablished {
     cno: ConnectionNo,
+    #[allow(dead_code)]
     remote: SocketAddr,
     stream: IoStream,
     read_buf: bytes::BytesMut,
@@ -163,10 +157,14 @@ pub struct RootEstablished {
     state_tx: watch::Sender<State>,
     // state_rx: watch::Receiver<State>,
     //
+    #[allow(dead_code)]
     stats_tx: watch::Sender<Stats>,
+    #[allow(dead_code)]
     stats_rx: watch::Receiver<Stats>,
     //
+    #[allow(dead_code)]
     command_tx: mpsc::UnboundedSender<Command>,
+    #[allow(dead_code)]
     command_rx: mpsc::UnboundedReceiver<Command>,
     //
     handle_inner: Arc<RHandleInner>,
@@ -394,7 +392,7 @@ impl ConnectionTask {
 
     // HERE TO PROCEDURE
     async fn on_atom(&mut self, atom: Atom2) {
-        let id = atom.id();
+        let _id = atom.id();
     }
 }
 

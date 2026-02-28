@@ -37,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let stream = tokio::net::TcpStream::connect(remote).await?;
     // let local_addr = stream.local_addr().unwrap();
     let handshake = OutgoingPcpHandshake::new(stream, remote, None);
-    let (oleh, mut ret) = handshake.ping(self_session_id, Some(args.bind), args.check_port).await?;
+    let (oleh, ret) = handshake.ping(self_session_id, Some(args.bind), args.check_port).await?;
 
     dbg!(&oleh);
     dbg!(&ret);

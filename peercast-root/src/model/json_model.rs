@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
-    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
+    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo},
     repository::Channel,
 };
 use serde::Serialize;

@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use libpeercast_re::{
-    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo, connection::PcpConnection},
+    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo, connection::PcpConnection},
     repository::{Channel, ChannelState, ChannelType},
 };
 use tokio::sync::{
@@ -102,7 +102,7 @@ impl RootChannel2 {
     pub fn control(&self) -> ChannelControl {
         ChannelControl {}
     }
-    pub fn control_with_authenticate(&self, broadcast_id: GnuId) -> AuthedChannelControl {
+    pub fn control_with_authenticate(&self, _broadcast_id: GnuId) -> AuthedChannelControl {
         AuthedChannelControl {}
     }
 
