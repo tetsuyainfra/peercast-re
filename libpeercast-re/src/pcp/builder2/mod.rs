@@ -6,6 +6,7 @@ mod host;
 mod ok;
 mod oleh;
 mod ping_pong;
+mod quit;
 mod root;
 
 pub use broadcast::*;
@@ -16,6 +17,7 @@ pub use host::*;
 pub use ok::*;
 pub use oleh::*;
 pub use ping_pong::*;
+pub use quit::*;
 pub use root::*;
 
 use crate::pcp::{Atom2, AtomMut, Id4};
