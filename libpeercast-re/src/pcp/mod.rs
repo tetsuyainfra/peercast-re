@@ -13,6 +13,7 @@ mod channel2;
 mod classify;
 pub mod connection;
 pub mod connection4;
+pub mod connection5;
 pub mod error_code;
 mod gnuid;
 mod id4;
