@@ -67,7 +67,7 @@ pub trait AtomView {
 /// Atom2
 /// Atom2が作成された時点で、内部データの完全性は保証されているものとする。
 /// 例えば、lengthフィールドが実際のデータ長と一致していることなどを含む。
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Atom2 {
     raw: bytes::Bytes,
     // verified: bool, // TODO:もしこの構造体内でデータの整合性を検証するならば、このフィールドが必要になる

@@ -12,6 +12,7 @@ use crate::pcp::{
 
 ////////////////////////////////////////////////////////////////////////////////
 /// AtomMutの実装
+#[derive(Clone, PartialEq, Eq)]
 pub struct AtomMut {
     id: Id4,
     data: AtomDataMut,
@@ -78,7 +79,7 @@ impl From<AtomMut> for Atom2 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AtomDataMut {
     Parent(Vec<AtomMut>),
     Child(BytesMut),
