@@ -4,12 +4,11 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use libpeercast_re::{
-    ConnectionNo,
-    pcp::connection2::{ConnectionFactory, SharedConnectionFactory},
-};
+use libpeercast_re::ConnectionNo;
+use tokio::net::TcpStream;
 
 use crate::{
+    connection::RootConnectionFactory,
     db::{CheckedHostRepository, SqliteCheckedHostRepository},
     model::{CheckedHost, PortLevel},
 };
@@ -51,7 +50,7 @@ impl HostCheckService {
     /// 3. ポートチェックは最終実行から一定時間経過している場合にのみ実施
     /// 4. ポートチェックの結果に基づいてデータベースを更新し、最終的なPortLevelを返す。
     pub async fn do_host_check(
-        conn_factory: &SharedConnectionFactory,
+        _conn_factory: &RootConnectionFactory,
         db_pool: &sqlx::Pool<sqlx::sqlite::Sqlite>,
 
         target_addr: IpAddr,
@@ -76,7 +75,7 @@ impl HostCheckService {
         }
 
         // ポートチェックを実行
-        Self::port_check(conn_factory, target_addr, target_port).await?;
+        // Self::port_check(conn_factory, target_addr, target_port).await?;
         todo!()
     }
 
@@ -85,13 +84,13 @@ impl HostCheckService {
     /// - target_port: チェック対象のポート番号
     /// - 戻り値: (PortLevel, Option<u32>) ポートの状態と配信速度（速度が測定できない場合はNone）
     pub async fn port_check(
-        conn_factory: &SharedConnectionFactory,
+        _conn_factory: &RootConnectionFactory,
         target_addr: IpAddr,
         target_port: u16,
     ) -> anyhow::Result<(PortLevel, Option<u32>)> {
         let remote = SocketAddr::new(target_addr, target_port);
         let stream = tokio::net::TcpStream::connect(remote).await?;
-        let _conn = conn_factory.create_outgoing_connection(ConnectionNo::new(), stream, remote);
+        // let _conn = conn_factory.create_outgoing_connection(ConnectionNo::new(), stream, remote);
 
         todo!()
     }

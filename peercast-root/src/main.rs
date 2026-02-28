@@ -4,8 +4,9 @@ use std::sync::Arc;
 use anyhow::Context;
 use clap::Parser;
 use libpeercast_re::pcp::GnuId;
-use libpeercast_re::pcp::connection2::shared_connection_factory;
+use libpeercast_re::pcp::connection5::shared;
 use libpeercast_re::repository::Repository;
+use peercast_root::connection::RootSpec;
 use peercast_root::prelude::*;
 use peercast_root::repository::RootRepository2;
 use peercast_root::{FooterToml, IndexInfo};
@@ -27,6 +28,7 @@ async fn main() -> anyhow::Result<()> {
     cli::version_print(&args)?;
 
     logging::init(&args)?;
+    let cancell_token = CancellationToken::new();
     let arc_state = init(&args, GnuId::new(), (args.bind, args.port).into()).await?;
 
     // Init Socket
@@ -35,7 +37,6 @@ async fn main() -> anyhow::Result<()> {
     let listener_http = tokio::net::TcpListener::bind((args.api_bind, args.api_port)).await?;
     info!("HTTP listening on http://{}", listener_http.local_addr().unwrap(),);
 
-    let cancell_token = CancellationToken::new();
     let mut set = tokio::task::JoinSet::new();
     set.build_task().name("ApiServer").spawn(server_http(
         arc_state.clone(),
@@ -57,10 +58,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn init(args: &cli::Args, _self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
-    let self_session_id = GnuId::new();
+async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
-    let (connection_factory, connection_manager) = shared_connection_factory();
+    let (connection_factory, connection_manager) = shared::connection_factory::<RootSpec>();
 
     let mut index_txt_footer = vec![];
     if let Some(ref path) = args.index_txt_footer {

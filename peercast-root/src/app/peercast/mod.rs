@@ -1,13 +1,12 @@
 use std::net::SocketAddr;
 
-use anyhow::anyhow;
-use futures_util::{SinkExt, StreamExt};
 use libpeercast_re::{
     ConnectionNo,
     io::Io,
     pcp::{
         AtomCodec, GnuId, ValidChannelInfo, ValidTrackInfo,
         builder2::{BroadcastInfo, OkBuilder2, RootBuilder2, TrackInfo},
+        connection5::{Connection, ConnectionFactory, ConnectionHandle, ConnectionManager, HandshakeConnection},
         procedure::handshake::{self, IncomingProtocolDiscriminator, IncommingType, Parts, PartsWrapFramed},
     },
     repository::Repository,
@@ -18,9 +17,10 @@ use tokio::{
     sync::watch,
 };
 use tokio_util::{codec::Framed, sync::CancellationToken};
+use tracing::Instrument;
 
 use crate::app::{AppState, ArcState};
-use peercast_root::prelude::*;
+use peercast_root::{connection::RootHandshakeResult, prelude::*};
 
 pub async fn server_peercast(
     state: ArcState,
@@ -85,43 +85,66 @@ async fn serve_peercast(
     closed_send: watch::Receiver<()>,
 ) -> anyhow::Result<()> {
     info!(?cno, ?remote, "SPAWN SERVE");
+    let handshake_connection =
+        state.connection_factory.create_accepted_connection(cno, remote, Some(graceful_shutdown.child_token()), None);
 
-    let discrimer = IncomingProtocolDiscriminator::new();
-
-    let handshake_protocol = discrimer.identify(cno, stream, remote).await?;
-    match handshake_protocol {
-        handshake::HandshakeProtocol::Pcp(incoming_pcp_handshake) => {
-            info!(?cno, ?remote, "ACCEPT PCP");
-            let mut handshaked = incoming_pcp_handshake.handshake(state.self_session_id).await?;
-            match handshaked.in_type {
-                IncommingType::Ping => {
-                    info!(?cno, ?remote, "PCP PING shutting down");
-                    handshaked.shutdown().await;
-                    Ok(())
-                }
-                IncommingType::YellowPage(broadcast_id) => {
-                    serve_root(state, graceful_shutdown, broadcast_id, handshaked.parts).await
-                }
-            }
-        }
-        handshake::HandshakeProtocol::HttpPcp(incoming_http_pcp_handshake) => {
-            info!(?cno, ?remote, "ACCEPT HTTP_PCP");
-            incoming_http_pcp_handshake.shutdown().await;
+    let handshake_result = handshake_connection.handshake().await?;
+    match handshake_result {
+        RootHandshakeResult::Pcp(root_established) => {
+            info!(?cno, ?remote, "Connection is PCP");
+            let handle = root_established.handle();
+            let task_name = handle.task_name();
+            let span = tracing::info_span!("Conn", ?cno);
+            let _ = tokio::task::Builder::new().name(&task_name).spawn(async move {
+                let _enter = span.enter();
+                root_established.run().await
+            })?;
+            state.connection_manager.insert(handle);
             Ok(())
         }
-        handshake::HandshakeProtocol::Http(incoming_http_handshake) => {
-            info!(?cno, ?remote, "ACCEPT HTTP");
-            incoming_http_handshake.shutdown().await;
-            Ok(())
-        }
-        handshake::HandshakeProtocol::Unknown(incoming_unknown_handshake) => {
-            info!(?cno, ?remote, "ACCEPT Unknown");
-            incoming_unknown_handshake.shutdown().await;
+        _ => {
+            info!(?cno, ?remote, "Connection Finished");
             Ok(())
         }
     }
 }
 
+/*
+let discrimer = IncomingProtocolDiscriminator::new();
+
+let handshake_protocol = discrimer.identify(cno, stream, remote).await?;
+match handshake_protocol {
+    handshake::HandshakeProtocol::Pcp(incoming_pcp_handshake) => {
+        info!(?cno, ?remote, "ACCEPT PCP");
+        let mut handshaked = incoming_pcp_handshake.handshake(state.self_session_id).await?;
+        match handshaked.in_type {
+            IncommingType::Ping => {
+                info!(?cno, ?remote, "PCP PING shutting down");
+                handshaked.shutdown().await;
+                Ok(())
+            }
+            IncommingType::YellowPage(broadcast_id) => {
+                serve_root(state, graceful_shutdown, broadcast_id, handshaked.parts).await
+            }
+        }
+    }
+    handshake::HandshakeProtocol::HttpPcp(incoming_http_pcp_handshake) => {
+        info!(?cno, ?remote, "ACCEPT HTTP_PCP");
+        incoming_http_pcp_handshake.shutdown().await;
+        Ok(())
+    }
+    handshake::HandshakeProtocol::Http(incoming_http_handshake) => {
+        info!(?cno, ?remote, "ACCEPT HTTP");
+        incoming_http_handshake.shutdown().await;
+        Ok(())
+    }
+    handshake::HandshakeProtocol::Unknown(incoming_unknown_handshake) => {
+        info!(?cno, ?remote, "ACCEPT Unknown");
+        incoming_unknown_handshake.shutdown().await;
+        Ok(())
+    }
+} */
+/*
 //-------------------------------------------------------------------------------
 // PCP
 //-------------------------------------------------------------------------------
@@ -193,7 +216,11 @@ async fn serve_root<S: Io>(
     let valid_track_info = ValidTrackInfo::from(&track_info);
 
     let target_channel =
-        state.repository.create_or_get(channel_id, Some(valid_channel_info), Some(valid_track_info), None);
+        state.repository.create_or_get(channel_id, Some(valid_channel_info), Some(valid_track_info), None).await;
+
+    let channel_ctrl = target_channel.control_with_authenticate(broadcast_id);
+
+    // state.connection_factory.create_accepted_connection(cno, stream, remote, write_buf, read_buf).await;
 
     // ここでいよいよConnectionにしてWrapする
     // let name = format!("PCP-{}", handshaked.parts.cno);
@@ -209,6 +236,7 @@ async fn serve_root<S: Io>(
 
     Ok(())
 }
+    */
 
 /*
 #[inline]

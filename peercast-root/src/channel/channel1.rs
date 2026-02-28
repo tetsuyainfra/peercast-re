@@ -35,6 +35,7 @@ pub struct RootChannel {
 }
 #[derive(Debug)]
 pub struct RootConfig {
+    pub broadcast_id: GnuId,
     pub tracker_host: Option<SocketAddr>,
 }
 

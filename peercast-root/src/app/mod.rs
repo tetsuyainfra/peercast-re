@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use libpeercast_re::pcp::{
-    GnuId,
-    connection2::{SharedConnectionFactory, SharedConnectionManager},
+use libpeercast_re::pcp::GnuId;
+use peercast_root::{
+    IndexInfo, RestrictPortLevel,
+    connection::{RootConnectionFactory, RootConnectionManager},
+    repository::RootRepository2,
 };
-use peercast_root::{IndexInfo, RestrictPortLevel, repository::RootRepository2};
 
 pub mod cli;
 pub mod http;
@@ -44,8 +45,8 @@ pub struct AppState {
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
     pub yellow_page: Arc<yp::YellowPage>,
     pub repository: RootRepository2,
-    pub connection_factory: SharedConnectionFactory,
-    pub connection_manager: Arc<SharedConnectionManager>,
+    pub connection_factory: RootConnectionFactory,
+    pub connection_manager: RootConnectionManager,
 }
 
 #[derive(Debug)]

@@ -5,6 +5,7 @@ pub use index_info::{FooterToml, IndexInfo};
 use thiserror::Error;
 
 pub mod config;
+pub mod connection;
 pub mod db;
 pub mod filter;
 pub mod model;
@@ -39,7 +40,6 @@ pub enum RestrictPortLevel {
 /// ポートチェックの制限速度で設定できる最小値（この値は含めない）
 pub static YP_LIMIT_SPEED_MIN: u32 = 499; // 500KBps
 
-
 #[derive(Debug, Error)]
 pub enum TomlConfigError {
     #[error("IO error: {0}")]
@@ -48,4 +48,3 @@ pub enum TomlConfigError {
     #[error("TOML deserialize error: {0}")]
     Toml(#[from] toml::de::Error),
 }
-

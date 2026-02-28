@@ -99,6 +99,13 @@ impl Channel for RootChannel2 {
 }
 
 impl RootChannel2 {
+    pub fn control(&self) -> ChannelControl {
+        ChannelControl {}
+    }
+    pub fn control_with_authenticate(&self, broadcast_id: GnuId) -> AuthedChannelControl {
+        AuthedChannelControl {}
+    }
+
     pub fn attach_connection(
         self,
         _pcp_connection: PcpConnection,
@@ -109,6 +116,14 @@ impl RootChannel2 {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// ChannelControl, AuthedChannelControl
+//
+#[derive(Debug)]
+pub struct ChannelControl {}
+
+#[derive(Debug)]
+pub struct AuthedChannelControl {}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
