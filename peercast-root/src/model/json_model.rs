@@ -2,7 +2,8 @@ use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
-    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo},
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::GnuId,
     repository::Channel,
 };
 use serde::Serialize;
@@ -10,10 +11,10 @@ use serde::Serialize;
 use crate::{IndexInfo, model::RootChannel2};
 
 //-------------------------------------------------------------------------------
-// Response structs
+/// 公開APIで使用するChannelInfo
 //-------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize)]
-pub struct JsonChannel {
+pub struct JsonChannelInfo {
     /// チャンネルID
     pub id: GnuId,
     /// チャンネル名
@@ -45,7 +46,7 @@ pub struct JsonChannel {
     /// 作成日時
     pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
     /// トラック情報
-    pub track: JsonTrack,
+    pub track: JsonTrackInfo,
 
     /// WMV, FLVなどのタイプ
     #[serde(rename = "type")]
@@ -53,7 +54,7 @@ pub struct JsonChannel {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct JsonTrack {
+pub struct JsonTrackInfo {
     pub title: String,
     pub creator: String,
     pub url: String,
@@ -61,7 +62,7 @@ pub struct JsonTrack {
     pub genre: String,
 }
 
-impl From<&RootChannel2> for JsonChannel {
+impl From<&RootChannel2> for JsonChannelInfo {
     fn from(ch: &RootChannel2) -> Self {
         let ValidChannelInfo {
             typee,
@@ -75,7 +76,7 @@ impl From<&RootChannel2> for JsonChannel {
             bitrate,
         } = ch.channel_info().unwrap_or_default();
 
-        JsonChannel {
+        JsonChannelInfo {
             id: ch.cid(),
             name,
             tracker_addr: ch.tracker_address(),
@@ -96,9 +97,9 @@ impl From<&RootChannel2> for JsonChannel {
     }
 }
 
-impl From<ValidTrackInfo> for JsonTrack {
+impl From<ValidTrackInfo> for JsonTrackInfo {
     fn from(t: ValidTrackInfo) -> Self {
-        JsonTrack {
+        JsonTrackInfo {
             title: t.title,
             creator: t.creator,
             url: t.url,
@@ -108,7 +109,7 @@ impl From<ValidTrackInfo> for JsonTrack {
     }
 }
 
-impl JsonChannel {
+impl JsonChannelInfo {
     pub fn to_line_of_index_txt(&self) -> String {
         create_index_line(
             &self.name,
@@ -145,7 +146,7 @@ impl JsonChannel {
             number_of_listener: 0,
             number_of_relay: 0,
             created_at: Utc.timestamp_opt(0, 0).unwrap(),
-            track: JsonTrack {
+            track: JsonTrackInfo {
                 title: "".into(),
                 creator: "".into(),
                 url: "".into(),
@@ -156,9 +157,9 @@ impl JsonChannel {
     }
 }
 
-impl From<&IndexInfo> for JsonChannel {
+impl From<&IndexInfo> for JsonChannelInfo {
     fn from(value: &IndexInfo) -> Self {
-        let mut j = JsonChannel::empty();
+        let mut j = JsonChannelInfo::empty();
         let IndexInfo {
             id,
             name,

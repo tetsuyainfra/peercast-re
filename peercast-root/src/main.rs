@@ -86,7 +86,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         };
 
         let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
-        let dummy_channel_info = libpeercast_re::pcp::ValidChannelInfo {
+        let dummy_channel_info = libpeercast_re::model::ValidChannelInfo {
             name: "Dummyチャンネル名".to_string(),
             url: "http://example.com".to_string(),
             genre: format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into(),
@@ -97,7 +97,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
             bitrate: 128,
             typee: "FLV".to_string(),
         };
-        let dummy_track_info = libpeercast_re::pcp::ValidTrackInfo {
+        let dummy_track_info = libpeercast_re::model::ValidTrackInfo {
             title: "Dummy Track".to_string(),
             creator: "Dummy Artist".to_string(),
             url: "http://example.com/track".to_string(),

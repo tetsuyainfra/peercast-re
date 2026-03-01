@@ -11,7 +11,7 @@ use axum_client_ip::ClientIp;
 use hyper::{StatusCode, Uri, header};
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
-use peercast_root::{model::JsonChannel, service::HostCheckService};
+use peercast_root::{model::JsonChannelInfo, service::HostCheckService};
 use rust_embed::Embed;
 use serde::Deserialize;
 use tracing::{debug, info, trace};
@@ -57,7 +57,7 @@ pub async fn index_txt(
     let _x = HostCheckService::do_host_check(&state.connection_factory, &state.db_pool, target_ip, target_port).await?;
 
     let filter_config = FilterConfig {};
-    let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
+    let channels: Vec<JsonChannelInfo> = state.repository.map_collect(|_id, ch| ch.into());
     let string_channels = state.yellow_page.to_index_txt(&filter_config, channels);
 
     Ok(itertools::join(string_channels, "\n"))

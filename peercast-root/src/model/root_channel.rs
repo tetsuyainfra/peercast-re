@@ -1,7 +1,8 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use libpeercast_re::{
-    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo, connection::PcpConnection},
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{GnuId, connection::PcpConnection},
     repository::{Channel, ChannelState, ChannelType},
 };
 use tokio::sync::{
