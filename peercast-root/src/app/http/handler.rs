@@ -4,14 +4,17 @@ use axum::{
     Json,
     extract::{Query, State},
     response::IntoResponse,
+    routing,
 };
 
 use axum_client_ip::ClientIp;
+use hyper::{StatusCode, Uri, header};
 // use futures_util::FutureExt;
-use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
 use peercast_root::{model::JsonChannel, service::HostCheckService};
+use rust_embed::Embed;
 use serde::Deserialize;
+use tracing::{debug, info, trace};
 
 use crate::app::{ArcState, yp::FilterConfig};
 
@@ -64,11 +67,15 @@ pub async fn index_json(
     ClientIp(_client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
-) -> Result<Json<Vec<JsonChannel>>, ApiError> {
-    let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
-    let json_channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
+    // ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
+) -> Json<Vec<String>> {
+    // let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
+    // let json_channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
 
-    Ok(json_channels)
+    // Ok(json_channels)
+
+    let v = vec!["apple".to_string(), "banana".to_string()];
+    Json(v)
 }
 
 //-------------------------------------------------------------------------------
@@ -133,6 +140,74 @@ where
             let (host, port_str) = s.rsplit_once(':').ok_or_else(|| serde::de::Error::custom("SplitFailed"))?;
             let port = port_str.parse::<u16>().map_err(serde::de::Error::custom)?;
             Ok(Some((host.into(), port)))
+        }
+    }
+}
+
+//-------------------------------------------------------------------------------
+// Static Files Handlers
+//-------------------------------------------------------------------------------
+// #[cfg(not(debug_assertions))]
+#[derive(rust_embed::RustEmbed)]
+#[folder = "src/public/"]
+struct Assets;
+
+pub fn static_router() -> axum::Router {
+    #[cfg(debug_assertions)]
+    {
+        // 開発時：ローカルディレクトリをそのまま配信
+        axum::Router::new().fallback_service(axum::routing::get_service(
+            tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
+        ))
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        debug!("Assets include files");
+        for a in Assets::iter() {
+            debug!("- {}", a.as_ref());
+        }
+        // リリース時：バイナリ埋め込み
+        axum::Router::new()
+            // .route("/", axum::routing::get(embed_handler))
+            // .route("/{*path}", axum::routing::get(embed_handler))
+            .fallback(routing::get(embed_handler))
+    }
+}
+#[cfg(not(debug_assertions))]
+async fn embed_handler(uri: Uri) -> impl IntoResponse {
+    let path = uri.path();
+    trace!("REQLINE: {}", path);
+    let path = if path.ends_with("/") {
+        [path, "index.html"].concat()
+    } else {
+        path.into()
+    };
+    let path = if path.starts_with("/") {
+        path.replacen("/", "", 1)
+    } else {
+        path
+    };
+    trace!("   PATH: {}", path);
+
+    match Assets::get(&path) {
+        Some(content) => {
+            let body = content.data.into_owned();
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            (
+                //
+                [(header::CONTENT_TYPE, mime.as_ref())],
+                body,
+            )
+                .into_response()
+        }
+        None => {
+            (
+                //
+                StatusCode::NOT_FOUND,
+                "Not Found",
+            )
+                .into_response()
         }
     }
 }

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <title>Page Title</title>
+  </head>
+  <body>
+
+    <div>
+        <h1>PeerCast-YP</h1>
+        <p>
+
+        </p>
+        <hr />
+        <button onclick="request_index()">reload</button>
+        <div id="yp-table">
+        </div>
+    </div>
+
+  </body>
+  <script>
+    const TARGET_ID = "yp-table"
+    function request_index() {
+        fetch('/index.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTPエラー: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(responseBody => {
+                console.info("response", responseBody)
+                renderTable(responseBody)
+            })
+            .catch(error => {
+                console.error('エラーが発生しました:', error);
+                document.getElementById('message').innerText = 'エラーが発生しました。';
+            });
+    }
+    function renderTable(data) {
+        document.getElementById(TARGET_ID).innerText = data;
+    }
+
+   request_index()
+  </script>
+</html>

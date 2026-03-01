@@ -6,9 +6,10 @@ use hyper::Method;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
-use tower_http::{cors::CorsLayer, services::ServeDir, set_header::SetResponseHeaderLayer};
+use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
 
 use crate::app::ArcState;
+use crate::app::http::handler::static_router;
 use peercast_root::prelude::*;
 
 pub mod handler;
@@ -35,9 +36,10 @@ pub async fn server_http(
     info!("START HTTP SERVER");
 
     let app = Router::new()
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
         .route("/index.txt", routing::get(handler::index_txt))
-        .route("/api/index.json", routing::get(handler::index_json))
+        .route("/index.json", routing::get(handler::index_json))
+        .fallback_service(static_router())
+        //
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
         .layer(CorsLayer::new().allow_origin(cor_origins).allow_methods([Method::GET]))
         .layer(SetResponseHeaderLayer::if_not_present(
