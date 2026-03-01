@@ -1,7 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, future::Future, marker::PhantomData};
 
 use crate::{
-    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
     repository::typical_repository::TypicalRepository,
 };
 

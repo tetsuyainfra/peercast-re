@@ -1,7 +1,8 @@
 use std::{collections::HashMap, future::Future};
 
 use crate::{
-    pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo},
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
     repository::{Channel, Repository},
 };
 

@@ -1,6 +1,8 @@
+use crate::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+};
 use std::{future::Future, net::SocketAddr};
-
-use crate::pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo};
 
 mod dummy_channel;
 mod local_repository;

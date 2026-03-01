@@ -1,6 +1,9 @@
 use serde::de;
 
-use crate::pcp::{ChannelInfo, GnuId, TrackInfo, ValidChannelInfo, ValidTrackInfo};
+use crate::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+};
 
 use super::Channel;
 

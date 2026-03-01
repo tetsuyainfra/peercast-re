@@ -6,7 +6,8 @@ use std::{
 use tracing::debug;
 
 use crate::{
-    pcp::{GnuId, ValidChannelInfo, ValidTrackInfo},
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::GnuId,
     repository::{typical_repository::TypicalRepository, Channel, Repository},
     util::mutex_poisoned,
 };

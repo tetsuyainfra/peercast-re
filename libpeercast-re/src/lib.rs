@@ -30,6 +30,7 @@ pub mod codec;
 pub mod error;
 pub mod http;
 pub mod io;
+pub mod model;
 pub mod net;
 /// Peercast Protocol
 pub mod pcp;
