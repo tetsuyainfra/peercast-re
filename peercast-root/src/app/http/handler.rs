@@ -4,17 +4,14 @@ use axum::{
     Json,
     extract::{Query, State},
     response::IntoResponse,
-    routing,
 };
 
 use axum_client_ip::ClientIp;
-use hyper::{StatusCode, Uri, header};
+use hyper::StatusCode;
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
 use peercast_root::{model::JsonChannelInfo, service::HostCheckService};
-use rust_embed::Embed;
 use serde::Deserialize;
-use tracing::{debug, info, trace};
 
 use crate::app::{ArcState, yp::FilterConfig};
 
@@ -66,7 +63,7 @@ pub async fn index_txt(
 pub async fn index_json(
     ClientIp(_client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
-    state: State<ArcState>,
+    _state: State<ArcState>,
     // ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
 ) -> Json<Vec<String>> {
     // let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
@@ -147,7 +144,7 @@ where
 //-------------------------------------------------------------------------------
 // Static Files Handlers
 //-------------------------------------------------------------------------------
-// #[cfg(not(debug_assertions))]
+#[cfg(not(debug_assertions))]
 #[derive(rust_embed::RustEmbed)]
 #[folder = "src/public/"]
 struct Assets;
