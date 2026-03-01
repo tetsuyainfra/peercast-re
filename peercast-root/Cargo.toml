@@ -54,6 +54,9 @@ hyper-util = { version = "0.1.10", features = ["full"] }
 # Embed files to binary
 rust-embed = "8.11.0"
 
+# MIME
+mime_guess = "2.0.5"
+
 # DB
 sqlx = { version = "0.8", features = [ "runtime-tokio", "derive", "macros", "sqlite", "chrono", "json"] }
 
