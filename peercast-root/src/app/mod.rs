@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use libpeercast_re::pcp::GnuId;
 use peercast_root::{
-    IndexInfo, RestrictPortLevel,
+    RestrictPortLevel,
     connection::{RootConnectionFactory, RootConnectionManager},
+    model::IndexInfo,
     repository::RootRepository2,
 };
 

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use clap::{Parser, builder::TypedValueParser};
 use libpeercast_re::pcp::GnuId;
-use peercast_root::{FooterToml, IndexInfo};
+use peercast_root::{config::FooterToml, model::IndexInfo};
 
 fn main() {
     let args = Args::parse();

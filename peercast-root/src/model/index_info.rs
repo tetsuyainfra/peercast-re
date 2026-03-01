@@ -1,24 +1,8 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 
 use chrono::{DateTime, Utc};
 use libpeercast_re::pcp::GnuId;
 use serde::{Deserialize, Serialize};
-
-use crate::TomlConfigError;
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-pub struct FooterToml {
-    #[serde(default)]
-    pub infomations: Vec<IndexInfo>,
-}
-
-impl FooterToml {
-    pub fn from_path(path: &PathBuf) -> Result<Self, TomlConfigError> {
-        let s = std::fs::read_to_string(path)?;
-        let t = toml::from_str(&s)?;
-        Ok(t)
-    }
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IndexInfo {

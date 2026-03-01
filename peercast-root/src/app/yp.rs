@@ -1,5 +1,5 @@
 use axum::Json;
-use peercast_root::{IndexInfo, model::JsonChannelInfo};
+use peercast_root::model::{IndexInfo, JsonChannelInfo};
 
 #[derive(Debug)]
 pub struct YellowPage {

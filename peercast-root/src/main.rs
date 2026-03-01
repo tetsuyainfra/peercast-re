@@ -6,10 +6,12 @@ use clap::Parser;
 use libpeercast_re::pcp::GnuId;
 use libpeercast_re::pcp::connection5::shared;
 use libpeercast_re::repository::Repository;
+use peercast_root::config::FooterToml;
 use peercast_root::connection::RootSpec;
+use peercast_root::model::IndexInfo;
+use peercast_root::model::RootConfig;
 use peercast_root::prelude::*;
 use peercast_root::repository::RootRepository2;
-use peercast_root::{FooterToml, IndexInfo};
 use tokio_util::sync::CancellationToken;
 
 // App modules
@@ -104,8 +106,14 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
             album: "Dummy Album".to_string(),
             genre: "Various".to_string(),
         };
+        let dummy_config = RootConfig {
+            broadcast_id: GnuId::from(0xFEDCBA987654321_u128),
+            tracker_addr: Some("127.0.0.1:7144".parse().unwrap()),
+        };
 
-        repository.create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), None).await;
+        repository
+            .create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), Some(dummy_config))
+            .await;
     }
 
     let api_config = ApiConfig {

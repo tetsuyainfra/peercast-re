@@ -1,7 +1,4 @@
-mod index_info;
-
 use clap::ValueEnum;
-pub use index_info::{FooterToml, IndexInfo};
 use thiserror::Error;
 
 pub mod config;
