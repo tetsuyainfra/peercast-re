@@ -8,6 +8,6 @@ pub use checked_host::CheckedHost;
 pub use db_ip_addr::DbIpAddr;
 pub use port::PortLevel;
 
-pub use channel_meta::JsonChannelInfo;
+pub use channel_meta::ChannelMeta;
 
 pub use index_info::IndexInfo;

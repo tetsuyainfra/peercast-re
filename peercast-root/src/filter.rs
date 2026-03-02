@@ -2,7 +2,7 @@ use std::i32;
 
 // use peercast_root::{PortLevel, RestrictPortLevel};
 
-use crate::{RestrictPortLevel, model::JsonChannelInfo, model::PortLevel};
+use crate::{RestrictPortLevel, model::ChannelMeta, model::PortLevel};
 
 /// Vec<JsonChannel>を条件についてフィルタリングす
 /// @param namespace: YPの名前空間
@@ -23,9 +23,9 @@ fn filter_channel(
     yp_restrict_speed: u32,
     own_port_level: PortLevel,
     // Input
-    channel: JsonChannelInfo,
-) -> Option<JsonChannelInfo> {
-    let mut c = channel;
+    channel_meta: ChannelMeta,
+) -> Option<ChannelMeta> {
+    let mut c = channel_meta;
     debug_assert!(crate::YP_LIMIT_SPEED_MIN < yp_restrict_speed); // MEMO: testの時消えなければよい
 
     // 名前空間のフィルタリング
@@ -123,9 +123,9 @@ pub fn filter_channels(
     own_port_level: PortLevel,
     _own_speed: u32,
     // Input
-    channel: Vec<JsonChannelInfo>,
-) -> Vec<JsonChannelInfo> {
-    channel
+    channel_metas: Vec<ChannelMeta>,
+) -> Vec<ChannelMeta> {
+    channel_metas
         .into_iter()
         .filter_map(|c| {
             filter_channel(

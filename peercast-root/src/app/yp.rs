@@ -1,5 +1,5 @@
 use axum::Json;
-use peercast_root::model::{IndexInfo, JsonChannelInfo};
+use peercast_root::model::{ChannelMeta, IndexInfo};
 
 #[derive(Debug)]
 pub struct YellowPage {
@@ -23,14 +23,14 @@ impl YellowPage {
 }
 
 impl YellowPage {
-    pub fn to_index_json(&self, config: &FilterConfig, channels: Vec<JsonChannelInfo>) -> Json<Vec<JsonChannelInfo>> {
+    pub fn to_index_json(&self, config: &FilterConfig, channels: Vec<ChannelMeta>) -> Json<Vec<ChannelMeta>> {
         let filtered_channels = filter_channels(config, channels);
         let channels = merge_footer(&self.footer_channels, filtered_channels);
 
         Json(channels)
     }
 
-    pub fn to_index_txt(&self, config: &FilterConfig, channels: Vec<JsonChannelInfo>) -> Vec<String> {
+    pub fn to_index_txt(&self, config: &FilterConfig, channels: Vec<ChannelMeta>) -> Vec<String> {
         let filtered_channels = filter_channels(config, channels);
         let channels = merge_footer(&self.footer_channels, filtered_channels);
 
@@ -38,12 +38,12 @@ impl YellowPage {
     }
 }
 
-fn filter_channels(_config: &FilterConfig, channels: Vec<JsonChannelInfo>) -> Vec<JsonChannelInfo> {
+fn filter_channels(_config: &FilterConfig, channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
     // TODO: implement filtering logic
     channels
 }
 
-fn merge_footer(footer_channels: &Vec<IndexInfo>, mut channels: Vec<JsonChannelInfo>) -> Vec<JsonChannelInfo> {
+fn merge_footer(footer_channels: &Vec<IndexInfo>, mut channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
     channels.reserve(footer_channels.len());
     channels.extend(footer_channels.iter().map(|e| e.into()));
     channels

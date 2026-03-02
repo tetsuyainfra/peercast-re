@@ -1,9 +1,9 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
     model::{ValidChannelInfo, ValidTrackInfo},
-    pcp::{ChannelInfo, GnuId},
+    pcp::GnuId,
     repository::Channel,
 };
 use serde::Serialize;
@@ -15,9 +15,10 @@ use crate::model::IndexInfo;
 /// 公開APIで使用するChannelMeta
 //-------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize)]
-pub struct JsonChannelInfo {
+pub struct ChannelMeta {
     /// チャンネルID
     pub id: GnuId,
+
     /// チャンネル名
     pub name: String,
     /// 配信者アドレス(もしくは初期接続先アドレス)
@@ -38,8 +39,10 @@ pub struct JsonChannelInfo {
     pub stream_ext: String,
     /// ビットレート(kbps単位)
     pub bitrate: i32,
-    // filetype: String,
-    // status: String,
+    /// WMV, FLVなどのタイプ
+    #[serde(rename = "type")]
+    pub typee: String,
+
     /// リスナー数
     pub number_of_listener: i32,
     /// リレー数
@@ -47,17 +50,11 @@ pub struct JsonChannelInfo {
     /// 作成日時
     pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
 
-    /// チャンネル情報(配信名など)
-    // pub info: ValidChannelInfo,
     /// トラック情報
     pub track: JsonTrackInfo,
-
-    /// WMV, FLVなどのタイプ
-    #[serde(rename = "type")]
-    pub typee: String,
 }
 
-impl JsonChannelInfo {
+impl ChannelMeta {
     pub fn to_line_of_index_txt(&self) -> String {
         self::line_of_index_txt_from_json(self)
     }
@@ -87,7 +84,7 @@ impl JsonChannelInfo {
     }
 }
 
-impl From<&RootChannel2> for JsonChannelInfo {
+impl From<&RootChannel2> for ChannelMeta {
     fn from(ch: &RootChannel2) -> Self {
         let ValidChannelInfo {
             typee,
@@ -101,7 +98,7 @@ impl From<&RootChannel2> for JsonChannelInfo {
             bitrate,
         } = ch.channel_info().unwrap();
 
-        JsonChannelInfo {
+        Self {
             id: ch.cid(),
             name,
             tracker_addr: ch.tracker_address(),
@@ -151,9 +148,9 @@ impl From<ValidTrackInfo> for JsonTrackInfo {
     }
 }
 
-impl From<&IndexInfo> for JsonChannelInfo {
+impl From<&IndexInfo> for ChannelMeta {
     fn from(value: &IndexInfo) -> Self {
-        let mut j = JsonChannelInfo::Empty();
+        let mut j = ChannelMeta::Empty();
         let IndexInfo {
             id,
             name,
@@ -189,7 +186,7 @@ impl From<&IndexInfo> for JsonChannelInfo {
     }
 }
 
-fn line_of_index_txt_from_json(info: &JsonChannelInfo) -> String {
+fn line_of_index_txt_from_json(info: &ChannelMeta) -> String {
     create_index_line(
         &info.name,
         &info.id,

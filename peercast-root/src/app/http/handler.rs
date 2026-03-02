@@ -10,7 +10,7 @@ use axum_client_ip::ClientIp;
 use hyper::StatusCode;
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
-use peercast_root::{model::JsonChannelInfo, service::HostCheckService};
+use peercast_root::{model::ChannelMeta, service::HostCheckService};
 use serde::Deserialize;
 
 use crate::app::{ArcState, yp::FilterConfig};
@@ -54,7 +54,7 @@ pub async fn index_txt(
     let _x = HostCheckService::do_host_check(&state.connection_factory, &state.db_pool, target_ip, target_port).await?;
 
     let filter_config = FilterConfig {};
-    let channels: Vec<JsonChannelInfo> = state.repository.map_collect(|_id, ch| ch.into());
+    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.into());
     let string_channels = state.yellow_page.to_index_txt(&filter_config, channels);
 
     Ok(itertools::join(string_channels, "\n"))
@@ -64,8 +64,8 @@ pub async fn index_json(
     ClientIp(_client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
     state: State<ArcState>,
-) -> Result<Json<Vec<JsonChannelInfo>>, ApiError> {
-    let channels: Vec<JsonChannelInfo> = state.repository.map_collect(|_id, ch| ch.into());
+) -> Result<Json<Vec<ChannelMeta>>, ApiError> {
+    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.into());
     // let channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
 
     Ok(Json(channels))
