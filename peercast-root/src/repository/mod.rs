@@ -1,3 +1,4 @@
-mod root_channel;
+use libpeercast_re::repository::SharedRepository;
 
-pub use root_channel::RootRepository2;
+pub use crate::channel::{RootChannel2, RootConfig};
+pub type RootRepository2 = SharedRepository<RootChannel2>;

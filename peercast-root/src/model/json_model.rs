@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, str::FromStr};
 
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
@@ -8,7 +8,8 @@ use libpeercast_re::{
 };
 use serde::Serialize;
 
-use crate::{IndexInfo, model::RootChannel2};
+use crate::channel::RootChannel2;
+use crate::model::IndexInfo;
 
 //-------------------------------------------------------------------------------
 /// 公開APIで使用するChannelInfo
@@ -19,7 +20,7 @@ pub struct JsonChannelInfo {
     pub id: GnuId,
     /// チャンネル名
     pub name: String,
-    /// 配信者アドレス(もしくは接続先アドレス)
+    /// 配信者アドレス(もしくは初期接続先アドレス)
     pub tracker_addr: Option<SocketAddr>,
     /// 連絡先URL
     pub contact_url: String,
@@ -53,6 +54,41 @@ pub struct JsonChannelInfo {
     pub typee: String,
 }
 
+impl JsonChannelInfo {
+    pub fn to_line_of_index_txt(&self) -> String {
+        self::line_of_index_txt_from_json(self)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn Empty() -> Self {
+        // println!("DATETIME              {}", Utc.timestamp_opt(0, 0).unwrap());
+        Self {
+            id: GnuId::NONE,
+            name: "".into(),
+            tracker_addr: None,
+            contact_url: "".into(),
+            genre: "".into(),
+            raw_genre: "".into(),
+            desc: "".into(),
+            comment: "".into(),
+            typee: "".into(),
+            stream_type: "".into(),
+            stream_ext: "".into(),
+            bitrate: 0,
+            number_of_listener: 0,
+            number_of_relay: 0,
+            created_at: Utc.timestamp_opt(0, 0).unwrap(),
+            track: JsonTrackInfo {
+                title: "".into(),
+                creator: "".into(),
+                url: "".into(),
+                album: "".into(),
+                genre: "".into(),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonTrackInfo {
     pub title: String,
@@ -60,6 +96,18 @@ pub struct JsonTrackInfo {
     pub url: String,
     pub album: String,
     pub genre: String,
+}
+
+impl From<ValidTrackInfo> for JsonTrackInfo {
+    fn from(t: ValidTrackInfo) -> Self {
+        JsonTrackInfo {
+            title: t.title,
+            creator: t.creator,
+            url: t.url,
+            album: t.album,
+            genre: t.genre,
+        }
+    }
 }
 
 impl From<&RootChannel2> for JsonChannelInfo {
@@ -97,69 +145,9 @@ impl From<&RootChannel2> for JsonChannelInfo {
     }
 }
 
-impl From<ValidTrackInfo> for JsonTrackInfo {
-    fn from(t: ValidTrackInfo) -> Self {
-        JsonTrackInfo {
-            title: t.title,
-            creator: t.creator,
-            url: t.url,
-            album: t.album,
-            genre: t.genre,
-        }
-    }
-}
-
-impl JsonChannelInfo {
-    pub fn to_line_of_index_txt(&self) -> String {
-        create_index_line(
-            &self.name,
-            &self.id,
-            &self.tracker_addr,
-            &self.contact_url,
-            &self.genre,
-            &self.desc,
-            &self.comment,
-            self.number_of_listener,
-            self.number_of_relay,
-            self.bitrate,
-            &self.typee,
-            &self.stream_type,
-            &self.stream_ext,
-            &self.created_at,
-        )
-    }
-    pub fn empty() -> Self {
-        // println!("DATETIME              {}", Utc.timestamp_opt(0, 0).unwrap());
-        Self {
-            id: GnuId::NONE,
-            name: "".into(),
-            tracker_addr: None,
-            contact_url: "".into(),
-            genre: "".into(),
-            raw_genre: "".into(),
-            desc: "".into(),
-            comment: "".into(),
-            typee: "".into(),
-            stream_type: "".into(),
-            stream_ext: "".into(),
-            bitrate: 0,
-            number_of_listener: 0,
-            number_of_relay: 0,
-            created_at: Utc.timestamp_opt(0, 0).unwrap(),
-            track: JsonTrackInfo {
-                title: "".into(),
-                creator: "".into(),
-                url: "".into(),
-                album: "".into(),
-                genre: "".into(),
-            },
-        }
-    }
-}
-
 impl From<&IndexInfo> for JsonChannelInfo {
     fn from(value: &IndexInfo) -> Self {
-        let mut j = JsonChannelInfo::empty();
+        let mut j = JsonChannelInfo::Empty();
         let IndexInfo {
             id,
             name,
@@ -195,6 +183,24 @@ impl From<&IndexInfo> for JsonChannelInfo {
     }
 }
 
+fn line_of_index_txt_from_json(info: &JsonChannelInfo) -> String {
+    create_index_line(
+        &info.name,
+        &info.id,
+        &info.tracker_addr,
+        &info.contact_url,
+        &info.genre,
+        &info.desc,
+        &info.comment,
+        info.number_of_listener,
+        info.number_of_relay,
+        info.bitrate,
+        &info.typee,
+        &info.stream_type,
+        &info.stream_ext,
+        &info.created_at,
+    )
+}
 // 順番に合わせる
 // https://github.com/plonk/peercast-yt/blob/b60f176317406e79a5468ba80da8be1d83bb6126/core/common/public.cpp#L102
 fn create_index_line(

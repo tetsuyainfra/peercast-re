@@ -63,16 +63,12 @@ pub async fn index_txt(
 pub async fn index_json(
     ClientIp(_client_ip): ClientIp,
     Query(_params): Query<IndexTextParams>,
-    _state: State<ArcState>,
-    // ) -> Result<Json<Vec<JsonChannel>>, ApiError> {
-) -> Json<Vec<String>> {
-    // let channels: Vec<JsonChannel> = state.repository.map_collect(|_id, ch| ch.into());
-    // let json_channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
+    state: State<ArcState>,
+) -> Result<Json<Vec<JsonChannelInfo>>, ApiError> {
+    let channels: Vec<JsonChannelInfo> = state.repository.map_collect(|_id, ch| ch.into());
+    // let channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
 
-    // Ok(json_channels)
-
-    let v = vec!["apple".to_string(), "banana".to_string()];
-    Json(v)
+    Ok(Json(channels))
 }
 
 //-------------------------------------------------------------------------------

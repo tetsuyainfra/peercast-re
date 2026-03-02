@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 use thiserror::Error;
 
+pub mod channel;
 pub mod config;
 pub mod connection;
 pub mod db;
