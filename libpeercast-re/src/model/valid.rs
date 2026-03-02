@@ -1,20 +1,27 @@
 use crate::pcp::builder2::TrackInfo;
 ////////////////////////////////////////////////////////////////////////////////
-// ValidChannelInfo: データが正しい事を保証されたChannelInfo
-//
+/// ValidChannelInfo: データが正しい事を保証されたChannelInfo
+/// 主にAtomからChannelに情報を伝達する時の中間データとして使われる
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ValidChannelInfo {
-    pub typee: String,
+    /// 配信名
     pub name: String,
+    /// ジャンル
     pub genre: String,
+    /// 配信詳細
     pub desc: String,
+    /// コメント
     pub comment: String,
+    /// コンタクトURL
     pub url: String,
     /// MIME(例: video/x-flv)
     pub stream_type: String,
     /// 拡張子(例: .flv)
     pub stream_ext: String,
+    /// ビットレート(kbps単位)
     pub bitrate: i32,
+    /// WMV, FLVなどのタイプ(おそらく大文字)
+    pub typee: String,
 }
 /*
 impl From<&ChannelInfo> for ValidChannelInfo {
@@ -68,13 +75,18 @@ impl From<&ChannelInfo> for ValidChannelInfo {
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ValidTrackInfo: データが正しい事を保証されたTrackInfo
-//
+/// 主にAtomからChannelに情報を伝達する時の中間データとして使われる
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ValidTrackInfo {
+    /// track title
     pub title: String,
-    pub creator: String,
-    pub url: String,
+    /// track album name
     pub album: String,
+    /// track creator
+    pub creator: String,
+    /// track url
+    pub url: String,
+    /// track genre
     pub genre: String,
 }
 
