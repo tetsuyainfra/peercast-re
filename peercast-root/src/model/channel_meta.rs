@@ -3,7 +3,7 @@ use std::{net::SocketAddr, str::FromStr};
 use chrono::{DateTime, TimeZone, Utc};
 use libpeercast_re::{
     model::{ValidChannelInfo, ValidTrackInfo},
-    pcp::GnuId,
+    pcp::{ChannelInfo, GnuId},
     repository::Channel,
 };
 use serde::Serialize;
@@ -12,7 +12,7 @@ use crate::channel::RootChannel2;
 use crate::model::IndexInfo;
 
 //-------------------------------------------------------------------------------
-/// 公開APIで使用するChannelInfo
+/// 公開APIで使用するChannelMeta
 //-------------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonChannelInfo {
@@ -46,6 +46,9 @@ pub struct JsonChannelInfo {
     pub number_of_relay: i32,
     /// 作成日時
     pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
+
+    /// チャンネル情報(配信名など)
+    // pub info: ValidChannelInfo,
     /// トラック情報
     pub track: JsonTrackInfo,
 
@@ -78,34 +81,8 @@ impl JsonChannelInfo {
             number_of_listener: 0,
             number_of_relay: 0,
             created_at: Utc.timestamp_opt(0, 0).unwrap(),
-            track: JsonTrackInfo {
-                title: "".into(),
-                creator: "".into(),
-                url: "".into(),
-                album: "".into(),
-                genre: "".into(),
-            },
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct JsonTrackInfo {
-    pub title: String,
-    pub creator: String,
-    pub url: String,
-    pub album: String,
-    pub genre: String,
-}
-
-impl From<ValidTrackInfo> for JsonTrackInfo {
-    fn from(t: ValidTrackInfo) -> Self {
-        JsonTrackInfo {
-            title: t.title,
-            creator: t.creator,
-            url: t.url,
-            album: t.album,
-            genre: t.genre,
+            // info: Default::default(),
+            track: Default::default(),
         }
     }
 }
@@ -122,7 +99,7 @@ impl From<&RootChannel2> for JsonChannelInfo {
             stream_type,
             stream_ext,
             bitrate,
-        } = ch.channel_info().unwrap_or_default();
+        } = ch.channel_info().unwrap();
 
         JsonChannelInfo {
             id: ch.cid(),
@@ -140,7 +117,36 @@ impl From<&RootChannel2> for JsonChannelInfo {
             number_of_listener: ch.number_of_listener(),
             number_of_relay: ch.number_of_relay(),
             created_at: ch.created_at(),
+            // info: ch.channel_info().unwrap_or_default().into(),
             track: ch.track_info().unwrap_or_default().into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct JsonTrackInfo {
+    pub title: String,
+    pub creator: String,
+    pub url: String,
+    pub album: String,
+    pub genre: String,
+}
+
+impl From<ValidTrackInfo> for JsonTrackInfo {
+    fn from(i: ValidTrackInfo) -> Self {
+        let ValidTrackInfo {
+            title,
+            creator,
+            url,
+            album,
+            genre,
+        } = i;
+        Self {
+            title,
+            creator,
+            url,
+            album,
+            genre,
         }
     }
 }
@@ -227,7 +233,8 @@ fn create_index_line(
     let addr = tracker_addr.as_ref().map(|a| a.to_string()).unwrap_or_default();
 
     format!(
-        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
+        // "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
+        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<>{artist}<>{album}<>{track_title}<>{track_url}<>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
         name = encode_safe(&name.clone()),
         id = id,
         addr = addr,
@@ -238,6 +245,11 @@ fn create_index_line(
         number_of_relay = number_of_relay,
         bitrate = bitrate,
         typee = encode_safe(&typee),
+        // TODO: track_infoの実装
+        artist = "",
+        album = "",
+        track_title = "",
+        track_url = "",
         name_escaped = encode_safe(&name),
         time_hour = hour,
         time_min = min,
