@@ -2,7 +2,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use libpeercast_re::{
     model::{ValidChannelInfo, ValidTrackInfo},
-    pcp::{GnuId, connection::PcpConnection, connection5::ConnectionHandle},
+    pcp::{GnuId, connection5::ConnectionHandle},
     repository::{Channel, ChannelState, ChannelType},
 };
 use tokio::sync::{
@@ -10,10 +10,7 @@ use tokio::sync::{
     watch,
 };
 
-use crate::{
-    connection::{RootHandle, RootSpec},
-    prelude::*,
-};
+use crate::{connection::RootHandle, model::ChannelMeta, prelude::*};
 ////////////////////////////////////////////////////////////////////////////////
 // RootConfig
 //
@@ -115,6 +112,40 @@ impl RootChannel2 {
 
     pub fn attach_connection(&self, root_connection_handle: RootHandle) {
         self.0.attach_connection(root_connection_handle);
+    }
+
+    pub fn channel_meta(&self) -> ChannelMeta {
+        let ValidChannelInfo {
+            name,
+            genre,
+            desc,
+            comment,
+            url,
+            stream_type,
+            stream_ext,
+            bitrate,
+            typee,
+        } = self.channel_info().unwrap_or_default();
+        let track_info = self.track_info().unwrap_or_default();
+
+        ChannelMeta {
+            id: self.cid(),
+            name,
+            contact_url: url,
+            genre: genre.clone(),
+            display_genre: None,
+            desc,
+            comment,
+            stream_type,
+            stream_ext,
+            bitrate,
+            typee,
+            number_of_listener: self.number_of_listener(),
+            number_of_relay: self.number_of_relay(),
+            tracker_addr: self.tracker_address(),
+            created_at: self.created_at(),
+            track: track_info.into(),
+        }
     }
 }
 

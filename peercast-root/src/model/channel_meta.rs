@@ -25,10 +25,10 @@ pub struct ChannelMeta {
     pub tracker_addr: Option<SocketAddr>,
     /// 連絡先URL
     pub contact_url: String,
-    /// ジャンル
+    /// 生のジャンル(namespace, listener_hideableなどの指定を含む)
     pub genre: String,
-    /// 生のジャンル文字列(namespace, listener_hideableなどの指定を含む)
-    pub raw_genre: String,
+    /// ユーザーに表示されるジャンル(変化がなければNone)
+    pub display_genre: Option<String>,
     /// 説明文
     pub desc: String,
     /// コメント
@@ -68,7 +68,7 @@ impl ChannelMeta {
             tracker_addr: None,
             contact_url: "".into(),
             genre: "".into(),
-            raw_genre: "".into(),
+            display_genre: None,
             desc: "".into(),
             comment: "".into(),
             typee: "".into(),
@@ -80,42 +80,6 @@ impl ChannelMeta {
             created_at: Utc.timestamp_opt(0, 0).unwrap(),
             // info: Default::default(),
             track: Default::default(),
-        }
-    }
-}
-
-impl From<&RootChannel2> for ChannelMeta {
-    fn from(ch: &RootChannel2) -> Self {
-        let ValidChannelInfo {
-            typee,
-            name,
-            genre,
-            desc,
-            comment,
-            url,
-            stream_type,
-            stream_ext,
-            bitrate,
-        } = ch.channel_info().unwrap();
-
-        Self {
-            id: ch.cid(),
-            name,
-            tracker_addr: ch.tracker_address(),
-            contact_url: url,
-            genre: genre.clone(),
-            raw_genre: genre,
-            desc,
-            comment,
-            typee,
-            stream_type,
-            stream_ext,
-            bitrate,
-            number_of_listener: ch.number_of_listener(),
-            number_of_relay: ch.number_of_relay(),
-            created_at: ch.created_at(),
-            // info: ch.channel_info().unwrap_or_default().into(),
-            track: ch.track_info().unwrap_or_default().into(),
         }
     }
 }
@@ -173,7 +137,7 @@ impl From<&IndexInfo> for ChannelMeta {
         j.tracker_addr = tracker_addr.clone();
         j.contact_url = contact_url.clone();
         j.genre = genre.clone();
-        j.raw_genre = genre.clone();
+        j.display_genre = Some(genre.clone());
         j.desc = desc.clone();
         j.comment = comment.clone();
         j.stream_ext = stream_ext.clone();
