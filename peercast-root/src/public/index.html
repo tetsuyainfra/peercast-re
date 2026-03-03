@@ -70,7 +70,7 @@
                     </td>
                     <td class="col-type">
                         <span class="type">TYPE(FLV,MP3,WMV)</span>
-                        <span class="speed">XXXX Kbps</span>
+                        <span class="speed"><span class="bitrate"></span>Kbps</span>
                         <!-- <span class="Unknown">Free</span> -->
                     </td>
                 </tr>
@@ -135,7 +135,7 @@
             })
             .catch(error => {
                 console.error('エラーが発生しました:', error);
-                document.getElementById('message').innerText = 'エラーが発生しました。';
+                document.getElementById('message').textContent = 'エラーが発生しました。';
             });
     }
     function renderTable(data) {
@@ -152,23 +152,24 @@
         data.forEach(ch => {
             const rowFramgent = rowTemplate.content.cloneNode(true);
 
-            rowFramgent.querySelector('.name').innerText = ch.name;
-            rowFramgent.querySelector('.genre').innerText = ch.genre;
-            rowFramgent.querySelector('.desc').innerText = ch.desc;
-            rowFramgent.querySelector('.comment').innerText = ch.comment;
+            rowFramgent.querySelector('.name').textContent = ch.name;
+            rowFramgent.querySelector('.genre').textContent = ch.display_genre ? ch.display_genre : ch.genre;
+            rowFramgent.querySelector('.desc').textContent = ch.desc;
+            rowFramgent.querySelector('.comment').textContent = ch.comment;
             // status
-            rowFramgent.querySelector('.listener').innerText = ch.number_of_listener;
-            rowFramgent.querySelector('.relay').innerText = ch.number_of_relay;
-            rowFramgent.querySelector('.created_at').innerText = dateTo(ch.created_at);
+            rowFramgent.querySelector('.listener').textContent = ch.number_of_listener;
+            rowFramgent.querySelector('.relay').textContent = ch.number_of_relay;
+            rowFramgent.querySelector('.created_at').textContent = dateTo(ch.created_at);
             //
-            rowFramgent.querySelector('.type').innerText = ch.type;
+            rowFramgent.querySelector('.type').textContent = ch.type;
+            rowFramgent.querySelector('.bitrate').textContent = ch.bitrate;
 
             tbody.insertBefore(rowFramgent, comment_pos)
         });
 
-        tfoot.querySelector(".result-page").innerText = data.length;
-        tfoot.querySelector(".result-all").innerText = data.length;
-        tfoot.querySelector(".result-now").innerText = formatNow();
+        tfoot.querySelector(".result-page").textContent = data.length;
+        tfoot.querySelector(".result-all").textContent = data.length;
+        tfoot.querySelector(".result-now").textContent = formatNow();
 
 
         // 更新
