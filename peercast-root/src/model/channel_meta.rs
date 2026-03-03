@@ -112,44 +112,6 @@ impl From<ValidTrackInfo> for JsonTrackInfo {
     }
 }
 
-impl From<&IndexInfo> for ChannelMeta {
-    fn from(value: &IndexInfo) -> Self {
-        let mut j = ChannelMeta::Empty();
-        let IndexInfo {
-            id,
-            name,
-            tracker_addr,
-            contact_url,
-            genre,
-            desc,
-            comment,
-            typee,
-            stream_type,
-            stream_ext,
-            bitrate,
-            number_of_listener,
-            number_of_relay,
-            created_at,
-        } = value;
-        j.id = id.clone();
-        j.typee = typee.clone();
-        j.name = name.clone();
-        j.tracker_addr = tracker_addr.clone();
-        j.contact_url = contact_url.clone();
-        j.genre = genre.clone();
-        j.display_genre = Some(genre.clone());
-        j.desc = desc.clone();
-        j.comment = comment.clone();
-        j.stream_ext = stream_ext.clone();
-        j.stream_type = stream_type.clone();
-        j.bitrate = *bitrate;
-        j.number_of_listener = *number_of_listener;
-        j.number_of_relay = *number_of_relay;
-        j.created_at = created_at.unwrap_or_else(|| chrono::Utc::now());
-        j
-    }
-}
-
 fn line_of_index_txt_from_json(info: &ChannelMeta) -> String {
     create_index_line(
         &info.name,
