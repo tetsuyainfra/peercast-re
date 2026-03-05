@@ -58,7 +58,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                port_speed as `port_speed: u16`,
+                upload_speed as `upload_speed: u16`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts
             "#
@@ -76,7 +76,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                port_speed as `port_speed: u16`,
+                upload_speed as `upload_speed: u16`,
                 updated_at as `updated_at: DateTime<Utc>`
                FROM checked_hosts WHERE id = $1"#,
             id
@@ -95,7 +95,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16`,
                 port_level as `port_level: PortLevel`,
-                port_speed as `port_speed: u16`,
+                upload_speed as `upload_speed: u16`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts
                     WHERE ip_address = $1 AND port = $2
@@ -118,7 +118,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                port_speed as `port_speed: u16`,
+                upload_speed as `upload_speed: u16`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts WHERE ip_address = $1
             "#,
@@ -135,20 +135,20 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         ip: IpAddr,
         port: u16,
         port_level: PortLevel,
-        port_speed: Option<u16>,
+        upload_speed: Option<u16>,
     ) -> Result<i64, sqlx::Error> {
         let ip = DbIpAddr(ip);
         let id = sqlx::query_scalar!(
             r#"
             INSERT
-                INTO checked_hosts (ip_address, port, port_level, port_speed)
+                INTO checked_hosts (ip_address, port, port_level, upload_speed)
                 VALUES ($1, $2, $3, $4)
                 RETURNING id
             "#,
             ip,
             port,
             port_level,
-            port_speed
+            upload_speed
         )
         .fetch_one(&self.pool)
         .await?;
@@ -163,7 +163,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                     ip_address = $1,
                     port = $2,
                     port_level = $3,
-                    port_speed = $4,
+                    upload_speed = $4,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $5
             "#,
@@ -171,7 +171,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
             host.ip_address,
             host.port,
             host.port_level,
-            host.port_speed,
+            host.upload_speed,
             // where
             host.id
         )
@@ -241,7 +241,7 @@ mod tests {
             assert_eq!(hosts[0].ip_address, DbIpAddr(ip));
             assert_eq!(hosts[0].port, port);
             assert_eq!(hosts[0].port_level, port_level);
-            assert_eq!(hosts[0].port_speed, port_speed);
+            assert_eq!(hosts[0].upload_speed, port_speed);
 
             assert!(repo.insert(ip, port, port_level, port_speed).await.is_err());
 
@@ -249,7 +249,7 @@ mod tests {
             assert_eq!(r.ip_address, DbIpAddr(ip));
             assert_eq!(r.port, port);
             assert_eq!(r.port_level, port_level);
-            assert_eq!(r.port_speed, port_speed);
+            assert_eq!(r.upload_speed, port_speed);
         }
         #[tokio::test]
         async fn test_update() {
@@ -265,7 +265,7 @@ mod tests {
             host.ip_address = DbIpAddr("127.0.0.2".parse::<IpAddr>().unwrap());
             host.port = 8081;
             host.port_level = PortLevel::WelldoneWithSpeed;
-            host.port_speed = Some(100);
+            host.upload_speed = Some(100);
             repo.update(&host).await.unwrap();
 
             let diff_host = repo.find_by_id(id).await.unwrap().unwrap();

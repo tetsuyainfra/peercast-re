@@ -140,7 +140,7 @@ mod tests {
             ip_address: DbIpAddr("0.0.0.0".parse().unwrap()),
             port: 0,
             port_level: PortLevel::None,
-            port_speed: None,
+            upload_speed: None,
             updated_at: Utc::now(),
         }
     }

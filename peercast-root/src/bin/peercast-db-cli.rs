@@ -19,12 +19,12 @@ async fn main() -> anyhow::Result<()> {
         SubCommand::List => {
             repo.all().await?.iter().for_each(|host| {
                 println!(
-                    "ID: {}, IP: {}, port: {}, port_level: {}, port_speed: {:?}, updated_at: {:?}",
+                    "ID: {}, IP: {}, port: {}, port_level: {}, upload_speed: {:?}, updated_at: {:?}",
                     host.id.unwrap(),
                     host.ip_address.0,
                     host.port,
                     host.port_level,
-                    host.port_speed,
+                    host.upload_speed,
                     host.updated_at
                 );
             });
