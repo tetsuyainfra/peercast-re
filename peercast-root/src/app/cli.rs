@@ -1,9 +1,49 @@
-use std::process::exit;
+use std::{process::exit, vec};
 
 use axum_client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
 use peercast_root::RestrictPortLevel;
 use url::Url;
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_PORT: u16 = 7144;
+#[cfg(debug_assertions)]
+const DEFAULT_PORT: u16 = 17144;
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_API_BIND: &'static str = "127.0.0.1";
+#[cfg(debug_assertions)]
+const DEFAULT_API_BIND: &'static str = "0.0.0.0";
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_API_PORT: u16 = 7143;
+#[cfg(debug_assertions)]
+const DEFAULT_API_PORT: u16 = 17143;
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_ACCESS_LOG_FILE: Option<&'static str> = Some(concat!("/var/log/", env!("CARGO_BIN_NAME"), ".log"));
+#[cfg(debug_assertions)]
+const DEFAULT_ACCESS_LOG_FILE: Option<&'static str> = Some("./temp/debug.log");
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_CREATE_DUMMY_CHANNEL: bool = false;
+#[cfg(debug_assertions)]
+const DEFAULT_CREATE_DUMMY_CHANNEL: bool = true;
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_INDEX_TXT_FOOTER: Option<&'static str> = None;
+#[cfg(debug_assertions)]
+const DEFAULT_INDEX_TXT_FOOTER: Option<&'static str> = Some("share/peercast-root_footer.toml");
+
+// #[cfg(not(debug_assertions))]
+// const DEFAULT_ALLOW_CORS: &'static str = "";
+// #[cfg(debug_assertions)]
+const DEFAULT_ALLOW_CORS: &'static str = "http://localhost:3000";
+
+#[cfg(not(debug_assertions))]
+const DEFAULT_CACHE_MAX_AGE: u32 = 30;
+#[cfg(debug_assertions)]
+const DEFAULT_CACHE_MAX_AGE: u32 = 0;
 
 /// Simple Daemon Program
 #[derive(Parser, Debug, Clone)]
@@ -14,40 +54,27 @@ pub struct Args {
     #[arg(short, long, default_value = "0.0.0.0")]
     pub bind: std::net::IpAddr,
 
-    #[cfg(not(debug_assertions))]
     /// PeerCast root server port
-    #[arg(short, long, default_value_t = 7144)]
+    #[arg(short, long, default_value_t = DEFAULT_PORT)]
     pub port: u16,
 
-    #[cfg(debug_assertions)]
-    /// PeerCast root server port
-    #[arg(short, long, default_value_t = 17144)]
-    pub port: u16,
-
-    #[cfg(not(debug_assertions))]
     /// HTTP API address
-    #[arg(long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = DEFAULT_API_BIND)]
     pub api_bind: std::net::IpAddr,
 
-    #[cfg(debug_assertions)]
-    /// HTTP API address
-    #[arg(long, default_value = "0.0.0.0")]
-    pub api_bind: std::net::IpAddr,
-
-    #[cfg(not(debug_assertions))]
     /// HTTP API port
-    #[arg(long, default_value_t = 7143)]
-    pub api_port: u16,
-
-    #[cfg(debug_assertions)]
-    /// HTTP API port
-    #[arg(long, default_value_t = 17143)]
+    #[arg(long, default_value_t = DEFAULT_API_PORT)]
     pub api_port: u16,
 
     /// Trackerのジャンル名で指定するYPの名前
     /// genre: [yp]@Game
     #[arg(long, default_value = "yp")]
-    pub yp_name_space: String,
+    pub yp_name: String,
+
+    /// Trackerのジャンル名に指定できる名前空間を使用できるか
+    /// genre: [yp]@Game
+    #[arg(long, default_value_t = true)]
+    pub yp_name_spaceable: bool,
 
     /// Listener数を表示にできるか
     /// genre: yp[?]@Game
@@ -93,55 +120,22 @@ pub struct Args {
     pub daemon_merge_stderr: bool,
 
     /// Path to log file by DEBUG MODE
-    #[cfg(debug_assertions)]
-    #[arg(short = 'L', value_name = "ACCESS_LOG_FILE", default_value = "./temp/debug.log")]
-    pub access_log: std::path::PathBuf,
-
-    /// Path to log file
-    #[cfg(not(debug_assertions))]
-    #[arg(
-        short = 'L',
-        value_name = "ACCESS_LOG_FILE",
-        default_value = concat!("/var/log/", env!("CARGO_BIN_NAME"), ".log")
-    )]
+    #[arg(short = 'L', value_name = "ACCESS_LOG_FILE", default_value = DEFAULT_ACCESS_LOG_FILE)]
     pub access_log: std::path::PathBuf,
 
     /// Path to footer file by DEBUG MODE
-    #[cfg(debug_assertions)]
-    #[arg(long, value_name = "FOOTER_FILE.toml", default_value = "share/peercast-root_footer.toml")]
-    pub index_txt_footer: Option<std::path::PathBuf>,
-
-    /// Path to footer file
-    #[cfg(not(debug_assertions))]
-    #[arg(long, value_name="FOOTER_FILE.toml", default_value = None)]
+    #[arg(long, value_name = "FOOTER_FILE.toml", default_value = DEFAULT_INDEX_TXT_FOOTER)]
     pub index_txt_footer: Option<std::path::PathBuf>,
 
     /// Create dummy channel at initialize.
-    #[cfg(debug_assertions)]
-    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=true)]
+    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=DEFAULT_CREATE_DUMMY_CHANNEL)]
     pub create_dummy_channel: bool,
 
-    /// Create dummy channel at initialize.
-    #[cfg(not(debug_assertions))]
-    #[arg(long, value_parser, action = clap::ArgAction::Set, default_value_t=false)]
-    pub create_dummy_channel: bool,
-
-    #[cfg(not(debug_assertions))]
     /// Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
-    #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS )]
+    #[arg(long, long_help=LONG_HELP_CORS, value_delimiter=',', default_value=DEFAULT_ALLOW_CORS)]
     pub allow_cors: Vec<String>,
 
-    #[cfg(debug_assertions)]
-    /// Append Access-Controll-Allow-Origin 's Values (example: http://example.com,http://example.com:7143)
-    #[arg(long, value_delimiter = ',', long_help=LONG_HELP_CORS, default_value="http://localhost:3000")]
-    pub allow_cors: Vec<String>,
-
-    #[cfg(not(debug_assertions))]
-    #[arg(long, value_parser, default_value_t = 30)]
-    pub cache_max_age: u32,
-
-    #[cfg(debug_assertions)]
-    #[arg(long, value_parser, default_value_t = 0)]
+    #[arg(long, default_value_t = DEFAULT_CACHE_MAX_AGE)]
     pub cache_max_age: u32,
 
     // #[arg(long, default_value = "ConnectInfo")]

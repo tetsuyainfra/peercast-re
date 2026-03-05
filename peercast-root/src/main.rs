@@ -121,7 +121,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         listener_hideable: args.yp_listerer_hideable,
         port_check_level: args.yp_restrict_port_level,
         name_space: args.yp_name_space.clone(),
-        allow_cors: args.allow_cors.clone(),
+        allow_cors: args.allow_cors.iter().filter(|s| s.is_empty()).map(|s| s.to_string()).collect(),
         cache_max_age: args.cache_max_age,
         client_ip_source: args.client_ip_source.clone(),
     };
