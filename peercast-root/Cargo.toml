@@ -10,6 +10,7 @@ libpeercast-re = { version = "*", path = "../libpeercast-re" }
 
 anyhow = { version = "1.0.95" }
 thiserror = {version = "2.0.12"}
+regex = { version = "1.12.3" }
 
 # tracing logging
 tracing = "0.1.41"
