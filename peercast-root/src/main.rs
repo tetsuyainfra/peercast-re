@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use clap::Parser;
+use libpeercast_re::model::ValidChannelInfo;
+use libpeercast_re::model::ValidTrackInfo;
 use libpeercast_re::pcp::GnuId;
 use libpeercast_re::pcp::connection5::shared;
 use libpeercast_re::repository::Repository;
@@ -19,6 +21,7 @@ mod app;
 use app::cli;
 use app::logging;
 
+use crate::app::yp::SiteConfig;
 use crate::app::{ApiConfig, AppState, ArcState, server_http, server_peercast};
 
 #[cfg(test)]
@@ -80,47 +83,10 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
     let repository = RootRepository2::new(|_| async {}).await;
 
     if args.create_dummy_channel {
-        let level_fmt = match args.yp_restrict_port_level {
-            peercast_root::RestrictPortLevel::None => "",
-            peercast_root::RestrictPortLevel::PortCheck => "@",
-            peercast_root::RestrictPortLevel::BroadcastSpeed => "@@",
-            peercast_root::RestrictPortLevel::RestrictSpeed => "@@@",
-        };
-
-        let dummy_channel_id = GnuId::from(0x123456789ABCDEF_u128);
-        let dummy_channel_info = libpeercast_re::model::ValidChannelInfo {
-            name: "Dummyチャンネル名".to_string(),
-            url: "http://example.com".to_string(),
-            genre: format!("{}{}ダミージャンル", args.yp_name_space, level_fmt).into(),
-            desc: "This is a dummy channel desc".to_string(),
-            comment: "No comments.".to_string(),
-            stream_type: "video/x-flv".to_string(),
-            stream_ext: ".flv".to_string(),
-            bitrate: 128,
-            typee: "FLV".to_string(),
-        };
-        let dummy_track_info = libpeercast_re::model::ValidTrackInfo {
-            title: "Dummy Track".to_string(),
-            creator: "Dummy Artist".to_string(),
-            url: "http://example.com/track".to_string(),
-            album: "Dummy Album".to_string(),
-            genre: "Various".to_string(),
-        };
-        let dummy_config = RootConfig {
-            broadcast_id: GnuId::from(0xFEDCBA987654321_u128),
-            tracker_addr: Some("127.0.0.1:7144".parse().unwrap()),
-        };
-
-        repository
-            .create_or_get(dummy_channel_id, Some(dummy_channel_info), Some(dummy_track_info), Some(dummy_config))
-            .await;
+        create_dummy_channel(&repository).await;
     }
 
     let api_config = ApiConfig {
-        restrict_speed: args.yp_limit_speed,
-        listener_hideable: args.yp_listerer_hideable,
-        port_check_level: args.yp_restrict_port_level,
-        name_space: args.yp_name_space.clone(),
         allow_cors: args.allow_cors.iter().filter(|s| s.is_empty()).map(|s| s.to_string()).collect(),
         cache_max_age: args.cache_max_age,
         client_ip_source: args.client_ip_source.clone(),
@@ -128,7 +94,13 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
 
     let db_pool = init_db(args).await?;
 
-    let yellow_page = app::yp::YellowPage::new(&args.yp_name_space).add_footer_channels(index_txt_footer.clone());
+    let yp_config = SiteConfig {
+        yp_name: args.yp_name.clone(),
+        listener_hideable: args.yp_listerer_hideable,
+        restrict_speed: args.yp_limit_speed,
+        max_restrict_level: args.yp_restrict_port_level,
+    };
+    let yellow_page = app::yp::YellowPage::new(yp_config).add_footer_channels(index_txt_footer.clone());
     let yellow_page = Arc::new(yellow_page);
 
     let app_sate = AppState {
@@ -150,4 +122,47 @@ async fn init_db(args: &cli::Args) -> anyhow::Result<sqlx::Pool<sqlx::sqlite::Sq
     info!("Connecting to database at {}", args.database_url.as_str());
     let pool = SqlitePoolOptions::new().connect(args.database_url.as_str()).await?;
     Ok(pool)
+}
+
+async fn create_dummy_channel(repository: &RootRepository2) {
+    let vars = vec![
+        dummy_channel(0, "dummy"),
+        dummy_channel(1, "ypdummy"),
+        dummy_channel(2, "yp@dummy"),
+        dummy_channel(3, "yp@@dummy"),
+        dummy_channel(4, "yp@@@dummy"),
+    ];
+
+    for v in vars {
+        println!("{:?}", v);
+        repository.create_or_get(v.0, Some(v.1), Some(v.2), Some(v.3)).await;
+    }
+}
+
+fn dummy_channel(i: usize, genre: &str) -> (GnuId, ValidChannelInfo, ValidTrackInfo, RootConfig) {
+    let cid = GnuId::from(0x123456789ABCDEF_u128 + i as u128);
+    let channel_info = libpeercast_re::model::ValidChannelInfo {
+        name: "Dummyチャンネル名".to_string(),
+        url: "http://example.com".to_string(),
+        genre: genre.to_string(),
+        desc: "This is a dummy channel desc".to_string(),
+        comment: "No comments.".to_string(),
+        stream_type: "video/x-flv".to_string(),
+        stream_ext: ".flv".to_string(),
+        bitrate: 128,
+        typee: "FLV".to_string(),
+    };
+    let track_info = libpeercast_re::model::ValidTrackInfo {
+        title: "Dummy Track".to_string(),
+        creator: "Dummy Artist".to_string(),
+        url: "http://example.com/track".to_string(),
+        album: "Dummy Album".to_string(),
+        genre: "Various".to_string(),
+    };
+    let dummy_config = RootConfig {
+        broadcast_id: GnuId::from(0xFEDCBA987654321_u128),
+        tracker_addr: Some("127.0.0.1:7144".parse().unwrap()),
+    };
+
+    (cid, channel_info, track_info, dummy_config)
 }

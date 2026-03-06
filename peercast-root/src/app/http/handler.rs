@@ -13,7 +13,7 @@ use libpeercast_re::repository::Repository;
 use peercast_root::{model::ChannelMeta, service::HostCheckService};
 use serde::Deserialize;
 
-use crate::app::{ArcState, yp::FilterConfig};
+use crate::app::ArcState;
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -53,9 +53,9 @@ pub async fn index_txt(
 
     let _x = HostCheckService::do_host_check(&state.connection_factory, &state.db_pool, target_ip, target_port).await?;
 
-    let filter_config = FilterConfig {};
     let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
-    let string_channels = state.yellow_page.to_index_txt(&filter_config, channels);
+    // let channels = state.yellow_page.filter_channel_meta(channels);
+    let string_channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
     Ok(itertools::join(string_channels, "\n"))
 }
@@ -66,40 +66,10 @@ pub async fn index_json(
     state: State<ArcState>,
 ) -> Result<Json<Vec<ChannelMeta>>, ApiError> {
     let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
-    // let channels = state.yellow_page.to_index_json(&FilterConfig {}, channels);
+    // let channels = state.yellow_page.filter_channel_meta(channels);
 
     Ok(Json(channels))
 }
-
-//-------------------------------------------------------------------------------
-// ApiConfig Mapper
-//-------------------------------------------------------------------------------
-// AppStateからApiConfigを取り出すためのFromRef実装
-// impl FromRef<Arc<AppState>> for Arc<ApiConfig> {
-//     fn from_ref(state: &Arc<AppState>) -> Arc<ApiConfig> {
-//         state.config
-//     }
-// }
-
-//-------------------------------------------------------------------------------
-// Database mapper
-//-------------------------------------------------------------------------------
-// impl FromRequestParts<ArcState> for DatabaseConnection {
-//     type Rejection = (StatusCode, String);
-
-//     async fn from_request_parts(
-//         _parts: &mut axum::http::request::Parts,
-//         state: &ArcState,
-//     ) -> Result<Self, Self::Rejection> {
-//         let pool = ConnectionPool::from_ref(&state.0.db_pool);
-
-//         // let conn = pool.get_owned().await.map_err(internal_error)?;
-//         let ret_conn = timeout(Duration::from_millis(2000), pool.get_owned()).await.map_err(internal_error)?;
-//         let conn = ret_conn.map_err(internal_error)?;
-
-//         Ok(Self(conn))
-//     }
-// }
 
 /// Utility function for mapping any error into a `500 Internal Server Error` response.
 #[allow(dead_code)]
@@ -122,6 +92,7 @@ pub struct IndexTextParams {
     pub Host: Option<(String, u16)>,
 }
 
+/// Hostクエリの分解に使う補助メソッド 0字の文字列をNoneとして扱う
 fn empty_string_as_none<'de, D>(de: D) -> Result<Option<(String, u16)>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -167,6 +138,7 @@ pub fn static_router() -> axum::Router {
             .fallback(routing::get(embed_handler))
     }
 }
+
 #[cfg(not(debug_assertions))]
 async fn embed_handler(uri: Uri) -> impl IntoResponse {
     let path = uri.path();

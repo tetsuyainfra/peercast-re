@@ -52,6 +52,9 @@ pub struct ChannelMeta {
 
     /// トラック情報
     pub track: JsonTrackInfo,
+
+    /// ネームスペース
+    pub namespace: Option<String>,
 }
 
 impl ChannelMeta {
@@ -80,6 +83,7 @@ impl ChannelMeta {
             created_at: Utc.timestamp_opt(0, 0).unwrap(),
             // info: Default::default(),
             track: Default::default(),
+            namespace: None,
         }
     }
 }

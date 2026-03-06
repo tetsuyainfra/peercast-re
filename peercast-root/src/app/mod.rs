@@ -29,12 +29,6 @@ pub struct ApiConfig {
 
     /// クライアントIPの取得元
     pub client_ip_source: cli::ClientIpSourceArg,
-
-    /// PortCheckの制限速度
-    pub restrict_speed: u32,
-    pub listener_hideable: bool,
-    pub port_check_level: RestrictPortLevel,
-    pub name_space: String,
 }
 
 #[allow(dead_code)]

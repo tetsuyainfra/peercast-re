@@ -145,6 +145,7 @@ impl RootChannel2 {
             tracker_addr: self.tracker_address(),
             created_at: self.created_at(),
             track: track_info.into(),
+            namespace: None,
         }
     }
 }
