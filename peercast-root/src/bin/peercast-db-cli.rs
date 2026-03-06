@@ -80,9 +80,6 @@ async fn main() -> anyhow::Result<()> {
         } => {
             let port_level = port_level.try_into().context("Invalid port_level value")?;
             if let Some(speed) = port_speed {
-                if port_level != PortLevel::WelldoneWithSpeed {
-                    anyhow::bail!("port_speed can be set only when port_level is WelldoneWithSpeed");
-                }
                 if speed > 1000 {
                     anyhow::bail!("port_speed must be between 0 and 1000");
                 }

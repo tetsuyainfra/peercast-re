@@ -232,7 +232,7 @@ mod tests {
 
             let ip = "127.0.0.1".parse::<IpAddr>().unwrap();
             let port = 8080;
-            let port_level = PortLevel::WelldoneWithSpeed;
+            let port_level = PortLevel::Welldone;
             let port_speed = Some(2);
 
             let id = repo.insert(ip, port, port_level, port_speed).await.unwrap();
@@ -264,7 +264,7 @@ mod tests {
             let mut host = repo.find_by_id(id).await.unwrap().unwrap();
             host.ip_address = DbIpAddr("127.0.0.2".parse::<IpAddr>().unwrap());
             host.port = 8081;
-            host.port_level = PortLevel::WelldoneWithSpeed;
+            host.port_level = PortLevel::Welldone;
             host.upload_speed = Some(100);
             repo.update(&host).await.unwrap();
 

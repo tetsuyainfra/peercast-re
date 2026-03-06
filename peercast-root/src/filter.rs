@@ -85,10 +85,7 @@ fn filter_channel(
     fn to_speed(port_level: PortLevel) -> u32 {
         match port_level {
             PortLevel::Incomplete => 0,
-            PortLevel::None => 0,
             PortLevel::Welldone => 1,
-            // PortLevel::WelldoneWithSpeed(speed) => speed as u32,
-            PortLevel::WelldoneWithSpeed => 2,
         }
     }
 
