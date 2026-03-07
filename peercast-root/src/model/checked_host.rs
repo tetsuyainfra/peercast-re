@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use chrono::{DateTime, Utc};
 
 use crate::model::PortLevel;
@@ -15,11 +17,20 @@ pub struct CheckedHost {
 }
 
 impl CheckedHost {
-    // pub fn new(hostname: DbIpAddr, is_active: bool) -> Self {
-    //     Self {
-    //         id: None,
-    //         hostname,
-    //         is_active,
-    //     }
-    // }
+    pub fn new(
+        ip_address: IpAddr,
+        port: u16,
+        port_level: PortLevel,
+        upload_speed: Option<u16>,
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id: None,
+            ip_address: DbIpAddr(ip_address),
+            port,
+            port_level,
+            upload_speed,
+            updated_at,
+        }
+    }
 }

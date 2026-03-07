@@ -3,12 +3,18 @@ use std::{
     time::Duration,
 };
 
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
+use libpeercast_re::pcp::{
+    GnuId,
+    connection5::{ConnectionFactory, OutgoingConnection, ping::Ping},
+};
 
 use crate::{
-    connection::RootConnectionFactory,
+    connection::{RootConnectionFactory, RootSpec},
     db::{CheckedHostRepository, SqliteCheckedHostRepository},
     model::{CheckedHost, PortLevel},
+    service::port_checker::PortChecker,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -23,104 +29,69 @@ pub enum HostCheckServiceError {
     Internal(#[from] anyhow::Error),
 }
 
-pub struct HostCheckService;
+pub struct HostCheckService<R, P> {
+    repo: R,
+    port_checker: P,
+}
 
-impl HostCheckService {
-    const CHECK_VALID_HOURS: Duration = Duration::from_hours(24);
-    const CHECK_INTERVAL_SECS: Duration = Duration::from_secs(10);
+impl<R, P> HostCheckService<R, P> {
+    pub fn new(repo: R, port_checker: P) -> Self {
+        Self {
+            repo,
+            port_checker,
+        }
+    }
+}
 
-    #[allow(dead_code)]
+impl<R, P> HostCheckService<R, P>
+where
+    R: CheckedHostRepository,
+    P: PortChecker,
+{
+    const TTL: Duration = Duration::from_hours(24);
+    const HEALTH_CHECK_INTERVAL: chrono::TimeDelta = chrono::TimeDelta::seconds(10);
+
     /// ホストチェックの実装
     /// - `target_addr`: チェック対象のIPアドレス
     /// - `target_port`: チェック対象のポート番号
-    /// - 戻り値: ポートの状態を示すPortLevel
+    /// - 戻り値: ホスト情報(CheckedHost)
     ///
     /// # Errors
     /// - `HostCheckServiceError::InternalDB`: データベース操作中にエラーが発生した場合
     /// - `HostCheckServiceError::Internal`: その他の内部エラーが発生した場合
-    ////
-    /// 内部の動作
-    /// 1. データベースから対象ホストの情報を取得
-    /// 2. その結果が以下の条件に基づいて処理を分岐
-    ///    2.a ポート開放済みかつ有効期限内の場合は早期リターン
-    ///    2.b 有効期限切れの場合はポートチェックを再実施
-    ///    2.c ただし、ポートチェックの最終実行から一定時間経過していない場合は、再実施せずに早期リターン
-    /// 3. ポートチェックは最終実行から一定時間経過している場合にのみ実施
-    /// 4. ポートチェックの結果に基づいてデータベースを更新し、最終的なPortLevelを返す。
-    pub async fn do_host_check(
-        _conn_factory: &RootConnectionFactory,
-        db_pool: &sqlx::Pool<sqlx::sqlite::Sqlite>,
-
-        target_addr: IpAddr,
-        target_port: u16,
-        // ) -> Result<PortLevel, HostCheckServiceError> {
-    ) -> Result<PortLevel, HostCheckServiceError> {
+    pub async fn do_check(&self, target_addr: IpAddr, target_port: u16) -> Result<CheckedHost, HostCheckServiceError> {
         let now = chrono::Utc::now();
-        let checked_host_repo = SqliteCheckedHostRepository::new(db_pool.clone());
-        let host = checked_host_repo.find_by_ip_port(target_addr, target_port).await?;
+        let host = self.repo.find_by_ip_port(target_addr, target_port).await?;
 
-        if Self::is_port_opened(&host, now) {
-            // ポート開放されているかつ有効期限内の場合は早期リターン
-            return Ok(host.unwrap().port_level);
-        }
-
-        // 以降、ポートチェックは実施しないといけないが、最終実行から一定時間経過していない場合は、再実施せずに早期リターン
-        if let Some(host) = &host {
-            if now < host.updated_at + Self::CHECK_INTERVAL_SECS {
-                // 最終実行から一定時間経過していない場合は、再実施せずに早期リターン
-                return Err(HostCheckServiceError::SkippedCheck);
-            }
-        }
-
-        // ポートチェックを実行
-        // Self::port_check(conn_factory, target_addr, target_port).await?;
-        todo!()
-    }
-
-    /// ポートチェック
-    /// - target_addr: チェック対象のIPアドレス
-    /// - target_port: チェック対象のポート番号
-    /// - 戻り値: (PortLevel, Option<u32>) ポートの状態と配信速度（速度が測定できない場合はNone）
-    pub async fn port_check(
-        _conn_factory: &RootConnectionFactory,
-        target_addr: IpAddr,
-        target_port: u16,
-    ) -> anyhow::Result<(PortLevel, Option<u32>)> {
-        let remote = SocketAddr::new(target_addr, target_port);
-        let _stream = tokio::net::TcpStream::connect(remote).await?;
-        // let _conn = conn_factory.create_outgoing_connection(ConnectionNo::new(), stream, remote);
-
-        todo!()
-    }
-
-    // ポート開放されているか？
-    fn is_port_opened(host: &Option<CheckedHost>, now: DateTime<Utc>) -> bool {
         let Some(host) = host else {
-            // ホストが存在しない場合はFalseを返す
-            return false;
+            // テーブルになかった場合、単にチェックして結果を保存して返す
+            let result = self.port_checker.check(target_addr, target_port).await;
+            let id = self.repo.insert(target_addr, target_port, result, None).await?;
+            let host = self.repo.find_by_id(id).await?.ok_or_else(|| {
+                anyhow!("Inserted a row and obtained its ID, but no row with that ID was found. id: {}", id)
+            })?;
+            return Ok(host);
         };
 
-        // 現在時刻よりも、ホストの更新日時 + 有効期限の時間が小さい場合は、ホストの情報が古いとみなす
-        if now > host.updated_at + Self::CHECK_VALID_HOURS {
-            return false;
+        // ポートが解放されていて、
+        // 更新時＋TTLの合算時が現在時刻より小さいならば、そのままホスト情報を返してよい
+        if host.port_level == PortLevel::Welldone && host.updated_at + Self::TTL >= now {
+            // skip check
+            return Ok(host);
         }
 
-        // ポートレベルがWelldone以上であれば、ポートが開放されているとみなす
-        if host.port_level < PortLevel::Welldone {
-            return false;
+        // 最終チェックから時間が経過していない場合、そのままホスト情報を返す
+        if now.signed_duration_since(host.updated_at) < Self::HEALTH_CHECK_INTERVAL {
+            return Ok(host);
         }
 
-        true
-    }
+        // ポートチェックして結果を保存して返す
+        let mut host = host;
+        let result_level = self.port_checker.check(target_addr, target_port).await;
+        host.port_level = result_level;
+        let _ = self.repo.update(&mut host).await?;
 
-    #[allow(dead_code)]
-    fn is_recheck_ok(host: &CheckedHost, now: DateTime<Utc>) -> bool {
-        // 現在時刻よりも、ホストの更新日時 + チェック間隔の時間が小さい場合は、再チェックできないとみなす
-        if now < host.updated_at + Self::CHECK_INTERVAL_SECS {
-            return false;
-        }
-
-        true
+        Ok(host)
     }
 }
 
@@ -143,47 +114,5 @@ mod tests {
             upload_speed: None,
             updated_at: Utc::now(),
         }
-    }
-
-    #[test]
-    fn test_return_or_check() {
-        let now = Utc::now();
-
-        // ホストが存在しない場合はFalseを返す
-        assert_eq!(HostCheckService::is_port_opened(&None, now), false);
-
-        // let now = Utc::now();
-        // // 有効期限切れの時間
-        // let expried = now - HostCheckService::CHECK_VALID_HOURS - Duration::from_secs(1);
-
-        // // 再チェックまでの時間
-        // let check_interval = now - HostCheckService::CHECK_INTERVAL_SECS - Duration::from_secs(1);
-
-        // // (port open, not expired) => True
-        // // (true, true)
-        // // ホストが存在し、有効期限切れでポート開放されている場合はTrueを返す
-        // let mut host = checked_host_mock();
-        // host.port_level = PortLevel::Welldone;
-        // host.port_speed = Some(1000);
-        // host.updated_at = now;
-        // assert_eq!(HostCheckService::is_return_or_check(&Some(host), now), true);
-
-        // // (true, false)
-        // // ホストが存在し、有効期限切れだけどポート開放されている場合はTrueを返す
-        // let mut host = checked_host_mock();
-        // host.port_level = PortLevel::Welldone;
-        // host.port_speed = Some(1000);
-        // host.updated_at = now;
-        // host.updated_at = now - HostCheckService::CHECK_VALID_HOURS - Duration::from_secs(1);
-        // assert_eq!(HostCheckService::is_return_or_check(&Some(host), now), false);
-
-        // // (true, false)
-        // // ホストが存在し、有効期限内でポート開放されていない場合はFalseを返す
-        // let mut host = checked_host_mock();
-        // host.port_level = PortLevel::Incomplete;
-        // host.port_speed = None;
-        // host.updated_at = now;
-        // host.updated_at = now - HostCheckService::CHECK_VALID_HOURS / 2;
-        // assert_eq!(HostCheckService::is_return_or_check(&Some(host), now), false);
     }
 }

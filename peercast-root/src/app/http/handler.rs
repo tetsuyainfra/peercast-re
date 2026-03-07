@@ -10,7 +10,11 @@ use axum_client_ip::ClientIp;
 use hyper::StatusCode;
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
-use peercast_root::{model::ChannelMeta, service::HostCheckService};
+use peercast_root::{
+    db::SqliteCheckedHostRepository,
+    model::ChannelMeta,
+    service::{HostCheckService, PingPortChecker},
+};
 use serde::Deserialize;
 
 use crate::app::ArcState;
@@ -51,7 +55,10 @@ pub async fn index_txt(
         None => (ip_addr, 7144),
     };
 
-    let _x = HostCheckService::do_host_check(&state.connection_factory, &state.db_pool, target_ip, target_port).await?;
+    let repo = SqliteCheckedHostRepository::new(state.db_pool.clone());
+    let port_checker = PingPortChecker::new(&state.connection_factory);
+    let host_check_service = HostCheckService::new(repo, port_checker);
+    let _x = host_check_service.do_check(target_ip, target_port).await?;
 
     let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
     // let channels = state.yellow_page.filter_channel_meta(channels);
