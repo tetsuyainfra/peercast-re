@@ -9,7 +9,7 @@ use futures_util::SinkExt;
 
 use crate::pcp::{
     atom2::{Atom2Kind, AtomView},
-    builder2::{self, ParseError},
+    builder2::{self, InfoParseError},
     Atom2, AtomMut, GnuId, Id4,
 };
 use crate::prelude::*;
@@ -92,16 +92,16 @@ pub struct HeloInfo {
 }
 
 impl TryFrom<&Atom2> for HeloInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
         if atom.id() != Id4::PCP_HELO {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let pv = match atom.view() {
             Atom2Kind::Parent(pv) => pv,
-            Atom2Kind::Child(_) => return Err(ParseError::TargetNotFound),
+            Atom2Kind::Child(_) => return Err(InfoParseError::TargetNotFound),
         };
 
         let mut helo = HeloInfo::default();
@@ -112,11 +112,11 @@ impl TryFrom<&Atom2> for HeloInfo {
             };
             match cv.id() {
                 Id4::PCP_HELO_SESSIONID => {
-                    let v = cv.data().read_u128::<BigEndian>().map_err(|_| ParseError::InvalidPayload)?;
+                    let v = cv.data().read_u128::<BigEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
                     helo.session_id = Some(GnuId::from(v));
                 }
                 Id4::PCP_HELO_BCID => {
-                    let v = cv.data().read_u128::<BigEndian>().map_err(|_| ParseError::InvalidPayload)?;
+                    let v = cv.data().read_u128::<BigEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
                     helo.session_id = Some(GnuId::from(v));
                 }
                 Id4::PCP_HELO_AGENT => {
@@ -125,15 +125,15 @@ impl TryFrom<&Atom2> for HeloInfo {
                     helo.agent = Some(v.to_string());
                 }
                 Id4::PCP_HELO_VERSION => {
-                    let v = cv.data().read_u32::<LittleEndian>().map_err(|_| ParseError::InvalidPayload)?;
+                    let v = cv.data().read_u32::<LittleEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
                     helo.version = Some(v);
                 }
                 Id4::PCP_HELO_PORT => {
-                    let v = cv.data().read_u16::<LittleEndian>().map_err(|_| ParseError::InvalidPayload)?;
+                    let v = cv.data().read_u16::<LittleEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
                     helo.port = Some(v);
                 }
                 Id4::PCP_HELO_PING => {
-                    let v = cv.data().read_u16::<LittleEndian>().map_err(|_| ParseError::InvalidPayload)?;
+                    let v = cv.data().read_u16::<LittleEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
                     helo.port_check = Some(v);
                 }
                 _ => {

@@ -7,7 +7,7 @@ use bytes::Buf;
 
 use crate::pcp::{
     atom2::{Atom2Kind, AtomView},
-    builder2::{self, ParseError},
+    builder2::{self, InfoParseError},
     Atom2, AtomMut, GnuId, Id4,
 };
 use crate::prelude::*;
@@ -57,16 +57,16 @@ pub struct OlehInfo {
 }
 
 impl TryFrom<&Atom2> for OlehInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
         if atom.id() != Id4::PCP_OLEH {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let pv = match atom.view() {
             Atom2Kind::Parent(pv) => pv,
-            Atom2Kind::Child(_) => return Err(ParseError::TargetNotFound),
+            Atom2Kind::Child(_) => return Err(InfoParseError::TargetNotFound),
         };
 
         let mut session_id = None;
@@ -113,7 +113,7 @@ impl TryFrom<&Atom2> for OlehInfo {
         }
 
         Ok(Self {
-            session_id: session_id.ok_or(ParseError::TargetNotFound)?,
+            session_id: session_id.ok_or(InfoParseError::TargetNotFound)?,
             remote_ip,
             agent,
             port,

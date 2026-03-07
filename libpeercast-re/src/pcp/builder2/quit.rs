@@ -1,7 +1,7 @@
 use bytes::Buf;
 use tracing::{error, warn};
 
-use crate::pcp::{error_code::QuitCode, Atom, AtomMut, Id4};
+use crate::pcp::{builder2::InfoParseError, error_code::QuitCode, Atom, Atom2, Atom2Kind, AtomMut, AtomView, Id4};
 
 #[derive(Debug)]
 pub enum QuitReason {
@@ -42,7 +42,6 @@ impl QuitBuilder2 {
     }
 }
 
-/*
 #[derive(Debug, Clone)]
 pub struct QuitInfo {
     quit_code: u32,
@@ -65,27 +64,46 @@ impl QuitInfo {
             }
         }
     }
+}
 
-    pub fn parse(atom: &Atom) -> QuitInfo {
-        // FIXME: panicはさすがにやりすぎでは？
+impl TryFrom<&Atom2> for QuitInfo {
+    type Error = InfoParseError;
+
+    fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
         if atom.id() != Id4::PCP_QUIT {
-            panic!("this atom is not quit! {:?}", atom);
+            return Err(InfoParseError::TargetNotFound);
         }
-        let quit_atoms = match atom {
-            Atom::Child(c) => c,
-            Atom::Parent(p) => panic!("this atom is not quit! {:?}", p),
+        let Atom2Kind::Child(quit_atom) = atom.view() else {
+            return Err(InfoParseError::TargetNotFound);
         };
-        if quit_atoms.payload().len() != 4 {
-            panic!("this atom is not quit! {:?}", atom);
+        if quit_atom.length() != 4 {
+            return Err(InfoParseError::InvalidPayload);
         }
+        let quit_code = atom.payload().get_u32_le();
 
-        let quit_code = quit_atoms.payload().get_u32_le();
-        QuitInfo {
+        Ok(QuitInfo {
             quit_code,
-        }
+        })
     }
 }
-    */
+// pub fn parse(atom: &Atom) -> QuitInfo {
+//     // FIXME: panicはさすがにやりすぎでは？
+//     if atom.id() != Id4::PCP_QUIT {
+//         panic!("this atom is not quit! {:?}", atom);
+//     }
+//     let quit_atoms = match atom {
+//         Atom::Child(c) => c,
+//         Atom::Parent(p) => panic!("this atom is not quit! {:?}", p),
+//     };
+//     if quit_atoms.payload().len() != 4 {
+//         panic!("this atom is not quit! {:?}", atom);
+//     }
+
+//     let quit_code = quit_atoms.payload().get_u32_le();
+//     QuitInfo {
+//         quit_code,
+//     }
+// }
 
 /*
 参考文献

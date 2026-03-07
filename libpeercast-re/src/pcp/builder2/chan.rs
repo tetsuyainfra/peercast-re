@@ -6,7 +6,7 @@ use crate::pcp::{
         decode2::{decode_gnuid, decode_i32, decode_vecu8},
         Atom2Kind, AtomView, ChildView, ParentView,
     },
-    builder2::ParseError,
+    builder2::InfoParseError,
     Atom2, GnuId, Id4,
 };
 ////////////////////////////////////////////////////////////////////////////////
@@ -20,11 +20,11 @@ pub struct ChanInfo {
     pub track_info: Option<TrackInfo>,
 }
 impl TryFrom<&ParentView<'_>> for ChanInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(parent: &ParentView<'_>) -> Result<Self, Self::Error> {
         if (parent.id() != Id4::PCP_CHAN) {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let mut ci = ChanInfo::default();
@@ -52,15 +52,15 @@ impl TryFrom<&ParentView<'_>> for ChanInfo {
 }
 
 impl TryFrom<&Atom2> for ChanInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
         if (atom.id() != Id4::PCP_CHAN) {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let Atom2Kind::Parent(pv) = atom.view() else {
-            return Err(super::ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         };
 
         ChanInfo::try_from(&pv)
@@ -88,11 +88,11 @@ pub struct ChannelInfo {
 }
 
 impl TryFrom<&ParentView<'_>> for ChannelInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(view: &ParentView<'_>) -> Result<Self, Self::Error> {
         if view.id() != Id4::PCP_CHAN_INFO {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let mut ci = ChannelInfo::default();
@@ -135,11 +135,11 @@ pub struct TrackInfo {
     pub genre: Option<Vec<u8>>, // only PeerCastStation?
 }
 impl TryFrom<&ParentView<'_>> for TrackInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(value: &ParentView<'_>) -> Result<Self, Self::Error> {
         if value.id() != Id4::PCP_CHAN_TRACK {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let mut ti = TrackInfo::default();

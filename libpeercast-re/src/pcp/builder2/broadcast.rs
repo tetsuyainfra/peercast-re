@@ -6,7 +6,7 @@ use crate::pcp::{
         decode2::{decode_gnuid, decode_i16, decode_i32, decode_u8, decode_vecu8},
         Atom2Kind, AtomView,
     },
-    builder2::{ChanInfo, HostInfo},
+    builder2::{ChanInfo, HostInfo, InfoParseError},
     Atom, Atom2, GnuId, Id4,
 };
 
@@ -83,15 +83,15 @@ pub struct BroadcastInfo {
 }
 
 impl TryFrom<&Atom2> for BroadcastInfo {
-    type Error = super::ParseError;
+    type Error = super::InfoParseError;
 
     fn try_from(a: &Atom2) -> Result<Self, Self::Error> {
         if (a.id() != Id4::PCP_BCST) {
-            return Err(super::ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let Atom2Kind::Parent(pv) = a.view() else {
-            return Err(super::ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         };
 
         let mut b = BroadcastInfo::default();

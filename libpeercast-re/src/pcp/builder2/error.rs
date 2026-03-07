@@ -1,5 +1,5 @@
 #[derive(Debug, thiserror::Error)]
-pub enum ParseError {
+pub enum InfoParseError {
     #[error("Target Not Found")]
     TargetNotFound,
 

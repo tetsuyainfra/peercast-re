@@ -7,7 +7,7 @@ use crate::pcp::{
         decode2::{decode_gnuid, decode_i16, decode_i32, decode_ip, decode_u16, decode_u8, decode_vecu8},
         Atom2Kind, AtomView, Kind, ParentView,
     },
-    builder2::ParseError,
+    builder2::InfoParseError,
     Atom2, GnuId, Id4,
 };
 
@@ -42,11 +42,11 @@ pub struct HostInfo {
 }
 
 impl TryFrom<&ParentView<'_>> for HostInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(parent_view: &ParentView<'_>) -> Result<Self, Self::Error> {
         if (parent_view.id() != Id4::PCP_HOST) {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let mut h = HostInfo::default();
@@ -103,15 +103,15 @@ impl TryFrom<&ParentView<'_>> for HostInfo {
 }
 
 impl TryFrom<Atom2> for HostInfo {
-    type Error = ParseError;
+    type Error = InfoParseError;
 
     fn try_from(atom: Atom2) -> Result<Self, Self::Error> {
         if (atom.id() != Id4::PCP_HOST) {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         }
 
         let Atom2Kind::Parent(parent_view) = atom.view() else {
-            return Err(ParseError::TargetNotFound);
+            return Err(InfoParseError::TargetNotFound);
         };
 
         HostInfo::try_from(&parent_view)
