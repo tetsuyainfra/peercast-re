@@ -12,14 +12,19 @@ pub trait PacketParser {
     fn next_packet(&mut self) -> Option<Self::Packet>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    /// 不正なフォーマット
+    #[error("不正なフォーマット")]
     InvalidFormat,
-    /// データの終端に達した
+
+    #[error("データの終端に達した")]
     UnexpectedEnd,
-    /// 不正なデータ
+
+    #[error("不正なデータ")]
     MalformedData,
+
+    #[error("io error")]
+    Io(#[from] std::io::Error),
 }
 
 const ATOM_HEADER_LENGTH: usize = 8;
