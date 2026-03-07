@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use tokio_util::sync::CancellationToken;
 
+use crate::pcp::connection5::OutgoingConnection;
 use crate::util::mutex_poisoned;
 use crate::{
     pcp::connection5::{ConnectionFactory, ConnectionHandle, ConnectionManager, ConnectionSpec, HandshakeConnection},
@@ -129,6 +130,14 @@ where
     ) -> Self::Handshake {
         let manager = self.manager.clone();
         Self::Handshake::new(cno, remote, shutdown_token, config, manager)
+    }
+
+    fn create_outgoing<C>(&self, remote: SocketAddr, config: Option<<C as OutgoingConnection>::Config>) -> C
+    where
+        C: OutgoingConnection<Spec = Self::Spec>,
+    {
+        let manager = self.manager.clone();
+        C::new(ConnectionNo::new(), remote, config, manager)
     }
 }
 

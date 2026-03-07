@@ -1,8 +1,12 @@
-use std::{borrow::Cow, future::Future, net::SocketAddr};
+use std::{
+    borrow::Cow,
+    future::Future,
+    net::{IpAddr, SocketAddr},
+};
 
 use tokio_util::sync::CancellationToken;
 
-use crate::{error::ConnectionError, io::Io, ConnectionNo};
+use crate::{error::ConnectionError, io::Io, pcp::Atom2, ConnectionNo};
 
 /// Connection型の特性を定義するtrait
 pub trait ConnectionSpec {
@@ -92,6 +96,10 @@ pub trait ConnectionFactory {
         shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
     ) -> Self::Handshake;
+
+    fn create_outgoing<C>(&self, remote: std::net::SocketAddr, config: Option<<C as OutgoingConnection>::Config>) -> C
+    where
+        C: OutgoingConnection<Spec = Self::Spec>;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -106,6 +114,21 @@ pub trait Connection: Sized {
     fn run(self) -> impl Future<Output = Result<(), ConnectionError>>;
 }
 
+/// OutgoingConnection
+pub trait OutgoingConnection: Connection {
+    type Config;
+    type Output;
+    fn new(
+        cno: ConnectionNo,
+        remote: std::net::SocketAddr,
+        config: Option<Self::Config>,
+        manager: <Self::Spec as ConnectionSpec>::Manager,
+    ) -> Self;
+
+    fn connect(self) -> impl Future<Output = Self::Output>;
+}
+
+pub mod ping;
 pub mod shared;
 
 #[cfg(any(test, doc))]
