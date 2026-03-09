@@ -3,17 +3,21 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use clap::Parser;
-use libpeercast_re::model::ValidChannelInfo;
-use libpeercast_re::model::ValidTrackInfo;
-use libpeercast_re::pcp::GnuId;
-use libpeercast_re::pcp::connection5::shared;
-use libpeercast_re::repository::Repository;
-use peercast_root::channel::RootConfig;
-use peercast_root::config::FooterToml;
-use peercast_root::connection::RootSpec;
-use peercast_root::model::IndexInfo;
-use peercast_root::prelude::*;
-use peercast_root::repository::RootRepository2;
+use libpeercast_re::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{GnuId, connection5::shared},
+    prelude::*,
+    repository::Repository,
+};
+use peercast_root::{
+    channel::RootConfig,
+    config::FooterToml,
+    connection::RootSpec,
+    model::IndexInfo,
+    repository::RootRepository2,
+    service::{SiteConfig, YellowPageService},
+};
+
 use tokio_util::sync::CancellationToken;
 
 // App modules
@@ -21,7 +25,6 @@ mod app;
 use app::cli;
 use app::logging;
 
-use crate::app::yp::SiteConfig;
 use crate::app::{ApiConfig, AppState, ArcState, server_http, server_peercast};
 
 #[cfg(test)]
@@ -100,7 +103,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         restrict_speed: args.yp_limit_speed,
         max_restrict_level: args.yp_restrict_port_level,
     };
-    let yellow_page = app::yp::YellowPage::new(yp_config).add_footer_channels(index_txt_footer.clone());
+    let yellow_page = YellowPageService::new(yp_config).add_footer_channels(index_txt_footer.clone());
     let yellow_page = Arc::new(yellow_page);
 
     let app_sate = AppState {

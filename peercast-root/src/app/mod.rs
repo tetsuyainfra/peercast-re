@@ -2,10 +2,10 @@ use std::sync::Arc;
 
 use libpeercast_re::pcp::GnuId;
 use peercast_root::{
-    RestrictPortLevel,
     connection::{RootConnectionFactory, RootConnectionManager},
     model::IndexInfo,
     repository::RootRepository2,
+    service::YellowPageService,
 };
 
 pub mod cli;
@@ -13,7 +13,6 @@ pub mod http;
 pub mod logging;
 pub mod peercast;
 pub mod portcheck;
-pub mod yp;
 
 pub use http::server_http;
 pub use peercast::server_peercast;
@@ -38,7 +37,7 @@ pub struct AppState {
     pub config: Arc<ApiConfig>,
     pub index_txt_footer: Vec<IndexInfo>,
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
-    pub yellow_page: Arc<yp::YellowPage>,
+    pub yellow_page: Arc<YellowPageService>,
     pub repository: RootRepository2,
     pub connection_factory: RootConnectionFactory,
     pub connection_manager: RootConnectionManager,

@@ -1,6 +1,7 @@
 mod host_check;
 mod port_checker;
+mod yellow_page;
 
 pub use host_check::HostCheckService;
-pub use port_checker::PingPortChecker;
-pub use port_checker::PortChecker;
+pub use port_checker::{PingPortChecker, PortChecker};
+pub use yellow_page::{SiteConfig, YellowPageService};

@@ -1,15 +1,7 @@
-use nom::Check;
-use peercast_root::{
+use crate::{
     RestrictPortLevel,
-    model::{ChannelMeta, CheckedHost, IndexInfo, PortLevel},
+    model::{ChannelMeta, CheckedHost, IndexInfo},
 };
-use regex::Regex;
-
-#[derive(Debug)]
-pub struct YellowPage {
-    config: SiteConfig,
-    footer_channels: Vec<IndexInfo>,
-}
 
 #[derive(Debug)]
 pub struct SiteConfig {
@@ -26,7 +18,13 @@ pub struct SiteConfig {
     pub max_restrict_level: RestrictPortLevel,
 }
 
-impl YellowPage {
+#[derive(Debug)]
+pub struct YellowPageService {
+    config: SiteConfig,
+    footer_channels: Vec<IndexInfo>,
+}
+
+impl YellowPageService {
     pub fn new(site_config: SiteConfig) -> Self {
         Self {
             config: site_config,
@@ -40,7 +38,7 @@ impl YellowPage {
     }
 }
 
-impl YellowPage {
+impl YellowPageService {
     pub fn filter_channel_meta(&self, host: CheckedHost, channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
         let filtered_channels = Self::filter_channels(&self.config, host, channels);
         let channels = Self::merge_footer(&self.footer_channels, filtered_channels);
@@ -138,18 +136,10 @@ impl YellowPage {
     }
 }
 
-struct SplitGenre<'a> {
-    namespace: &'a str,
-    hide: bool,
-    at_mark: u8,
-    genre: &'a str,
-}
-
 #[cfg(test)]
 mod test {
-    use peercast_root::model::{ChannelMeta, CheckedHost};
+    use super::*;
 
-    use crate::app::yp::{SiteConfig, YellowPage};
     #[test]
     fn test_re() {
         let pattern = format!(r"^{}(\??)(@{{0,3}})(.+)", "yp");
@@ -171,10 +161,10 @@ mod test {
 
     #[test]
     fn test_yp() {
-        let yp = YellowPage::new(SiteConfig {
+        let yp = YellowPageService::new(SiteConfig {
             yp_name: "yp".to_string(),
             listener_hideable: true,
-            max_restrict_level: peercast_root::RestrictPortLevel::PortCheck,
+            max_restrict_level: RestrictPortLevel::PortCheck,
             restrict_speed: 2000,
         });
 
