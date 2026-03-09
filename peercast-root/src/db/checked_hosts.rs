@@ -1,6 +1,5 @@
 use std::net::IpAddr;
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
@@ -9,7 +8,8 @@ use crate::model::DbIpAddr;
 use crate::model::PortLevel;
 use crate::prelude::*;
 
-#[async_trait]
+#[cfg_attr(test, mockall::automock)]
+#[async_trait::async_trait]
 pub trait CheckedHostRepository {
     async fn migrate(&self) -> Result<(), sqlx::Error>;
     // async fn add_checked_host(&self, host: &str) -> Result<(), String>;
@@ -44,7 +44,7 @@ impl SqliteCheckedHostRepository {
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl CheckedHostRepository for SqliteCheckedHostRepository {
     async fn migrate(&self) -> Result<(), sqlx::Error> {
         sqlx::migrate!("./migrations").run(&self.pool).await?;

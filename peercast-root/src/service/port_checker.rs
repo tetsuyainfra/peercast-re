@@ -7,6 +7,7 @@ use crate::{
     model::PortLevel,
 };
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait PortChecker: Send + Sync {
     /// ポートチェック
@@ -39,18 +40,5 @@ impl<'a> PortChecker for PingPortChecker<'a> {
         } else {
             PortLevel::Incomplete
         }
-    }
-}
-
-#[cfg(test)]
-pub struct MockPortChecker {
-    pub result: PortLevel,
-}
-
-#[cfg(test)]
-#[async_trait::async_trait]
-impl PortChecker for MockPortChecker {
-    async fn check(&self, _addr: IpAddr, _port: u16) -> PortLevel {
-        self.result
     }
 }

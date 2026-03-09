@@ -11,7 +11,7 @@ use hyper::StatusCode;
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
 use peercast_root::{
-    db::SqliteCheckedHostRepository,
+    db::{CheckedHostRepository, SqliteCheckedHostRepository},
     model::ChannelMeta,
     service::{HostCheckService, PingPortChecker},
 };
@@ -68,13 +68,25 @@ pub async fn index_txt(
 }
 
 pub async fn index_json(
-    ClientIp(_client_ip): ClientIp,
-    Query(_params): Query<IndexTextParams>,
+    ClientIp(client_ip): ClientIp,
+    Query(params): Query<IndexTextParams>,
     state: State<ArcState>,
 ) -> Result<Json<Vec<ChannelMeta>>, ApiError> {
-    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
-    // let channels = state.yellow_page.filter_channel_meta(channels);
+    let ip_addr: IpAddr = client_ip.to_canonical();
+    // Hostヘッダの有無で処理を分岐
+    // Hostヘッダがある場合はそちらを優先する。ただし接続元IPアドレスはハンドラーで取得したものを使う。
+    let (target_ip, target_port) = match params.Host {
+        Some((_host, port)) => (ip_addr, port),
+        None => (ip_addr, 7144),
+    };
 
+    let repo = SqliteCheckedHostRepository::new(state.db_pool.clone());
+    let port_checker = PingPortChecker::new(&state.connection_factory);
+    let checker = HostCheckService::new(repo, port_checker);
+
+    let host = checker.do_check(target_ip, target_port).await;
+
+    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
     Ok(Json(channels))
 }
 

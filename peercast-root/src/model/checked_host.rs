@@ -6,7 +6,7 @@ use crate::model::PortLevel;
 
 use super::DbIpAddr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct CheckedHost {
     pub id: Option<i64>,
     pub ip_address: DbIpAddr,

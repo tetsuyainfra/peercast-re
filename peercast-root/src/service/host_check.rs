@@ -97,22 +97,414 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::model::DbIpAddr;
+    use chrono::TimeDelta;
+    use mockall::predicate::{self, *};
+
+    use crate::{
+        db::MockCheckedHostRepository,
+        model::DbIpAddr,
+        service::port_checker::{self, MockPortChecker},
+    };
 
     use super::*;
 
+    // テーブルにホストがなく、pingを送って成功する場合
     #[tokio::test]
-    async fn test_do_host_check() {}
+    async fn test_no_host_on_table() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
 
-    #[allow(dead_code)]
-    fn checked_host_mock() -> CheckedHost {
-        CheckedHost {
-            id: None,
-            ip_address: DbIpAddr("0.0.0.0".parse().unwrap()),
-            port: 0,
-            port_level: PortLevel::Incomplete,
-            upload_speed: None,
-            updated_at: Utc::now(),
+        let mut repo = MockCheckedHostRepository::new();
+        let mut port_checker = MockPortChecker::new();
+
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| Ok(None));
+
+        port_checker
+            .expect_check()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(|_, _| PortLevel::Welldone);
+
+        // 結果をテーブルに登録
+        repo.expect_insert()
+            //
+            .with(
+                predicate::eq(ip_address),
+                predicate::eq(port),
+                predicate::eq(PortLevel::Welldone),
+                predicate::eq(None),
+            )
+            .times(1)
+            .return_once(|_, _, _, _| Ok(1000));
+
+        repo.expect_find_by_id()
+            //
+            .with(predicate::eq(1000))
+            .times(1)
+            .return_once(move |_| {
+                Ok(Some(CheckedHost {
+                    id: Some(1000),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Welldone,
+                    upload_speed: None,
+                    updated_at: now,
+                }))
+            });
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
         }
+        .do_check(ip_address, 7144)
+        .await
+        .unwrap();
+
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port, port);
+        assert_eq!(host.port_level, PortLevel::Welldone);
+        dbg!(host);
+    }
+
+    // テーブルにホストがなく、pingを送って失敗する場合
+    #[tokio::test]
+    async fn test_no_host_on_table_then_fail() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+
+        let mut repo = MockCheckedHostRepository::new();
+        let mut port_checker = MockPortChecker::new();
+
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| Ok(None));
+
+        port_checker
+            .expect_check()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(|_, _| PortLevel::Incomplete);
+
+        // 結果をテーブルに登録
+        repo.expect_insert()
+            //
+            .with(
+                predicate::eq(ip_address),
+                predicate::eq(port),
+                predicate::eq(PortLevel::Incomplete),
+                predicate::eq(None),
+            )
+            .times(1)
+            .return_once(|_, _, _, _| Ok(1000));
+
+        repo.expect_find_by_id()
+            //
+            .with(predicate::eq(1000))
+            .times(1)
+            .return_once(move |_| {
+                Ok(Some(CheckedHost {
+                    id: Some(1000),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Incomplete,
+                    upload_speed: None,
+                    updated_at: now,
+                }))
+            });
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, 7144)
+        .await
+        .unwrap();
+
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port, port);
+        assert_eq!(host.port_level, PortLevel::Incomplete);
+        dbg!(host);
+    }
+
+    // テーブルにWelldoneなホストが見つかって、有効期限内の場合
+    // 値をそのまま返す
+    #[tokio::test]
+    async fn test_host_on_table_in_valid_cache() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+
+        let mut repo = MockCheckedHostRepository::new();
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(7144))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| {
+                Ok(Some(CheckedHost {
+                    id: Some(1),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Welldone,
+                    upload_speed: None,
+                    updated_at: now.clone(),
+                }))
+            });
+
+        let mut port_checker = MockPortChecker::new();
+        // port_checker
+        //     .expect_check()
+        //     //
+        //     .with(predicate::eq(ip_address), predicate::eq(7144))
+        //     .times(1)
+        //     .return_once(|_, _| PortLevel::Welldone);
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, 7144)
+        .await
+        .unwrap();
+        // dbg!(host);
+    }
+
+    // テーブルにWelldoneなホストが見つかって、有効期限外の場合、
+    // チェックポートを失敗して更新して値を返す
+    #[tokio::test]
+    async fn test_host_on_table_in_invalid_cache() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+
+        let mut repo = MockCheckedHostRepository::new();
+        let updated_at =
+            now - (HostCheckService::<MockCheckedHostRepository, MockPortChecker>::TTL + Duration::from_hours(1));
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| {
+                Ok(Some(CheckedHost {
+                    id: Some(1),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Welldone,
+                    upload_speed: None,
+                    // 期限切れの時刻を入れる
+                    updated_at: updated_at,
+                }))
+            });
+
+        let mut port_checker = MockPortChecker::new();
+        port_checker
+            .expect_check()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(|_, _| PortLevel::Incomplete);
+
+        // 更新が走るはず
+        repo.expect_update()
+            //
+            .with(eq(CheckedHost {
+                id: Some(1),
+                ip_address: DbIpAddr(ip_address),
+                port: port,
+                port_level: PortLevel::Incomplete,
+                upload_speed: None,
+                updated_at: updated_at,
+            }))
+            .times(1)
+            .return_once(|_| Ok(()));
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, port)
+        .await
+        .unwrap();
+        // dbg!(host);
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port_level, PortLevel::Incomplete);
+    }
+
+    // テーブルにIncompleteなホストが見つかって、ポートチェック制限時間内の場合、
+    // 何もせず値を返す
+    #[tokio::test]
+    async fn test_incomplete_host_on_table_in_invalid_check_time() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+
+        let mut repo = MockCheckedHostRepository::new();
+        let mut port_checker = MockPortChecker::new();
+
+        // ヘルスチェックインターバル期間内の時間を設定する
+        let updated_at = now
+            - (HostCheckService::<MockCheckedHostRepository, MockPortChecker>::HEALTH_CHECK_INTERVAL
+                - TimeDelta::seconds(5));
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| {
+                Ok(Some(CheckedHost {
+                    id: Some(1),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Incomplete,
+                    upload_speed: None,
+                    updated_at: updated_at,
+                }))
+            });
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, port)
+        .await
+        .unwrap();
+        // dbg!(host);
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port_level, PortLevel::Incomplete);
+    }
+
+    // テーブルにIncompleteなホストが見つかって、ポートチェック制限時間期限外の場合、
+    // ポートチェックが走って、更新を行い値を返す
+    #[tokio::test]
+    async fn test_incomplete_host_on_table_in_valid_check_time() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+
+        let mut repo = MockCheckedHostRepository::new();
+
+        // ヘルスチェック制限時間外の時間を設定する
+        let updated_at = now
+            - (HostCheckService::<MockCheckedHostRepository, MockPortChecker>::HEALTH_CHECK_INTERVAL
+                + TimeDelta::seconds(1));
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| {
+                Ok(Some(CheckedHost {
+                    id: Some(1),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Incomplete,
+                    upload_speed: None,
+                    updated_at: updated_at,
+                }))
+            });
+
+        let mut port_checker = MockPortChecker::new();
+        // ポートチェック
+        port_checker
+            .expect_check()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(|_, _| PortLevel::Welldone);
+
+        // 更新
+        repo.expect_update()
+            //
+            .with(eq(CheckedHost {
+                id: Some(1),
+                ip_address: DbIpAddr(ip_address),
+                port: port,
+                port_level: PortLevel::Welldone,
+                upload_speed: None,
+                updated_at: updated_at,
+            }))
+            .times(1)
+            .return_once(|_| Ok(()));
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, port)
+        .await
+        .unwrap();
+        // dbg!(host);
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port_level, PortLevel::Welldone);
+    }
+
+    // テーブルにIncompleteなホストが見つかって、ポートチェック制限時間期限外の場合、
+    // ポートチェックが走って（Incomplete）、更新を行い値を返す
+    #[tokio::test]
+    async fn test_incomplete_host_on_table_in_valid_check_time_incomplete_ping() {
+        let now = Utc::now();
+        let ip_address: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+
+        let mut repo = MockCheckedHostRepository::new();
+
+        // ヘルスチェック制限時間外の時間を設定する
+        let updated_at = now
+            - (HostCheckService::<MockCheckedHostRepository, MockPortChecker>::HEALTH_CHECK_INTERVAL
+                + TimeDelta::seconds(1));
+        repo.expect_find_by_ip_port()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(move |ip_address: IpAddr, port: u16| {
+                Ok(Some(CheckedHost {
+                    id: Some(1),
+                    ip_address: DbIpAddr(ip_address),
+                    port,
+                    port_level: PortLevel::Incomplete,
+                    upload_speed: None,
+                    updated_at: updated_at,
+                }))
+            });
+
+        let mut port_checker = MockPortChecker::new();
+        // ポートチェック
+        port_checker
+            .expect_check()
+            //
+            .with(predicate::eq(ip_address), predicate::eq(port))
+            .times(1)
+            .return_once(|_, _| PortLevel::Incomplete);
+
+        // 更新
+        repo.expect_update()
+            //
+            .with(eq(CheckedHost {
+                id: Some(1),
+                ip_address: DbIpAddr(ip_address),
+                port: port,
+                port_level: PortLevel::Incomplete,
+                upload_speed: None,
+                updated_at: updated_at,
+            }))
+            .times(1)
+            .return_once(|_| Ok(()));
+
+        let host = HostCheckService {
+            repo,
+            port_checker,
+        }
+        .do_check(ip_address, port)
+        .await
+        .unwrap();
+        // dbg!(host);
+        assert_eq!(host.ip_address.0, ip_address);
+        assert_eq!(host.port_level, PortLevel::Incomplete);
     }
 }

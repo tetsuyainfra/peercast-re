@@ -94,6 +94,10 @@ utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
 utoipa-axum = "0.2"
 
+
+[dev-dependencies]
+mockall = { version = "0.14.0" }
+
 [package.metadata.deb]
 maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"
 copyright = "2025, tetsuyainfra"
