@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id,\n                ip_address AS `ip_address: DbIpAddr`,\n                port as `port!:u16` ,\n                port_level as `port_level: PortLevel`,\n                upload_speed as `upload_speed: u16`,\n                updated_at as `updated_at: DateTime<Utc>`\n                    FROM checked_hosts\n            ",
+  "query": "SELECT id,\n                ip_address AS `ip_address: DbIpAddr`,\n                port as `port!:u16` ,\n                port_level as `port_level: PortLevel`,\n                upload_speed as `upload_speed: u32`,\n                updated_at as `updated_at: DateTime<Utc>`\n               FROM checked_hosts WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -24,7 +24,7 @@
         "type_info": "Integer"
       },
       {
-        "name": "upload_speed: u16",
+        "name": "upload_speed: u32",
         "ordinal": 4,
         "type_info": "Integer"
       },
@@ -35,7 +35,7 @@
       }
     ],
     "parameters": {
-      "Right": 0
+      "Right": 1
     },
     "nullable": [
       false,
@@ -46,5 +46,5 @@
       false
     ]
   },
-  "hash": "66d0abc5eea94c779ec35bfa47daece7caf7452f27e956f1b2dfc1615c56e12f"
+  "hash": "a2129afbd88439081647af77e7b614396cb64f1cf7172176933038e506ffc286"
 }

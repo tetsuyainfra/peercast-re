@@ -12,7 +12,7 @@ pub struct CheckedHost {
     pub ip_address: DbIpAddr,
     pub port: u16,
     pub port_level: PortLevel,
-    pub upload_speed: Option<u16>,
+    pub upload_speed: Option<u32>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -21,7 +21,7 @@ impl CheckedHost {
         ip_address: IpAddr,
         port: u16,
         port_level: PortLevel,
-        upload_speed: Option<u16>,
+        upload_speed: Option<u32>,
         updated_at: DateTime<Utc>,
     ) -> Self {
         Self {

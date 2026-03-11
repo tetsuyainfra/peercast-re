@@ -145,6 +145,6 @@ pub enum SubCommand {
         ip: IpAddr,
         port: u16,
         port_level: i8,
-        port_speed: Option<u16>,
+        port_speed: Option<u32>,
     },
 }

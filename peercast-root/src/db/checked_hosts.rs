@@ -24,7 +24,7 @@ pub trait CheckedHostRepository {
         ip: IpAddr,
         port: u16,
         port_level: PortLevel,
-        port_speed: Option<u16>,
+        port_speed: Option<u32>,
     ) -> Result<i64, sqlx::Error>;
     async fn update(&self, host: &CheckedHost) -> Result<(), sqlx::Error>;
     async fn delete(&self, id: i64) -> Result<(), sqlx::Error>;
@@ -58,7 +58,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                upload_speed as `upload_speed: u16`,
+                upload_speed as `upload_speed: u32`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts
             "#
@@ -76,7 +76,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                upload_speed as `upload_speed: u16`,
+                upload_speed as `upload_speed: u32`,
                 updated_at as `updated_at: DateTime<Utc>`
                FROM checked_hosts WHERE id = $1"#,
             id
@@ -95,7 +95,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16`,
                 port_level as `port_level: PortLevel`,
-                upload_speed as `upload_speed: u16`,
+                upload_speed as `upload_speed: u32`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts
                     WHERE ip_address = $1 AND port = $2
@@ -118,7 +118,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
                 ip_address AS `ip_address: DbIpAddr`,
                 port as `port!:u16` ,
                 port_level as `port_level: PortLevel`,
-                upload_speed as `upload_speed: u16`,
+                upload_speed as `upload_speed: u32`,
                 updated_at as `updated_at: DateTime<Utc>`
                     FROM checked_hosts WHERE ip_address = $1
             "#,
@@ -135,7 +135,7 @@ impl CheckedHostRepository for SqliteCheckedHostRepository {
         ip: IpAddr,
         port: u16,
         port_level: PortLevel,
-        upload_speed: Option<u16>,
+        upload_speed: Option<u32>,
     ) -> Result<i64, sqlx::Error> {
         let ip = DbIpAddr(ip);
         let id = sqlx::query_scalar!(
