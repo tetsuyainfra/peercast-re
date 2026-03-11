@@ -67,6 +67,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
+    peercast_root::init();
     // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     let (connection_factory, connection_manager) = shared::connection_factory::<RootSpec>();
 

@@ -6,11 +6,15 @@ pub mod config;
 pub mod connection;
 pub mod db;
 pub mod filter;
+mod init;
 pub mod model;
 pub mod prelude;
 pub mod repository;
 pub mod service;
 pub mod test_helper;
+pub mod utils;
+
+pub use init::init;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？
 #[repr(i32)]
