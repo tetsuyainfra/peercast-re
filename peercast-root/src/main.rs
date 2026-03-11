@@ -102,6 +102,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         listener_hideable: args.yp_listerer_hideable,
         restrict_speed: args.yp_limit_speed,
         max_restrict_level: args.yp_restrict_port_level,
+        enable_user_status: false,
     };
     let yellow_page = YellowPageService::new(yp_config).add_footer_channels(index_txt_footer.clone());
     let yellow_page = Arc::new(yellow_page);
