@@ -118,10 +118,10 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
     let yellow_page = match args.yp_append_system_status {
         YpAppendSystemStatus::None => yellow_page,
         YpAppendSystemStatus::Default => {
-            yellow_page.add_create_status_channel_func(createSystemStatusDefaultFunction(&yp_config))
+            yellow_page.add_create_sys_status_func(createSystemStatusDefaultFunction(&yp_config))
         }
         YpAppendSystemStatus::WithHost => {
-            yellow_page.add_create_status_channel_func(createSystemStatusWithHostInfoFunction(&yp_config))
+            yellow_page.add_create_sys_status_func(createSystemStatusWithHostInfoFunction(&yp_config))
         }
     };
     let yellow_page = Arc::new(yellow_page);

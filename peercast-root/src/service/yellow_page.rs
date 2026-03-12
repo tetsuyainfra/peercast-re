@@ -24,14 +24,12 @@ pub struct SiteConfig {
 }
 
 type YpStatusFunc = Box<dyn Fn(&CheckedHost) -> Option<ChannelMeta> + Send + Sync>;
-// type YpSystemStatusFunc = fn(host: &CheckedHost) -> Option<ChannelMeta>;
-type YpSystemStatusFunc = Box<dyn Fn(&CheckedHost) -> Option<ChannelMeta> + Send + Sync>;
 
 pub struct YellowPageService {
     config: SiteConfig,
     footer_channels: Vec<IndexInfo>,
     create_user_status_func: YpStatusFunc,
-    create_status_channel: YpSystemStatusFunc,
+    create_sys_status_func: YpStatusFunc,
 }
 
 impl std::fmt::Debug for YellowPageService {
@@ -50,7 +48,7 @@ impl YellowPageService {
             config: site_config,
             footer_channels: Vec::new(),
             create_user_status_func: Box::new(|_| None),
-            create_status_channel: Box::new(|_| None),
+            create_sys_status_func: Box::new(|_| None),
         }
     }
     pub fn add_footer_channels(mut self, index_infos: Vec<IndexInfo>) -> Self {
@@ -58,12 +56,12 @@ impl YellowPageService {
         self.footer_channels.extend(index_infos.into_iter());
         self
     }
-    pub fn add_create_user_status_func(mut self, create_user_status_func: YpSystemStatusFunc) -> Self {
+    pub fn add_create_user_status_func(mut self, create_user_status_func: YpStatusFunc) -> Self {
         self.create_user_status_func = create_user_status_func;
         self
     }
-    pub fn add_create_status_channel_func(mut self, create_status_channel_func: YpSystemStatusFunc) -> Self {
-        self.create_status_channel = create_status_channel_func;
+    pub fn add_create_sys_status_func(mut self, create_sys_status_func: YpStatusFunc) -> Self {
+        self.create_sys_status_func = create_sys_status_func;
         self
     }
 }
@@ -79,7 +77,7 @@ impl YellowPageService {
         if let Some(channel_status) = (self.create_user_status_func)(host) {
             channels.push(channel_status)
         }
-        if let Some(channel_status) = (self.create_status_channel)(host) {
+        if let Some(channel_status) = (self.create_sys_status_func)(host) {
             channels.push(channel_status)
         }
 
@@ -192,7 +190,7 @@ impl YellowPageService {
 
 /// YpAppendUserStatus::Defaultの関数を作成する
 #[allow(non_snake_case)]
-pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆UserStatus", config.yp_name.to_ascii_uppercase());
 
     let f = move |host: &CheckedHost| -> Option<ChannelMeta> {
@@ -221,7 +219,7 @@ pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFun
 
 /// YpAppendSystemStatus::Defaultの関数を作成する
 #[allow(non_snake_case)]
-pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
 
     let f = move |_host: &CheckedHost| -> Option<ChannelMeta> {
@@ -247,7 +245,7 @@ pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusF
 
 /// YpAppendSystemStatus::WithStatusの関数を作成する
 #[allow(non_snake_case)]
-pub fn createSystemStatusWithHostInfoFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+pub fn createSystemStatusWithHostInfoFunction(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
 
     let f = move |host: &CheckedHost| -> Option<ChannelMeta> {
