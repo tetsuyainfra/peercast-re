@@ -161,15 +161,15 @@ pub struct AuthedChannelControl {}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
-pub struct AttachTaskFuture;
+// pub struct AttachTaskFuture;
 
-impl Future for AttachTaskFuture {
-    type Output = ();
+// impl Future for AttachTaskFuture {
+//     type Output = ();
 
-    fn poll(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        std::task::Poll::Ready(())
-    }
-}
+//     fn poll(self: std::pin::Pin<&mut Self>, _cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+//         std::task::Poll::Ready(())
+//     }
+// }
 
 ////////////////////////////////////////////////////////////////////////////////
 // ImplChannel

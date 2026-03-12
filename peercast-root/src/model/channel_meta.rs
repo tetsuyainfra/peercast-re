@@ -1,15 +1,8 @@
 use std::net::SocketAddr;
 
 use chrono::{DateTime, TimeZone, Utc};
-use libpeercast_re::{
-    model::{ValidChannelInfo, ValidTrackInfo},
-    pcp::GnuId,
-    repository::Channel,
-};
+use libpeercast_re::{model::ValidTrackInfo, pcp::GnuId};
 use serde::Serialize;
-
-use crate::channel::RootChannel2;
-use crate::model::IndexInfo;
 
 //-------------------------------------------------------------------------------
 /// 公開APIで使用するChannelMeta

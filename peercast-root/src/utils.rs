@@ -1,7 +1,3 @@
-use std::ffi::os_str::Display;
-
-use mime_guess::mime::STAR;
-
 use crate::init::START_TIME;
 
 pub fn process_uptime() -> Dhms {

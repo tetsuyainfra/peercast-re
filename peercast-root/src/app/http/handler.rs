@@ -8,15 +8,13 @@ use axum::{
 
 use axum_client_ip::ClientIp;
 use hyper::StatusCode;
-// use futures_util::FutureExt;
-use libpeercast_re::repository::Repository;
+use libpeercast_re::{prelude::*, repository::Repository};
 use peercast_root::{
     db::SqliteCheckedHostRepository,
     model::ChannelMeta,
     service::{HostCheckService, PingPortChecker},
 };
 use serde::Deserialize;
-use tracing::info;
 
 use crate::app::ArcState;
 
@@ -144,6 +142,7 @@ pub fn static_router() -> axum::Router {
 
     #[cfg(not(debug_assertions))]
     {
+        use axum::routing;
         debug!("Assets include files");
         for a in Assets::iter() {
             debug!("- {}", a.as_ref());
@@ -157,7 +156,7 @@ pub fn static_router() -> axum::Router {
 }
 
 #[cfg(not(debug_assertions))]
-async fn embed_handler(uri: Uri) -> impl IntoResponse {
+async fn embed_handler(uri: hyper::Uri) -> impl IntoResponse {
     let path = uri.path();
     trace!("REQLINE: {}", path);
     let path = if path.ends_with("/") {
@@ -178,7 +177,7 @@ async fn embed_handler(uri: Uri) -> impl IntoResponse {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
             (
                 //
-                [(header::CONTENT_TYPE, mime.as_ref())],
+                [(hyper::header::CONTENT_TYPE, mime.as_ref())],
                 body,
             )
                 .into_response()

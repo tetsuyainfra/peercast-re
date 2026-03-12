@@ -1,18 +1,9 @@
-use std::{
-    net::{IpAddr, SocketAddr},
-    time::Duration,
-};
+use std::{net::IpAddr, time::Duration};
 
 use anyhow::anyhow;
-use chrono::{DateTime, Utc};
-use libpeercast_re::pcp::{
-    GnuId,
-    connection5::{ConnectionFactory, OutgoingConnection, ping::Ping},
-};
 
 use crate::{
-    connection::{RootConnectionFactory, RootSpec},
-    db::{CheckedHostRepository, SqliteCheckedHostRepository},
+    db::CheckedHostRepository,
     model::{CheckedHost, PortLevel},
     service::port_checker::PortChecker,
 };
@@ -97,7 +88,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeDelta;
+    use chrono::{TimeDelta, Utc};
     use mockall::predicate::{self, *};
 
     use crate::{

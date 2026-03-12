@@ -1,4 +1,4 @@
-use std::{process::exit, vec};
+use std::process::exit;
 
 use axum_client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
@@ -82,10 +82,10 @@ pub struct Args {
     pub yp_listerer_hideable: bool,
 
     /// Portcheckのレベル制限
-    /// genre: ypGame ->  制限無し(level=None)
-    /// genre: yp[@]Game -> ポート解放をチェックする(level=1)
-    /// genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
-    /// genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
+    // genre: ypGame ->  制限無し(level=None)
+    // genre: yp[@]Game -> ポート解放をチェックする(level=1)
+    // genre: yp[@@]Game -> 配信ビットレートで表示制限(level=2)
+    // genre: yp[@@@]Game -> 2MBpsで表示制限(yp-limit-speedで設定可能)(level=3)
     #[arg(long, default_value = "port-check")]
     pub yp_restrict_port_level: RestrictPortLevel,
 
