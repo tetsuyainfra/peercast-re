@@ -3,7 +3,6 @@ use std::net::IpAddr;
 use anyhow::Context;
 use clap::Parser;
 use peercast_root::db::{CheckedHostRepository, SqliteCheckedHostRepository};
-use peercast_root::model::PortLevel;
 use sqlx::sqlite::SqlitePoolOptions;
 use url::Url;
 

@@ -91,11 +91,7 @@ mod tests {
     use chrono::{TimeDelta, Utc};
     use mockall::predicate::{self, *};
 
-    use crate::{
-        db::MockCheckedHostRepository,
-        model::DbIpAddr,
-        service::port_checker::{self, MockPortChecker},
-    };
+    use crate::{db::MockCheckedHostRepository, model::DbIpAddr, service::port_checker::MockPortChecker};
 
     use super::*;
 
@@ -113,7 +109,7 @@ mod tests {
             //
             .with(predicate::eq(ip_address), predicate::eq(port))
             .times(1)
-            .return_once(move |ip_address: IpAddr, port: u16| Ok(None));
+            .return_once(move |_ip_address: IpAddr, _port: u16| Ok(None));
 
         port_checker
             .expect_check()
@@ -177,7 +173,7 @@ mod tests {
             //
             .with(predicate::eq(ip_address), predicate::eq(port))
             .times(1)
-            .return_once(move |ip_address: IpAddr, port: u16| Ok(None));
+            .return_once(move |_ip_address: IpAddr, _port: u16| Ok(None));
 
         port_checker
             .expect_check()
@@ -250,7 +246,7 @@ mod tests {
                 }))
             });
 
-        let mut port_checker = MockPortChecker::new();
+        let port_checker = MockPortChecker::new();
         // port_checker
         //     .expect_check()
         //     //
@@ -258,7 +254,7 @@ mod tests {
         //     .times(1)
         //     .return_once(|_, _| PortLevel::Welldone);
 
-        let host = HostCheckService {
+        let _host = HostCheckService {
             repo,
             port_checker,
         }
@@ -338,7 +334,7 @@ mod tests {
         let port = 7144;
 
         let mut repo = MockCheckedHostRepository::new();
-        let mut port_checker = MockPortChecker::new();
+        let port_checker = MockPortChecker::new();
 
         // ヘルスチェックインターバル期間内の時間を設定する
         let updated_at = now

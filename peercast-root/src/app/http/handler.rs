@@ -8,7 +8,7 @@ use axum::{
 
 use axum_client_ip::ClientIp;
 use hyper::StatusCode;
-use libpeercast_re::{prelude::*, repository::Repository};
+use libpeercast_re::repository::Repository;
 use peercast_root::{
     db::SqliteCheckedHostRepository,
     model::ChannelMeta,
