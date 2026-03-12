@@ -183,7 +183,7 @@ impl YellowPageService {
 /// YpAppendSystemStatus::Defaultの関数を作成する
 #[allow(non_snake_case)]
 pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
-    let name = format!("{}◆Status", config.yp_name);
+    let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
 
     let f = move |_host: &CheckedHost| -> Option<ChannelMeta> {
         let mut meta = ChannelMeta::Empty();
@@ -195,6 +195,42 @@ pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusF
         meta.display_genre = None;
         meta.comment =
             format!("ProcessUptime={} Updated={}", uptime, now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false));
+        meta.number_of_listener = -9;
+        meta.number_of_relay = -9;
+        meta.typee = String::from("RAW");
+        meta.created_at = now;
+
+        Some(meta)
+    };
+
+    Box::new(f)
+}
+
+#[allow(non_snake_case)]
+pub fn createSystemStatusWithHostInfoFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+    let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
+
+    let f = move |host: &CheckedHost| -> Option<ChannelMeta> {
+        let mut meta = ChannelMeta::Empty();
+        let now = Utc::now();
+        let uptime = process_uptime();
+        let speed_args = match host.upload_speed {
+            Some(s) => format_args!("{} Kbps", s.clone()),
+            None => format_args!("Unknown"),
+        };
+
+        meta.name = name.clone();
+        meta.genre = format!("");
+        meta.display_genre = None;
+        meta.comment = format!(
+            "ProcessUptime={} Updated={} host={}:{} port={} speed={}",
+            uptime,
+            now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
+            host.ip_address.0,
+            host.port,
+            host.port_level,
+            speed_args
+        );
         meta.number_of_listener = -9;
         meta.number_of_relay = -9;
         meta.typee = String::from("RAW");

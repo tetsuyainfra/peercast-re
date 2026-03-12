@@ -60,6 +60,9 @@ pub enum YpAppendSystemStatus {
     None,
     /// 標準形式
     Default,
+
+    /// 標準形式 + アクセスしてきたホストの情報
+    WithHost,
 }
 
 #[derive(Debug, Error)]

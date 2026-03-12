@@ -16,7 +16,9 @@ use peercast_root::{
     connection::RootSpec,
     model::IndexInfo,
     repository::RootRepository2,
-    service::{SiteConfig, YellowPageService, createSystemStatusDefaultFunction},
+    service::{
+        SiteConfig, YellowPageService, createSystemStatusDefaultFunction, createSystemStatusWithHostInfoFunction,
+    },
 };
 
 use tokio_util::sync::CancellationToken;
@@ -110,6 +112,9 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         YpAppendSystemStatus::None => yellow_page,
         YpAppendSystemStatus::Default => {
             yellow_page.add_create_status_channel_func(createSystemStatusDefaultFunction(&yp_config))
+        }
+        YpAppendSystemStatus::WithHost => {
+            yellow_page.add_create_status_channel_func(createSystemStatusWithHostInfoFunction(&yp_config))
         }
     };
     let yellow_page = Arc::new(yellow_page);
