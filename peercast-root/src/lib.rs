@@ -53,6 +53,15 @@ impl From<usize> for RestrictPortLevel {
 /// ポートチェックの制限速度で設定できる最小値（この値は含めない）
 pub static YP_LIMIT_SPEED_MIN: u32 = 499; // 500KBps
 
+/// チャンネルリストに追加するユーザー情報の形式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum YpAppendUserStatus {
+    /// 追加しない
+    None,
+    /// 標準形式
+    Default,
+}
+
 /// チャンネルリストに追加するシステム情報の形式
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum YpAppendSystemStatus {

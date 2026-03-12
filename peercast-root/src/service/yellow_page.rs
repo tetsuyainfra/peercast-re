@@ -23,12 +23,14 @@ pub struct SiteConfig {
     pub max_restrict_level: RestrictPortLevel,
 }
 
+type YpStatusFunc = Box<dyn Fn(&CheckedHost) -> Option<ChannelMeta> + Send + Sync>;
 // type YpSystemStatusFunc = fn(host: &CheckedHost) -> Option<ChannelMeta>;
 type YpSystemStatusFunc = Box<dyn Fn(&CheckedHost) -> Option<ChannelMeta> + Send + Sync>;
 
 pub struct YellowPageService {
     config: SiteConfig,
     footer_channels: Vec<IndexInfo>,
+    create_user_status_func: YpStatusFunc,
     create_status_channel: YpSystemStatusFunc,
 }
 
@@ -47,12 +49,17 @@ impl YellowPageService {
         Self {
             config: site_config,
             footer_channels: Vec::new(),
+            create_user_status_func: Box::new(|_| None),
             create_status_channel: Box::new(|_| None),
         }
     }
     pub fn add_footer_channels(mut self, index_infos: Vec<IndexInfo>) -> Self {
         self.footer_channels.reserve(index_infos.len());
         self.footer_channels.extend(index_infos.into_iter());
+        self
+    }
+    pub fn add_create_user_status_func(mut self, create_user_status_func: YpSystemStatusFunc) -> Self {
+        self.create_user_status_func = create_user_status_func;
         self
     }
     pub fn add_create_status_channel_func(mut self, create_status_channel_func: YpSystemStatusFunc) -> Self {
@@ -69,6 +76,9 @@ impl YellowPageService {
     pub fn filter_channel_meta(&self, host: &CheckedHost, channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
         let filtered_channels = Self::filter_channels(&self.config, &host, channels);
         let mut channels = Self::merge_footer(&self.footer_channels, filtered_channels);
+        if let Some(channel_status) = (self.create_user_status_func)(host) {
+            channels.push(channel_status)
+        }
         if let Some(channel_status) = (self.create_status_channel)(host) {
             channels.push(channel_status)
         }
@@ -180,6 +190,35 @@ impl YellowPageService {
     }
 }
 
+/// YpAppendUserStatus::Defaultの関数を作成する
+#[allow(non_snake_case)]
+pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+    let name = format!("{}◆UserStatus", config.yp_name.to_ascii_uppercase());
+
+    let f = move |host: &CheckedHost| -> Option<ChannelMeta> {
+        let mut meta = ChannelMeta::Empty();
+        let now = Utc::now();
+        let speed_args = match host.upload_speed {
+            Some(s) => format_args!("{} Kbps", s.clone()),
+            None => format_args!("Unknown"),
+        };
+        //
+        meta.name = name.clone();
+        meta.genre = format!("");
+        meta.display_genre = None;
+        meta.comment =
+            format!("host={}:{} port={} speed={}", host.ip_address.0, host.port, host.port_level, speed_args);
+        meta.number_of_listener = -8;
+        meta.number_of_relay = -8;
+        meta.typee = String::from("RAW");
+        meta.created_at = now;
+
+        Some(meta)
+    };
+
+    Box::new(f)
+}
+
 /// YpAppendSystemStatus::Defaultの関数を作成する
 #[allow(non_snake_case)]
 pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
@@ -206,6 +245,7 @@ pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusF
     Box::new(f)
 }
 
+/// YpAppendSystemStatus::WithStatusの関数を作成する
 #[allow(non_snake_case)]
 pub fn createSystemStatusWithHostInfoFunction(config: &SiteConfig) -> YpSystemStatusFunc {
     let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());

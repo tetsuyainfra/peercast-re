@@ -10,7 +10,7 @@ use libpeercast_re::{
     repository::Repository,
 };
 use peercast_root::{
-    YpAppendSystemStatus,
+    YpAppendSystemStatus, YpAppendUserStatus,
     channel::RootConfig,
     config::FooterToml,
     connection::RootSpec,
@@ -18,6 +18,7 @@ use peercast_root::{
     repository::RootRepository2,
     service::{
         SiteConfig, YellowPageService, createSystemStatusDefaultFunction, createSystemStatusWithHostInfoFunction,
+        createUserStatusDefaultFunction,
     },
 };
 
@@ -108,6 +109,12 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         max_restrict_level: args.yp_restrict_port_level,
     };
     let yellow_page = YellowPageService::new(yp_config.clone()).add_footer_channels(index_txt_footer.clone());
+    let yellow_page = match args.yp_append_user_status {
+        YpAppendUserStatus::None => yellow_page,
+        YpAppendUserStatus::Default => {
+            yellow_page.add_create_user_status_func(createUserStatusDefaultFunction(&yp_config))
+        }
+    };
     let yellow_page = match args.yp_append_system_status {
         YpAppendSystemStatus::None => yellow_page,
         YpAppendSystemStatus::Default => {
