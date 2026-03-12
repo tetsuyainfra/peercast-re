@@ -158,7 +158,7 @@ async fn create_dummy_channel(repository: &RootRepository2) {
     ];
 
     for v in vars {
-        println!("{:?}", v);
+        // info!("{:?}", v);
         repository.create_or_get(v.0, Some(v.1), Some(v.2), Some(v.3)).await;
     }
 }
@@ -166,7 +166,7 @@ async fn create_dummy_channel(repository: &RootRepository2) {
 fn dummy_channel(i: usize, genre: &str) -> (GnuId, ValidChannelInfo, ValidTrackInfo, RootConfig) {
     let cid = GnuId::from(0x123456789ABCDEF_u128 + i as u128);
     let channel_info = libpeercast_re::model::ValidChannelInfo {
-        name: "Dummyチャンネル名".to_string(),
+        name: format!("名前({})", genre),
         url: "http://example.com".to_string(),
         genre: genre.to_string(),
         desc: "This is a dummy channel desc".to_string(),
