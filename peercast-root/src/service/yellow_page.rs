@@ -1,13 +1,14 @@
-use std::usize;
+use std::fmt;
 
-use clap::builder::Str;
+use chrono::Utc;
 
 use crate::{
     RestrictPortLevel,
     model::{ChannelMeta, CheckedHost, IndexInfo, PortLevel},
+    utils::process_uptime,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SiteConfig {
     /// YPの名前
     pub yp_name: String,
@@ -20,15 +21,25 @@ pub struct SiteConfig {
 
     /// 設定できるポートチェックのレベル
     pub max_restrict_level: RestrictPortLevel,
-
-    /// ユーザーの状態表示機能を有効にするか
-    pub enable_user_status: bool,
 }
 
-#[derive(Debug)]
+// type YpSystemStatusFunc = fn(host: &CheckedHost) -> Option<ChannelMeta>;
+type YpSystemStatusFunc = Box<dyn Fn(&CheckedHost) -> Option<ChannelMeta> + Send + Sync>;
+
 pub struct YellowPageService {
     config: SiteConfig,
     footer_channels: Vec<IndexInfo>,
+    create_status_channel: YpSystemStatusFunc,
+}
+
+impl std::fmt::Debug for YellowPageService {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("YellowPageService")
+            .field("config", &self.config)
+            .field("footer_channels", &self.footer_channels)
+            .field("create_status_channel", &"<function>")
+            .finish()
+    }
 }
 
 impl YellowPageService {
@@ -36,11 +47,16 @@ impl YellowPageService {
         Self {
             config: site_config,
             footer_channels: Vec::new(),
+            create_status_channel: Box::new(|_| None),
         }
     }
     pub fn add_footer_channels(mut self, index_infos: Vec<IndexInfo>) -> Self {
         self.footer_channels.reserve(index_infos.len());
         self.footer_channels.extend(index_infos.into_iter());
+        self
+    }
+    pub fn add_create_status_channel_func(mut self, create_status_channel_func: YpSystemStatusFunc) -> Self {
+        self.create_status_channel = create_status_channel_func;
         self
     }
 }
@@ -52,7 +68,10 @@ impl YellowPageService {
 
     pub fn filter_channel_meta(&self, host: &CheckedHost, channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
         let filtered_channels = Self::filter_channels(&self.config, &host, channels);
-        let channels = Self::merge_footer(&self.footer_channels, filtered_channels);
+        let mut channels = Self::merge_footer(&self.footer_channels, filtered_channels);
+        if let Some(channel_status) = (self.create_status_channel)(host) {
+            channels.push(channel_status)
+        }
 
         channels
     }
@@ -64,7 +83,6 @@ impl YellowPageService {
             listener_hideable,
             max_restrict_level,
             restrict_speed,
-            enable_user_status: _,
         } = config;
 
         let yp_name_len = yp_name.len();
@@ -162,6 +180,32 @@ impl YellowPageService {
     }
 }
 
+/// YpAppendSystemStatus::Defaultの関数を作成する
+#[allow(non_snake_case)]
+pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpSystemStatusFunc {
+    let name = format!("{}◆Status", config.yp_name);
+
+    let f = move |_host: &CheckedHost| -> Option<ChannelMeta> {
+        let mut meta = ChannelMeta::Empty();
+        let now = Utc::now();
+        let uptime = process_uptime();
+        //
+        meta.name = name.clone();
+        meta.genre = format!("");
+        meta.display_genre = None;
+        meta.comment =
+            format!("ProcessUptime={} Updated={}", uptime, now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false));
+        meta.number_of_listener = -9;
+        meta.number_of_relay = -9;
+        meta.typee = String::from("RAW");
+        meta.created_at = now;
+
+        Some(meta)
+    };
+
+    Box::new(f)
+}
+
 #[cfg(test)]
 mod test {
     use crate::model::DbIpAddr;
@@ -194,7 +238,6 @@ mod test {
             listener_hideable: true,
             max_restrict_level: RestrictPortLevel::RestrictSpeed,
             restrict_speed: 2000,
-            enable_user_status: false,
         });
         {
             let host = close_checkd_host();
@@ -245,7 +288,6 @@ mod test {
             listener_hideable: true,
             max_restrict_level: RestrictPortLevel::RestrictSpeed,
             restrict_speed: 2000,
-            enable_user_status: false,
         });
 
         {
@@ -310,7 +352,6 @@ mod test {
             listener_hideable: true,
             max_restrict_level: RestrictPortLevel::RestrictSpeed,
             restrict_speed: 2000,
-            enable_user_status: false,
         });
         {
             let mut host = checkd_host();
@@ -361,7 +402,6 @@ mod test {
             listener_hideable: true,
             max_restrict_level: RestrictPortLevel::RestrictSpeed,
             restrict_speed: 2000,
-            enable_user_status: false,
         });
         {
             let mut host = checkd_host();
@@ -412,7 +452,6 @@ mod test {
             listener_hideable: true,
             max_restrict_level: RestrictPortLevel::RestrictSpeed,
             restrict_speed: 2000,
-            enable_user_status: false,
         });
         {
             let mut host = checkd_host();

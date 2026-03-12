@@ -4,4 +4,4 @@ mod yellow_page;
 
 pub use host_check::HostCheckService;
 pub use port_checker::{PingPortChecker, PortChecker};
-pub use yellow_page::{SiteConfig, YellowPageService};
+pub use yellow_page::*;

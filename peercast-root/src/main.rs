@@ -10,12 +10,13 @@ use libpeercast_re::{
     repository::Repository,
 };
 use peercast_root::{
+    YpAppendSystemStatus,
     channel::RootConfig,
     config::FooterToml,
     connection::RootSpec,
     model::IndexInfo,
     repository::RootRepository2,
-    service::{SiteConfig, YellowPageService},
+    service::{SiteConfig, YellowPageService, createSystemStatusDefaultFunction},
 };
 
 use tokio_util::sync::CancellationToken;
@@ -68,7 +69,6 @@ async fn main() -> anyhow::Result<()> {
 
 async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr) -> anyhow::Result<ArcState> {
     peercast_root::init();
-    // _REPOSITORY.get_or_init(|| ChannelRepository::new(&self_session_id));
     let (connection_factory, connection_manager) = shared::connection_factory::<RootSpec>();
 
     let mut index_txt_footer = vec![];
@@ -98,16 +98,23 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
 
     let db_pool = init_db(args).await?;
 
+    // YellowPageの設定
     let yp_config = SiteConfig {
         yp_name: args.yp_name.clone(),
         listener_hideable: args.yp_listerer_hideable,
         restrict_speed: args.yp_limit_speed,
         max_restrict_level: args.yp_restrict_port_level,
-        enable_user_status: false,
     };
-    let yellow_page = YellowPageService::new(yp_config).add_footer_channels(index_txt_footer.clone());
+    let yellow_page = YellowPageService::new(yp_config.clone()).add_footer_channels(index_txt_footer.clone());
+    let yellow_page = match args.yp_append_system_status {
+        YpAppendSystemStatus::None => yellow_page,
+        YpAppendSystemStatus::Default => {
+            yellow_page.add_create_status_channel_func(createSystemStatusDefaultFunction(&yp_config))
+        }
+    };
     let yellow_page = Arc::new(yellow_page);
 
+    // AppStateの作成
     let app_sate = AppState {
         self_session_id,
         config: Arc::new(api_config),

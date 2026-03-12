@@ -11,11 +11,12 @@ use hyper::StatusCode;
 // use futures_util::FutureExt;
 use libpeercast_re::repository::Repository;
 use peercast_root::{
-    db::{CheckedHostRepository, SqliteCheckedHostRepository},
+    db::SqliteCheckedHostRepository,
     model::ChannelMeta,
     service::{HostCheckService, PingPortChecker},
 };
 use serde::Deserialize;
+use tracing::info;
 
 use crate::app::ArcState;
 
@@ -41,53 +42,50 @@ where
 //-------------------------------------------------------------------------------
 // Api Handlers
 //-------------------------------------------------------------------------------
+/// /index.txtを提供するハンドラー
 pub async fn index_txt(
     ClientIp(client_ip): ClientIp,
     Query(params): Query<IndexTextParams>,
     State(state): State<ArcState>,
 ) -> Result<String, ApiError> {
-    let ip_addr: IpAddr = client_ip.to_canonical();
-
-    // Hostヘッダの有無で処理を分岐
-    // Hostヘッダがある場合はそちらを優先する。ただし接続元IPアドレスはハンドラーで取得したものを使う。
-    let (target_ip, target_port) = match params.Host {
-        Some((_host, port)) => (ip_addr, port),
-        None => (ip_addr, 7144),
-    };
-
-    let repo = SqliteCheckedHostRepository::new(state.db_pool.clone());
-    let port_checker = PingPortChecker::new(&state.connection_factory);
-    let host_check_service = HostCheckService::new(repo, port_checker);
-    let _x = host_check_service.do_check(target_ip, target_port).await?;
-
-    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
-    // let channels = state.yellow_page.filter_channel_meta(channels);
+    let channels = _get_index(client_ip, params.Host, state).await?;
     let string_channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
     Ok(itertools::join(string_channels, "\n"))
 }
 
+/// /index.jsonを提供するハンドラー
 pub async fn index_json(
     ClientIp(client_ip): ClientIp,
     Query(params): Query<IndexTextParams>,
-    state: State<ArcState>,
+    State(state): State<ArcState>,
 ) -> Result<Json<Vec<ChannelMeta>>, ApiError> {
-    let ip_addr: IpAddr = client_ip.to_canonical();
+    let channels = _get_index(client_ip, params.Host, state).await?;
+    Ok(Json(channels))
+}
+
+async fn _get_index(
+    client_ip: IpAddr,
+    query_host: Option<(String, u16)>,
+    state: ArcState,
+) -> Result<Vec<ChannelMeta>, ApiError> {
     // Hostヘッダの有無で処理を分岐
     // Hostヘッダがある場合はそちらを優先する。ただし接続元IPアドレスはハンドラーで取得したものを使う。
-    let (target_ip, target_port) = match params.Host {
-        Some((_host, port)) => (ip_addr, port),
-        None => (ip_addr, 7144),
+    let (target_ip, target_port) = match query_host {
+        Some((_host, port)) => (client_ip, port),
+        None => (client_ip, 7144),
     };
 
     let repo = SqliteCheckedHostRepository::new(state.db_pool.clone());
     let port_checker = PingPortChecker::new(&state.connection_factory);
     let checker = HostCheckService::new(repo, port_checker);
 
-    let host = checker.do_check(target_ip, target_port).await;
+    let host = checker.do_check(target_ip, target_port).await?;
 
     let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
-    Ok(Json(channels))
+    let channels = state.yellow_page.filter_channel_meta(&host, channels);
+
+    Ok(channels)
 }
 
 /// Utility function for mapping any error into a `500 Internal Server Error` response.

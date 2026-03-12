@@ -2,7 +2,7 @@ use std::{process::exit, vec};
 
 use axum_client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
-use peercast_root::RestrictPortLevel;
+use peercast_root::{RestrictPortLevel, YpAppendSystemStatus};
 use url::Url;
 
 #[cfg(not(debug_assertions))]
@@ -94,6 +94,11 @@ pub struct Args {
          value_parser = clap::value_parser!(u32).range(peercast_root::YP_LIMIT_SPEED_MIN as i64..))]
     pub yp_limit_speed: u32,
 
+    /// チャンネルリストに追加するシステム情報の種類
+    #[arg(long, default_value = "default")]
+    pub yp_append_system_status: YpAppendSystemStatus,
+
+    // pub yp_append_user_status: YpAppendUserStatus,
     #[arg(short, long, env, value_parser = clap::builder::ValueParser::new(Url::parse), default_value="sqlite::memory:")]
     pub database_url: Url,
 
