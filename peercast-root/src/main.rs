@@ -74,6 +74,13 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
     peercast_root::init();
     let (connection_factory, connection_manager) = shared::connection_factory::<RootSpec>();
 
+    // HTMLディレクトリを指定した場合そこにフォルダがあるか確認する
+    if let Some(dir_path) = &args.use_outer_html_dir {
+        if !dir_path.is_dir() {
+            return Err(anyhow::anyhow!("use_outer_html_dir={} is not directory", dir_path.to_string_lossy()));
+        }
+    }
+
     let mut index_txt_footer = vec![];
     if let Some(ref path) = args.index_txt_footer {
         let t = FooterToml::from_path(path)
@@ -140,6 +147,9 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
     let app_sate = AppState {
         self_session_id,
         config: Arc::new(api_config),
+        //
+        use_outer_html_dir: args.use_outer_html_dir.clone(),
+        //
         index_txt_footer,
         db_pool,
         embed_tmpl_ctx,

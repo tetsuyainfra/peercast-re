@@ -19,8 +19,10 @@ pub async fn server_http(
     listener: TcpListener,
     graceful_shutdown: CancellationToken,
 ) -> anyhow::Result<()> {
-    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
-    info!("asset_dir: {:?}", &assets_dir);
+    // let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+    // info!("asset_dir: {:?}", &assets_dir);
+    let use_outer_html_dir = state.use_outer_html_dir.clone();
+    info!("use_outer_html_dir: {:?}", &use_outer_html_dir);
 
     let cor_origins: Vec<_> =
         state.0.config.allow_cors.iter().map(|origin| origin.parse::<HeaderValue>().unwrap()).collect();
@@ -39,7 +41,7 @@ pub async fn server_http(
         .route("/index.txt", routing::get(handler::index_txt))
         .route("/index.json", routing::get(handler::index_json))
         .route("/temp", routing::get(handler::temp))
-        .fallback_service(static_router())
+        .fallback_service(static_router(use_outer_html_dir))
         //
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
         .layer(CorsLayer::new().allow_origin(cor_origins).allow_methods([Method::GET]))

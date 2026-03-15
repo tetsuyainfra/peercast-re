@@ -144,6 +144,10 @@ pub struct Args {
     #[arg(long, default_value_t = true)]
     pub daemon_merge_stderr: bool,
 
+    /// if you want, use this html directory
+    #[arg(long, env)]
+    pub use_outer_html_dir: Option<std::path::PathBuf>,
+
     /// Path to log file by DEBUG MODE
     #[arg(short = 'L', value_name = "ACCESS_LOG_FILE", default_value = DEFAULT_ACCESS_LOG_FILE)]
     pub access_log: std::path::PathBuf,

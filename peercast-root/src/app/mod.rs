@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use libpeercast_re::pcp::GnuId;
 use peercast_root::{
@@ -51,6 +51,8 @@ pub struct AppState {
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
     pub yellow_page: Arc<YellowPageService>,
     pub repository: RootRepository2,
+    //
+    pub use_outer_html_dir: Option<PathBuf>,
     //
     pub embed_tmpl_ctx: EmbedTemplateCtx,
     //

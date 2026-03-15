@@ -16,7 +16,7 @@ use peercast_root::{
     service::{HostCheckService, PingPortChecker},
 };
 use serde::Deserialize;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::app::{AppState, ArcState};
 
@@ -169,34 +169,44 @@ where
 #[folder = "src/public/"]
 struct Assets;
 
-pub fn static_router() -> axum::Router {
-    #[cfg(debug_assertions)]
-    {
-        // 開発時：ローカルディレクトリをそのまま配信
-        axum::Router::new().fallback_service(axum::routing::get_service(
-            tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
-        ))
-    }
+pub fn static_router(assets_dir: Option<std::path::PathBuf>) -> axum::Router {
+    // #[cfg(debug_assertions)]
+    // {
+    //     // 開発時：ローカルディレクトリをそのまま配信
+    //     axum::Router::new().fallback_service(axum::routing::get_service(
+    //         tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
+    //     ))
+    // }
 
-    #[cfg(not(debug_assertions))]
+    // #[cfg(not(debug_assertions))]
     {
-        use axum::routing;
-        debug!("Assets include files");
-        for a in Assets::iter() {
-            debug!("- {}", a.as_ref());
+        if let Some(assets_dir) = assets_dir {
+            info!("static router is ServeDir");
+            // リリース時：指定ディレクトリを参照
+            axum::Router::new().fallback_service(axum::routing::get_service(
+                tower_http::services::ServeDir::new(assets_dir).append_index_html_on_directories(true),
+            ))
+        } else {
+            info!("static router is Assets(Embed)");
+            use axum::routing;
+            debug!("Assets include files");
+            for a in Assets::iter() {
+                debug!("- {}", a.as_ref());
+            }
+
+            // リリース時：バイナリ埋め込み
+            axum::Router::new()
+                // .route("/", axum::routing::get(embed_handler))
+                // .route("/{*path}", axum::routing::get(embed_handler))
+                .fallback(routing::get(embed_handler))
         }
-        // リリース時：バイナリ埋め込み
-        axum::Router::new()
-            // .route("/", axum::routing::get(embed_handler))
-            // .route("/{*path}", axum::routing::get(embed_handler))
-            .fallback(routing::get(embed_handler))
     }
 }
 
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 async fn embed_handler(uri: hyper::Uri) -> impl IntoResponse {
     let path = uri.path();
-    trace!("REQLINE: {}", path);
+    // trace!("REQLINE: {}", path);
     let path = if path.ends_with("/") {
         [path, "index.html"].concat()
     } else {
@@ -207,7 +217,7 @@ async fn embed_handler(uri: hyper::Uri) -> impl IntoResponse {
     } else {
         path
     };
-    trace!("   PATH: {}", path);
+    // trace!("   PATH: {}", path);
 
     match Assets::get(&path) {
         Some(content) => {
