@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::{any::Any, net::IpAddr};
 
 use axum::{
     Json,
@@ -9,14 +9,16 @@ use axum::{
 use axum_client_ip::ClientIp;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
+use mime_guess::mime;
 use peercast_root::{
     db::SqliteCheckedHostRepository,
     model::ChannelMeta,
     service::{HostCheckService, PingPortChecker},
 };
 use serde::Deserialize;
+use tracing::info;
 
-use crate::app::ArcState;
+use crate::app::{AppState, ArcState};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -86,6 +88,42 @@ async fn _get_index(
     Ok(channels)
 }
 
+pub async fn temp(State(state): State<ArcState>) -> impl IntoResponse {
+    use minijinja::Environment;
+
+    let mut env = Environment::new();
+    env.set_loader(|name| {
+        match mime_guess::from_path(name).first() {
+            None => {
+                return Ok(None);
+            }
+            Some(m) => {
+                if m.type_() != mime::TEXT {
+                    return Ok(None);
+                }
+            }
+        };
+
+        let Some(content) = Assets::get(&name) else {
+            return Ok(None);
+        };
+
+        let s = String::from_utf8_lossy(&content.data[..]).into_owned();
+        Ok(Some(s))
+    });
+    let mime = mime_guess::from_path("index.html").first_or_octet_stream();
+
+    // env.add_template("hello", "Hello {{ name }}!").unwrap();
+    let tmpl = env.get_template("index.html").unwrap();
+
+    (
+        //
+        [(hyper::header::CONTENT_TYPE, mime.as_ref())],
+        tmpl.render(&state.embed_tmpl_ctx).unwrap(),
+    )
+        .into_response()
+}
+
 /// Utility function for mapping any error into a `500 Internal Server Error` response.
 #[allow(dead_code)]
 fn internal_error<E>(err: E) -> (StatusCode, String)
@@ -126,7 +164,7 @@ where
 //-------------------------------------------------------------------------------
 // Static Files Handlers
 //-------------------------------------------------------------------------------
-#[cfg(not(debug_assertions))]
+// #[cfg(not(debug_assertions))]
 #[derive(rust_embed::RustEmbed)]
 #[folder = "src/public/"]
 struct Assets;

@@ -30,6 +30,18 @@ pub struct ApiConfig {
     pub client_ip_source: cli::ClientIpSourceArg,
 }
 
+#[allow(non_snake_case)]
+#[derive(Debug, serde::Serialize)]
+pub struct EmbedTemplateCtx {
+    pub EMBED_TITLE: String,
+    pub EMBED_YP_NAME: String,
+    pub EMBED_URL_HTTP: String,
+    pub EMBED_URL_PCP: String,
+
+    /// トラッカーのPeerCastでジャンルに含ませるべき文字列
+    pub tracker_yp_name: String,
+}
+
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct AppState {
@@ -39,6 +51,9 @@ pub struct AppState {
     pub db_pool: sqlx::Pool<sqlx::sqlite::Sqlite>,
     pub yellow_page: Arc<YellowPageService>,
     pub repository: RootRepository2,
+    //
+    pub embed_tmpl_ctx: EmbedTemplateCtx,
+    //
     pub connection_factory: RootConnectionFactory,
     pub connection_manager: RootConnectionManager,
 }

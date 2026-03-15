@@ -3,26 +3,26 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Page Title</title>
+    <title>{{ EMBED_TITLE }}</title>
 </head>
 
 <body>
 
     <div class="main">
-        <h1>peercast-root embed YP</h1>
+        <h1>{{ EMBED_YP_NAME }} powered by peercast-root</h1>
         <p>
             Rustで実装したPeercastのYPサーバーです。<br />
         </p>
         <p>
             Pcypなどで表示するには次のURLを指定してください
             <pre>
-                http://yp.007144.xyz
+                {{ EMBED_URL_HTTP }}
             </pre>
         </p>
         <p>
             PeerCastで配信するには次のアドレスを指定してください。
         <pre>
-                yp.007144.xyz:7144
+                {{ EMBED_URL_PCP }}
             </pre>
         </p>
         <hr />

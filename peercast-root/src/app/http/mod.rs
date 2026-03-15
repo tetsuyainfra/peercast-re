@@ -38,6 +38,7 @@ pub async fn server_http(
     let app = Router::new()
         .route("/index.txt", routing::get(handler::index_txt))
         .route("/index.json", routing::get(handler::index_json))
+        .route("/temp", routing::get(handler::temp))
         .fallback_service(static_router())
         //
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))

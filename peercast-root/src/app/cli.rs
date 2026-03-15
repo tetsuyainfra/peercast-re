@@ -102,6 +102,22 @@ pub struct Args {
     #[arg(long, default_value = "default")]
     pub yp_append_system_status: YpAppendSystemStatus,
 
+    /// 内臓YPのHTMLを書き換える際の変数(EMBED_YP_TITLE)
+    #[arg(long, env, default_value = "Embed-YP | peercast-root ")]
+    pub embed_title: String,
+
+    /// 内臓YPのHTMLを書き換える際の変数(EMBED_YP_NAME)
+    #[arg(long, env, default_value = "Embed-YP")]
+    pub embed_yp_name: String,
+
+    /// 内臓YPのHTMLを書き換える際の変数(EMBED_URL_HTTP)
+    #[arg(long, env, default_value = "http://yp.007144.xyz")]
+    pub embed_url_http: String,
+
+    /// 内臓YPのHTMLの書き換えに使用する変数(EMBED_URL_PCP)
+    #[arg(long, env, default_value = "yp.007144.xyz:7144")]
+    pub embed_url_pcp: String,
+
     // pub yp_append_user_status: YpAppendUserStatus,
     #[arg(short, long, env, value_parser = clap::builder::ValueParser::new(Url::parse), default_value="sqlite::memory:")]
     pub database_url: Url,

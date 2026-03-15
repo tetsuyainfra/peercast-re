@@ -52,6 +52,9 @@ tower-http = { version = "0.6.2", features = [
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 
+# HTML Template Engine
+minijinja = { version = "2.17.1", features = ["loader"] }
+
 # Embed files to binary
 rust-embed = "8.11.0"
 

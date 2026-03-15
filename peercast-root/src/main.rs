@@ -29,7 +29,7 @@ mod app;
 use app::cli;
 use app::logging;
 
-use crate::app::{ApiConfig, AppState, ArcState, server_http, server_peercast};
+use crate::app::{ApiConfig, AppState, ArcState, EmbedTemplateCtx, server_http, server_peercast};
 
 #[cfg(test)]
 mod test_helper;
@@ -99,6 +99,16 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         client_ip_source: args.client_ip_source.clone(),
     };
 
+    // 内臓YPの書き換え変数
+    let embed_tmpl_ctx = EmbedTemplateCtx {
+        EMBED_TITLE: args.embed_title.clone(),
+        EMBED_YP_NAME: args.embed_yp_name.clone(),
+        EMBED_URL_HTTP: args.embed_url_http.clone(),
+        EMBED_URL_PCP: args.embed_url_pcp.clone(),
+        //
+        tracker_yp_name: args.yp_name.clone(),
+    };
+
     let db_pool = init_db(args).await?;
 
     // YellowPageの設定
@@ -132,6 +142,7 @@ async fn init(args: &cli::Args, self_session_id: GnuId, _self_socket: SocketAddr
         config: Arc::new(api_config),
         index_txt_footer,
         db_pool,
+        embed_tmpl_ctx,
         yellow_page,
         repository,
         connection_factory,
