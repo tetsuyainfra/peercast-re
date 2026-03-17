@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 use tokio::sync::mpsc;
 
@@ -119,7 +119,7 @@ impl ConnectionHandle for MyConnectionHandle {
     fn cno(&self) -> crate::ConnectionNo {
         self.cno
     }
-    fn task_name(&self) -> std::borrow::Cow<'static, str> {
+    fn task_name(&self) -> Arc<String> {
         todo!()
     }
 

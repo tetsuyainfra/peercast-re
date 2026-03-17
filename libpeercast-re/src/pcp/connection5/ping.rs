@@ -149,7 +149,7 @@ async fn get_atom_timeout(
 
 #[cfg(test)]
 mod t {
-    use std::{net::SocketAddr, pin::Pin};
+    use std::{net::SocketAddr, pin::Pin, sync::Arc};
 
     use tokio_util::sync::CancellationToken;
 
@@ -213,7 +213,7 @@ mod t {
             todo!()
         }
 
-        fn task_name(&self) -> std::borrow::Cow<'static, str> {
+        fn task_name(&self) -> Arc<String> {
             todo!()
         }
 

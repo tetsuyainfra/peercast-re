@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     future::Future,
     net::{IpAddr, SocketAddr},
+    sync::Arc,
 };
 
 use tokio_util::sync::CancellationToken;
@@ -55,7 +56,7 @@ pub trait ConnectionHandle {
 
     fn cno(&self) -> ConnectionNo;
 
-    fn task_name(&self) -> Cow<'static, str>;
+    fn task_name(&self) -> Arc<String>;
     //  {
     //     Cow::Owned(format!("conn-{}", self.cno()))
     // }

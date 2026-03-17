@@ -1,5 +1,5 @@
 /// Establishdを複数のプロトコルに対応させるサンプル
-use std::{future::Future, net::SocketAddr};
+use std::{future::Future, net::SocketAddr, sync::Arc};
 
 use tokio::sync::{mpsc, watch};
 
@@ -119,7 +119,7 @@ impl ConnectionHandle for MyConnectionHandle {
     fn cno(&self) -> crate::ConnectionNo {
         self.cno
     }
-    fn task_name(&self) -> std::borrow::Cow<'static, str> {
+    fn task_name(&self) -> Arc<String> {
         todo!()
     }
 

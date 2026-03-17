@@ -479,8 +479,8 @@ impl ConnectionHandle for RootHandle {
         self.0.cno
     }
 
-    fn task_name(&self) -> std::borrow::Cow<'static, str> {
-        todo!()
+    fn task_name(&self) -> Arc<String> {
+        Arc::clone(&self.0.task_name)
     }
 
     fn state(&self) -> <Self::Spec as ConnectionSpec>::State {
