@@ -8,8 +8,8 @@ use tokio_util::sync::CancellationToken;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tower_http::{cors::CorsLayer, set_header::SetResponseHeaderLayer};
 
-use crate::app::ArcState;
 use crate::app::http::handler::static_router;
+use crate::app::{ArcState, EmbedTemplateCtx};
 use peercast_root::prelude::*;
 
 pub mod handler;
@@ -40,8 +40,7 @@ pub async fn server_http(
     let app = Router::new()
         .route("/index.txt", routing::get(handler::index_txt))
         .route("/index.json", routing::get(handler::index_json))
-        .route("/temp", routing::get(handler::temp))
-        .fallback_service(static_router(use_outer_html_dir))
+        .fallback_service(static_router(use_outer_html_dir, state.0.embed_tmpl_ctx.clone()))
         //
         .layer(TraceLayer::new_for_http().make_span_with(DefaultMakeSpan::default().include_headers(true)))
         .layer(CorsLayer::new().allow_origin(cor_origins).allow_methods([Method::GET]))

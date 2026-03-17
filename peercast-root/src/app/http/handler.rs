@@ -1,4 +1,4 @@
-use std::{any::Any, net::IpAddr};
+use std::{any::Any, net::IpAddr, sync::Arc};
 
 use axum::{
     Json,
@@ -10,6 +10,7 @@ use axum_client_ip::ClientIp;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
 use mime_guess::mime;
+use minijinja::Environment;
 use peercast_root::{
     db::SqliteCheckedHostRepository,
     model::ChannelMeta,
@@ -18,7 +19,7 @@ use peercast_root::{
 use serde::Deserialize;
 use tracing::{debug, info};
 
-use crate::app::{AppState, ArcState};
+use crate::app::{AppState, ArcState, EmbedTemplateCtx};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -88,42 +89,6 @@ async fn _get_index(
     Ok(channels)
 }
 
-pub async fn temp(State(state): State<ArcState>) -> impl IntoResponse {
-    use minijinja::Environment;
-
-    let mut env = Environment::new();
-    env.set_loader(|name| {
-        match mime_guess::from_path(name).first() {
-            None => {
-                return Ok(None);
-            }
-            Some(m) => {
-                if m.type_() != mime::TEXT {
-                    return Ok(None);
-                }
-            }
-        };
-
-        let Some(content) = Assets::get(&name) else {
-            return Ok(None);
-        };
-
-        let s = String::from_utf8_lossy(&content.data[..]).into_owned();
-        Ok(Some(s))
-    });
-    let mime = mime_guess::from_path("index.html").first_or_octet_stream();
-
-    // env.add_template("hello", "Hello {{ name }}!").unwrap();
-    let tmpl = env.get_template("index.html").unwrap();
-
-    (
-        //
-        [(hyper::header::CONTENT_TYPE, mime.as_ref())],
-        tmpl.render(&state.embed_tmpl_ctx).unwrap(),
-    )
-        .into_response()
-}
-
 /// Utility function for mapping any error into a `500 Internal Server Error` response.
 #[allow(dead_code)]
 fn internal_error<E>(err: E) -> (StatusCode, String)
@@ -164,21 +129,30 @@ where
 //-------------------------------------------------------------------------------
 // Static Files Handlers
 //-------------------------------------------------------------------------------
-// #[cfg(not(debug_assertions))]
+#[cfg(not(debug_assertions))]
 #[derive(rust_embed::RustEmbed)]
 #[folder = "src/public/"]
 struct Assets;
 
-pub fn static_router(assets_dir: Option<std::path::PathBuf>) -> axum::Router {
-    // #[cfg(debug_assertions)]
-    // {
-    //     // 開発時：ローカルディレクトリをそのまま配信
-    //     axum::Router::new().fallback_service(axum::routing::get_service(
-    //         tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
-    //     ))
-    // }
+#[cfg(not(debug_assertions))]
+struct StaticState {
+    env: Environment<'static>,
+    template_ctx: EmbedTemplateCtx,
+}
 
-    // #[cfg(not(debug_assertions))]
+pub fn static_router(
+    #[allow(unused)] assets_dir: Option<std::path::PathBuf>,
+    #[allow(unused)] template_ctx: EmbedTemplateCtx,
+) -> axum::Router {
+    #[cfg(debug_assertions)]
+    {
+        // 開発時：ローカルディレクトリをそのまま配信
+        axum::Router::new().fallback_service(axum::routing::get_service(
+            tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
+        ))
+    }
+
+    #[cfg(not(debug_assertions))]
     {
         if let Some(assets_dir) = assets_dir {
             info!("static router is ServeDir");
@@ -194,19 +168,45 @@ pub fn static_router(assets_dir: Option<std::path::PathBuf>) -> axum::Router {
                 debug!("- {}", a.as_ref());
             }
 
+            // Template Environment
+            let mut env = minijinja::Environment::new();
+            env.set_loader(|name| {
+                match mime_guess::from_path(name).first() {
+                    None => {
+                        return Ok(None);
+                    }
+                    Some(m) => {
+                        if m.type_() != mime::TEXT {
+                            return Ok(None);
+                        }
+                    }
+                };
+
+                let Some(content) = Assets::get(&name) else {
+                    return Ok(None);
+                };
+
+                let s = String::from_utf8_lossy(&content.data[..]).into_owned();
+                Ok(Some(s))
+            });
+            let state = StaticState {
+                env: env,
+                template_ctx,
+            };
+
             // リリース時：バイナリ埋め込み
             axum::Router::new()
                 // .route("/", axum::routing::get(embed_handler))
                 // .route("/{*path}", axum::routing::get(embed_handler))
                 .fallback(routing::get(embed_handler))
+                .with_state(Arc::new(state))
         }
     }
 }
 
-// #[cfg(not(debug_assertions))]
-async fn embed_handler(uri: hyper::Uri) -> impl IntoResponse {
+#[cfg(not(debug_assertions))]
+async fn embed_handler(uri: hyper::Uri, State(state): State<Arc<StaticState>>) -> impl IntoResponse {
     let path = uri.path();
-    // trace!("REQLINE: {}", path);
     let path = if path.ends_with("/") {
         [path, "index.html"].concat()
     } else {
@@ -217,26 +217,37 @@ async fn embed_handler(uri: hyper::Uri) -> impl IntoResponse {
     } else {
         path
     };
-    // trace!("   PATH: {}", path);
 
-    match Assets::get(&path) {
-        Some(content) => {
-            let body = content.data.into_owned();
-            let mime = mime_guess::from_path(path).first_or_octet_stream();
-            (
-                //
-                [(hyper::header::CONTENT_TYPE, mime.as_ref())],
-                body,
-            )
-                .into_response()
-        }
-        None => {
-            (
-                //
-                StatusCode::NOT_FOUND,
-                "Not Found",
-            )
-                .into_response()
+    let mime = mime_guess::from_path(&path).first_or_octet_stream();
+
+    match state.env.get_template(&path) {
+        // minijinjaで生成
+        Ok(tmpl) => match tmpl.render(&state.template_ctx) {
+            Ok(rendered) => {
+                (
+                    //
+                    [(hyper::header::CONTENT_TYPE, mime.as_ref())],
+                    rendered,
+                )
+                    .into_response()
+            }
+            Err(_e) => (StatusCode::INTERNAL_SERVER_ERROR, "Error").into_response(),
+        },
+
+        // 静的ファイルにフォールバック
+        Err(_e) => {
+            match Assets::get(&path) {
+                Some(content) => {
+                    let body = content.data.into_owned();
+                    (
+                        //
+                        [(hyper::header::CONTENT_TYPE, mime.as_ref())],
+                        body,
+                    )
+                        .into_response()
+                }
+                None => (StatusCode::NOT_FOUND, "Not Found").into_response(),
+            }
         }
     }
 }

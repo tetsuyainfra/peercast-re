@@ -31,7 +31,7 @@ pub struct ApiConfig {
 }
 
 #[allow(non_snake_case)]
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, Clone)]
 pub struct EmbedTemplateCtx {
     pub EMBED_TITLE: String,
     pub EMBED_YP_NAME: String,
