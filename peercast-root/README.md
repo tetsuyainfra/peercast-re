@@ -49,14 +49,16 @@ cargo run-db
 cargo sqlx prepare
 ```
 
-
-### MEMO
-port_speedは0~1000の値を取る
-
-## TODO
-- IPv4 in IPv6で最適化(DB上も16bytes固定になっていいかも？)
-- minijinjaよりhandlebarsの方が標準的でよさそう
-
 ## Appendix Binary
 - create_info : index.txtに追加できるFooterテキストを定義するTOMLを出力するためのコマンドです
 - peercast-db-cli : peercast-rootが作成するDBを読み書きできるCLIです
+
+## TODO
+- PCPで受け取ったデータでチャンネル情報を更新する
+- 5分後にチャンネルを削除する機能をつける
+- Dockerを作る
+- Debian Pacakgeを生成する
+- IPv4 in IPv6で最適化(DB上も16bytes固定になっていいかも？)
+- minijinjaよりhandlebarsの方が標準的でよさそう
+
+### MEMO
