@@ -57,6 +57,10 @@ aquamarine = { version = "0.6.0" }
 # IP address
 ipnet = { version = "2.11.0", features = ["serde"] }
 
+# Text encoding
+encoding_rs = { version ="0.8.35", features=[] }
+chardetng = "0.1.17"
+
 # 数値操作(cast等)
 num = "0.4.3"
 
