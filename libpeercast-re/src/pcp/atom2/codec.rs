@@ -32,6 +32,10 @@ impl Decoder for AtomCodec {
                 let atom_bytes = src.split_to(length);
                 Ok(Some(Atom2::new(atom_bytes.freeze())))
             }
+            Err(Atom2ParseError::UnexpectedEnd) => {
+                // データ着信途中の可能性があるので、Noneで返す
+                Ok(None)
+            }
             Err(e) => Err(e),
         }
     }
