@@ -82,7 +82,7 @@ impl HeloBuilder2 {
 
 #[derive(Debug, Default)]
 pub struct HeloInfo {
-    pub agent: Option<String>,
+    pub agent: Option<Vec<u8>>,
     pub version: Option<u32>,
     pub session_id: Option<GnuId>,
     pub broadcast_id: Option<GnuId>,
@@ -117,12 +117,11 @@ impl TryFrom<&Atom2> for HeloInfo {
                 }
                 Id4::PCP_HELO_BCID => {
                     let v = cv.data().read_u128::<BigEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
-                    helo.session_id = Some(GnuId::from(v));
+                    helo.broadcast_id = Some(GnuId::from(v));
                 }
                 Id4::PCP_HELO_AGENT => {
-                    // HACKME: Vec<u8>で受けた方がいいか？
-                    let v = String::from_utf8_lossy(cv.payload());
-                    helo.agent = Some(v.to_string());
+                    let v = cv.data().into();
+                    helo.agent = Some(v);
                 }
                 Id4::PCP_HELO_VERSION => {
                     let v = cv.data().read_u32::<LittleEndian>().map_err(|_| InfoParseError::InvalidPayload)?;
