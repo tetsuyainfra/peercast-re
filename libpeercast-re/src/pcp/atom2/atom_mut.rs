@@ -238,7 +238,7 @@ impl From<(Id4, i32)> for AtomMut {
 impl From<(Id4, Vec<u8>)> for AtomMut {
     fn from((id, value): (Id4, Vec<u8>)) -> Self {
         let mut payload = BytesMut::with_capacity(value.len());
-        payload.copy_from_slice(&value[..]);
+        payload.extend_from_slice(&value[..]);
 
         AtomMut {
             id: id,
@@ -252,7 +252,7 @@ impl From<(Id4, Vec<u8>)> for AtomMut {
 impl From<(Id4, String)> for AtomMut {
     fn from((id, value): (Id4, String)) -> Self {
         let mut payload = BytesMut::with_capacity(value.len() + 1);
-        payload.copy_from_slice(value.as_bytes());
+        payload.extend_from_slice(value.as_bytes());
         payload.put_u8(b'\0');
 
         AtomMut {
