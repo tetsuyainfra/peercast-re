@@ -41,7 +41,7 @@ impl OlehBuilder2 {
 
         //
         atoms.push((Id4::PCP_HELO_REMOTEIP, self.remote_ip).into());
-        atoms.push((Id4::PCP_HELO_PING, self.remote_port).into());
+        atoms.push((Id4::PCP_HELO_PORT, self.remote_port).into());
 
         (Id4::PCP_OLEH, atoms).into()
     }
@@ -119,5 +119,30 @@ impl TryFrom<&Atom2> for OlehInfo {
             port,
             version,
         })
+    }
+}
+
+#[cfg(test)]
+mod t {
+    use std::net::IpAddr;
+
+    use crate::pcp::builder::OlehBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_builder() {
+        let s = GnuId::new();
+        let ip: IpAddr = "127.0.0.1".parse().unwrap();
+        let port = 7144;
+        let oleh_atom = OlehBuilder2::new(s, ip, port).build();
+        dbg!(&oleh_atom);
+
+        let oleh_atom1 = OlehBuilder::new(s, ip, port).build();
+        dbg!(&oleh_atom1);
+
+        let x = OlehInfo::try_from(&oleh_atom.into());
+        assert_eq!(true, x.is_ok());
+        dbg!(&x);
     }
 }
