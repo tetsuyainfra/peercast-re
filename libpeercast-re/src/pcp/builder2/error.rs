@@ -5,4 +5,7 @@ pub enum InfoParseError {
 
     #[error("Invalid Payload")]
     InvalidPayload,
+
+    #[error("Unknown Type")]
+    UnknownType,
 }
