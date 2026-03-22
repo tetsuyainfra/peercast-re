@@ -9,7 +9,10 @@ use bytes::{
     BytesMut,
 };
 
-use crate::pcp::{atom2::atom_mut::AtomMut, Atom, Id4};
+use crate::{
+    error::Atom2ParseError,
+    pcp::{atom2::atom_mut::AtomMut, Atom, Id4},
+};
 
 pub mod atom_mut;
 pub mod codec;
@@ -139,7 +142,7 @@ impl fmt::Debug for Atom2 {
 }
 
 impl TryFrom<&[u8]> for Atom2 {
-    type Error = parser::ParseError;
+    type Error = Atom2ParseError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         match parser::try_parse_atom(value) {
@@ -326,9 +329,9 @@ fn calculate_parent_atom_bytesize(buf: &[u8]) -> usize {
 
 /*
 /// 信用されていないバッファから、Atomのバイトサイズを検証しつつ取得する
-fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
+fn verify_atom_bytes(buf: &[u8]) -> Result<usize, Atom2ParseError> {
     if buf.len() < ATOM_HEADER_LENGTH {
-        return Err(ParseError::UnexpectedEnd);
+        return Err(Atom2ParseError::UnexpectedEnd);
     }
 
     let size_and_parent = (&buf[4..8]).get_u32_le();
@@ -344,7 +347,7 @@ fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
             // ChildAtom の場合、lengthはバイトサイズそのもの
             let expected_size = ATOM_HEADER_LENGTH + length as usize;
             if buf.len() < expected_size {
-                return Err(ParseError::UnexpectedEnd);
+                return Err(Atom2ParseError::UnexpectedEnd);
             }
             Ok(expected_size)
         }
@@ -352,7 +355,7 @@ fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
             let mut offset = ATOM_HEADER_LENGTH; // 初期値はこのAtomのヘッダサイズ
             for _ in 0..length {
                 if offset >= buf.len() {
-                    return Err(ParseError::UnexpectedEnd);
+                    return Err(Atom2ParseError::UnexpectedEnd);
                 }
                 // 子Atomを順に解析してバイトサイズを合計する
                 let child_size = verify_atom_bytes(&buf[offset..])?;

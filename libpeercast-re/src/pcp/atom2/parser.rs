@@ -1,6 +1,9 @@
 use bytes::{Buf, Bytes, BytesMut};
 
-use crate::pcp::atom2::{Atom2, Kind};
+use crate::{
+    error::Atom2ParseError,
+    pcp::atom2::{Atom2, Kind},
+};
 
 pub trait PacketParser {
     type Packet;
@@ -12,29 +15,14 @@ pub trait PacketParser {
     fn next_packet(&mut self) -> Option<Self::Packet>;
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ParseError {
-    #[error("不正なフォーマット")]
-    InvalidFormat,
-
-    #[error("データの終端に達した")]
-    UnexpectedEnd,
-
-    #[error("不正なデータ")]
-    MalformedData,
-
-    #[error("io error")]
-    Io(#[from] std::io::Error),
-}
-
 const ATOM_HEADER_LENGTH: usize = 8;
 const ATOM_MAX_BYTE_LENGTH: u32 = 2 * 1024 * 1024; // 2MB
 
 /// 信用されていないバッファから、Atomを検証しつつ取得する
 /// 成功した場合、Atomのバイトサイズを返す
-pub(super) fn try_parse_atom(buf: &[u8]) -> Result<usize, ParseError> {
+pub(super) fn try_parse_atom(buf: &[u8]) -> Result<usize, Atom2ParseError> {
     if buf.len() < ATOM_HEADER_LENGTH {
-        return Err(ParseError::UnexpectedEnd);
+        return Err(Atom2ParseError::UnexpectedEnd);
     }
 
     let size_and_parent = (&buf[4..8]).get_u32_le();
@@ -47,7 +35,7 @@ pub(super) fn try_parse_atom(buf: &[u8]) -> Result<usize, ParseError> {
 
     if length > ATOM_MAX_BYTE_LENGTH {
         // 2MBを超えるAtomは不正とみなす
-        return Err(ParseError::MalformedData);
+        return Err(Atom2ParseError::MalformedData);
     }
 
     match kind {
@@ -55,7 +43,7 @@ pub(super) fn try_parse_atom(buf: &[u8]) -> Result<usize, ParseError> {
             // ChildAtom の場合、lengthはバイトサイズそのもの
             let expected_size = ATOM_HEADER_LENGTH + length as usize;
             if buf.len() < expected_size {
-                return Err(ParseError::UnexpectedEnd);
+                return Err(Atom2ParseError::UnexpectedEnd);
             }
             Ok(expected_size)
         }
@@ -63,7 +51,7 @@ pub(super) fn try_parse_atom(buf: &[u8]) -> Result<usize, ParseError> {
             let mut offset = ATOM_HEADER_LENGTH; // 初期値はこのAtomのヘッダサイズ
             for _ in 0..length {
                 if offset >= buf.len() {
-                    return Err(ParseError::UnexpectedEnd);
+                    return Err(Atom2ParseError::UnexpectedEnd);
                 }
                 // 子Atomを順に解析してバイトサイズを合計する
                 let child_size = try_parse_atom(&buf[offset..])?;

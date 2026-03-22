@@ -1,7 +1,10 @@
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::pcp::atom2::{atom_mut::AtomMut, parser::ParseError, Atom2};
+use crate::{
+    error::Atom2ParseError,
+    pcp::atom2::{atom_mut::AtomMut, Atom2},
+};
 
 #[derive(Debug)]
 pub struct AtomCodec {
@@ -20,7 +23,7 @@ impl AtomCodec {
 
 impl Decoder for AtomCodec {
     type Item = Atom2;
-    type Error = ParseError;
+    type Error = Atom2ParseError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         match super::parser::try_parse_atom(src) {

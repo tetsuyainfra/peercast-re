@@ -9,9 +9,8 @@ use tokio_util::codec::Framed;
 use uuid::Bytes;
 
 use crate::{
-    error::ConnectionError,
+    error::{Atom2ParseError, ConnectionError},
     pcp::{
-        atom2::parser::ParseError,
         builder2::{InfoParseError, OlehInfo, PingBuilder2, QuitBuilder2, QuitInfo, QuitReason},
         connection5::{Connection, ConnectionSpec, OutgoingConnection},
         Atom2, AtomCodec, AtomView, GnuId, Id4,
@@ -22,7 +21,7 @@ use crate::{
 #[derive(Debug, Error)]
 pub enum PingError {
     #[error("atom parse error")]
-    ParseError(#[from] ParseError),
+    ParseError(#[from] Atom2ParseError),
 
     #[error("atom to *Info parse error")]
     InfoParseError(#[from] InfoParseError),
