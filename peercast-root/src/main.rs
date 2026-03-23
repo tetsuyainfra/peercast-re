@@ -170,6 +170,34 @@ async fn init_db(args: &cli::Args) -> anyhow::Result<sqlx::Pool<sqlx::sqlite::Sq
 }
 
 async fn create_dummy_channel(repository: &RootRepository2) {
+    fn dummy_channel(i: usize, genre: &str) -> (GnuId, ValidChannelInfo, ValidTrackInfo, RootConfig) {
+        let cid = GnuId::from(0x123456789ABCDEF_u128 + i as u128);
+        let channel_info = libpeercast_re::model::ValidChannelInfo {
+            name: format!("名前({})", genre),
+            url: "http://example.com".to_string(),
+            genre: genre.to_string(),
+            desc: "This is a dummy channel desc".to_string(),
+            comment: "No comments.".to_string(),
+            stream_type: "video/x-flv".to_string(),
+            stream_ext: ".flv".to_string(),
+            bitrate: 128,
+            typee: "FLV".to_string(),
+        };
+        let track_info = libpeercast_re::model::ValidTrackInfo {
+            title: "Dummy Track".to_string(),
+            creator: "Dummy Artist".to_string(),
+            url: "http://example.com/track".to_string(),
+            album: "Dummy Album".to_string(),
+            genre: "Various".to_string(),
+        };
+        let dummy_config = RootConfig {
+            broadcast_id: GnuId::from(0xFEDCBA987654321_u128),
+            tracker_addr: Some("127.0.0.1:7144".parse().unwrap()),
+        };
+
+        (cid, channel_info, track_info, dummy_config)
+    }
+
     let vars = vec![
         dummy_channel(0, "dummy"),
         dummy_channel(1, "ypdummy"),
@@ -182,32 +210,4 @@ async fn create_dummy_channel(repository: &RootRepository2) {
         // info!("{:?}", v);
         repository.create_or_get(v.0, Some(v.1), Some(v.2), Some(v.3)).await;
     }
-}
-
-fn dummy_channel(i: usize, genre: &str) -> (GnuId, ValidChannelInfo, ValidTrackInfo, RootConfig) {
-    let cid = GnuId::from(0x123456789ABCDEF_u128 + i as u128);
-    let channel_info = libpeercast_re::model::ValidChannelInfo {
-        name: format!("名前({})", genre),
-        url: "http://example.com".to_string(),
-        genre: genre.to_string(),
-        desc: "This is a dummy channel desc".to_string(),
-        comment: "No comments.".to_string(),
-        stream_type: "video/x-flv".to_string(),
-        stream_ext: ".flv".to_string(),
-        bitrate: 128,
-        typee: "FLV".to_string(),
-    };
-    let track_info = libpeercast_re::model::ValidTrackInfo {
-        title: "Dummy Track".to_string(),
-        creator: "Dummy Artist".to_string(),
-        url: "http://example.com/track".to_string(),
-        album: "Dummy Album".to_string(),
-        genre: "Various".to_string(),
-    };
-    let dummy_config = RootConfig {
-        broadcast_id: GnuId::from(0xFEDCBA987654321_u128),
-        tracker_addr: Some("127.0.0.1:7144".parse().unwrap()),
-    };
-
-    (cid, channel_info, track_info, dummy_config)
 }
