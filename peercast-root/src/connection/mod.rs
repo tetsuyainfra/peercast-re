@@ -1,15 +1,18 @@
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
-use futures_util::{
+use futures::{
     SinkExt, StreamExt,
     stream::{SplitSink, SplitStream},
 };
 use libpeercast_re::{
     ConnectionNo,
+    error::HandshakeError,
     io::IoStream,
     pcp::{
-        Atom2, AtomCodec, AtomMut, AtomView,
-        builder2::{QuitBuilder2, QuitReason},
+        Atom2, AtomCodec, AtomMut, AtomView, GnuId, Id4,
+        builder2::{
+            BroadcastInfo, HeloInfo, MagicInfo, OkBuilder2, OlehBuilder2, QuitBuilder2, QuitReason, RootBuilder2,
+        },
         connection5::{
             Connection, ConnectionHandle, ConnectionSpec, HandshakeConnection,
             shared::{SharedFactory, SharedManager},
@@ -20,7 +23,7 @@ use libpeercast_re::{
 };
 use tokio::sync::{mpsc, watch};
 use tokio_util::codec::{Framed, FramedParts};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 pub type RootConnectionManager = SharedManager<RootSpec>;
 pub type RootConnectionFactory = SharedFactory<RootSpec>;
@@ -30,7 +33,7 @@ pub struct RootSpec();
 
 impl ConnectionSpec for RootSpec {
     type Handshake = RootHandshake;
-    type HandshakeConfig = Config;
+    type HandshakeConfig = RootHandshakeConfig;
 
     type State = State;
 
@@ -44,15 +47,20 @@ impl ConnectionSpec for RootSpec {
 ////////////////////////////////////////////////////////////////////////////////
 //  RootHandshake
 //
-pub struct Config {
-    io: IoStream,
+pub struct RootHandshakeConfig {
+    pub io: IoStream,
+    pub self_session_id: GnuId,
 }
+
+/// Root向けのHandshake構造体、Handshake::handshake()を呼び出すとプロトコルに応じて接続初期の手続きを済ます
 pub struct RootHandshake {
     cno: ConnectionNo,
     remote: SocketAddr,
     stream: IoStream,
     shutdown_token: tokio_util::sync::CancellationToken,
     manager: SharedManager<RootSpec>,
+    //
+    self_session_id: GnuId,
 }
 
 impl RootHandshake {}
@@ -69,8 +77,9 @@ impl HandshakeConnection for RootHandshake {
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
         manager: <Self::Spec as ConnectionSpec>::Manager,
     ) -> Self {
-        let Config {
+        let RootHandshakeConfig {
             io,
+            self_session_id,
         } = config.unwrap();
 
         Self {
@@ -79,6 +88,8 @@ impl HandshakeConnection for RootHandshake {
             stream: io,
             shutdown_token: shutdown_token.unwrap_or_else(|| tokio_util::sync::CancellationToken::new()),
             manager,
+            //
+            self_session_id,
         }
     }
 
@@ -97,6 +108,7 @@ impl HandshakeConnection for RootHandshake {
             stream,
             shutdown_token,
             manager: _,
+            self_session_id,
         } = self;
 
         let discrimer = IncomingProtocolDiscriminator::new();
@@ -114,9 +126,70 @@ impl HandshakeConnection for RootHandshake {
                     read_buf,
                     write_buf,
                 } = incoming_pcp_handshake.into_parts();
-                let establishd = RootEstablished::new(cno, remote, stream, read_buf, write_buf, shutdown_token);
 
-                Ok(RootHandshakeResult::Pcp(establishd))
+                // partsを作る
+                let mut parts = FramedParts::new::<Atom2>(stream, AtomCodec::new());
+                parts.read_buf = read_buf;
+                parts.write_buf = write_buf;
+                let mut framed = Framed::from_parts(parts);
+
+                // PCP_CONNECTの受信
+                let magic_atom = framed.next().await.ok_or_else(|| HandshakeError::ConnectionClosed)??;
+                let magic_info = MagicInfo::try_from(&magic_atom)?;
+                dbg!(&magic_info);
+
+                // REMOTEが送ってくるPCP_HELOを取得し、OLHEを返送
+                let helo_atom = framed.next().await.ok_or_else(|| HandshakeError::ConnectionClosed)??;
+                dbg!(&helo_atom);
+                let helo_info = HeloInfo::try_from(&helo_atom)?;
+                // TODO: helo_info.session_idが必ず存在すること
+                dbg!(&helo_info);
+                // TODO: PORT CHECKを追加する
+                let remote_peercast_port: Option<u16> = helo_info.port_check.or_else(|| helo_info.port);
+                let Some(remote_session_id) = helo_info.session_id else {
+                    error!(?cno, ?remote, "Connection must have SessionID");
+                    // TODO: return quit atom
+                    return Err(libpeercast_re::error::HandshakeError::Failed);
+                };
+
+                // OLHEを返送
+                let oleh_atom =
+                    OlehBuilder2::new(self_session_id, remote.ip(), remote_peercast_port.unwrap_or(0)).build();
+                dbg!(&oleh_atom);
+                let _ = framed.send(oleh_atom).await?;
+
+                // PCP_ROOTを送る
+                let root_atom = RootBuilder2::new()
+                    .set_update_interval(30)
+                    .set_next_update_interval(30)
+                    .set_msg("PeerCast-RE ROOT SERVER".into())
+                    .set_root_update(false)
+                    .build();
+                let _ = framed.send(root_atom).await?;
+
+                // Okを送る
+                let ok_atom = OkBuilder2::new(1).build();
+                let _ = framed.send(ok_atom).await?;
+
+                dbg!("send ok_atom");
+
+                // TODO: timeoutが必要
+                let mut broadcast_atom = None;
+                while let Some(Ok(atom)) = framed.next().await {
+                    if atom.id() == Id4::PCP_BCST {
+                        broadcast_atom = Some(atom);
+                        break;
+                    }
+                }
+                let Some(broadcast_atom) = broadcast_atom else {
+                    return Err(libpeercast_re::error::HandshakeError::Failed);
+                };
+
+                let broadcast_info = BroadcastInfo::try_from(&broadcast_atom)?;
+                dbg!(&broadcast_info);
+
+                let establishd = RootEstablished::new(cno, remote, framed, shutdown_token);
+                Ok(RootHandshakeResult::Pcp((establishd, broadcast_info)))
             }
             HandshakeProtocol::HttpPcp(_incoming_http_pcp_handshake) => {
                 error!("Not Implementing HTTP PCP PLEASE HACK ME");
@@ -135,7 +208,7 @@ impl HandshakeConnection for RootHandshake {
 }
 
 pub enum RootHandshakeResult {
-    Pcp(RootEstablished),
+    Pcp((RootEstablished, BroadcastInfo)),
     PcpHttp,
     Http,
     Unknown,
@@ -144,14 +217,15 @@ pub enum RootHandshakeResult {
 ////////////////////////////////////////////////////////////////////////////////
 //  RootEstablish
 //
+/// PcpHandshakeが完了した構造体、Connection::run()を呼び出すことでConnectionが永続化される
 pub struct RootEstablished {
     cno: ConnectionNo,
     #[allow(dead_code)]
     remote: SocketAddr,
-    stream: IoStream,
-    read_buf: bytes::BytesMut,
-    write_buf: bytes::BytesMut,
-
+    framed: Framed<IoStream, AtomCodec>,
+    // stream: IoStream,
+    // read_buf: bytes::BytesMut,
+    // write_buf: bytes::BytesMut,
     shutdown_token: tokio_util::sync::CancellationToken,
     //
     state_tx: watch::Sender<State>,
@@ -174,9 +248,10 @@ impl RootEstablished {
     fn new(
         cno: ConnectionNo,
         remote: SocketAddr,
-        stream: IoStream,
-        read_buf: bytes::BytesMut,
-        write_buf: bytes::BytesMut,
+        framed: Framed<IoStream, AtomCodec>,
+        // stream: IoStream,
+        // read_buf: bytes::BytesMut,
+        // write_buf: bytes::BytesMut,
         shutdown_token: tokio_util::sync::CancellationToken,
     ) -> Self {
         let (state_tx, state_rx) = watch::channel(State::Init);
@@ -193,9 +268,10 @@ impl RootEstablished {
         Self {
             cno,
             remote,
-            stream,
-            read_buf,
-            write_buf,
+            framed,
+            // stream,
+            // read_buf,
+            // write_buf,
             shutdown_token,
             //
             state_tx,
@@ -222,6 +298,9 @@ impl Connection for RootEstablished {
     fn cno(&self) -> ConnectionNo {
         self.cno
     }
+    fn remote(&self) -> SocketAddr {
+        self.remote.clone()
+    }
 
     fn handle(&self) -> <Self::Spec as ConnectionSpec>::Handle {
         self.handle()
@@ -234,13 +313,17 @@ impl Connection for RootEstablished {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// ConnectionTask
+//
 struct ConnectionTask {
-    stream: Option<IoStream>,
-    read_buf: Option<bytes::BytesMut>,
-    write_buf: Option<bytes::BytesMut>,
+    framed: Option<Framed<IoStream, AtomCodec>>,
+    // stream: Option<IoStream>,
+    // read_buf: Option<bytes::BytesMut>,
+    // write_buf: Option<bytes::BytesMut>,
     shutdown_token: tokio_util::sync::CancellationToken,
     //
-    state_tx: Option<watch::Sender<State>>,
+    state_tx: watch::Sender<State>,
     // state_rx: watch::Receiver<State>,
     //
     handle_inner: Arc<RHandleInner>,
@@ -256,12 +339,13 @@ impl ConnectionTask {
         let (reader_tx, reader_rx) = mpsc::unbounded_channel();
         let (writer_tx, writer_rx) = mpsc::unbounded_channel();
         Self {
-            stream: Some(established.stream),
-            read_buf: Some(established.read_buf),
-            write_buf: Some(established.write_buf),
+            framed: Some(established.framed),
+            // stream: Some(established.stream),
+            // read_buf: Some(established.read_buf),
+            // write_buf: Some(established.write_buf),
             shutdown_token: established.shutdown_token,
             //
-            state_tx: Some(established.state_tx),
+            state_tx: established.state_tx,
             // state_rx: established.state_rx,
             //
             handle_inner: established.handle_inner,
@@ -274,7 +358,7 @@ impl ConnectionTask {
     }
 
     async fn run(mut self) -> Result<(), libpeercast_re::error::ConnectionError> {
-        let mut now_state = self.state_tx.as_ref().unwrap().borrow().clone();
+        let mut now_state = self.state_tx.borrow().clone();
         loop {
             let new_state = match now_state {
                 State::Init => self.on_init().await,
@@ -287,30 +371,21 @@ impl ConnectionTask {
                 }
             };
             if now_state != new_state {
-                if let Some(state_tx) = self.state_tx.as_mut() {
-                    let _ = state_tx.send(new_state);
-                }
+                debug!("ChangeState {:?} TO {:?}", now_state, new_state);
+                let _ = self.state_tx.send(new_state);
                 now_state = new_state;
             }
         }
+
+        // managerから削除する
 
         Ok(())
     }
 
     async fn on_init(&mut self) -> State {
+        debug!("on_init");
         // ストリームの初期化
-        let stream = self.stream.take().unwrap();
-        let mut parts = FramedParts::new::<Atom2>(stream, AtomCodec::new());
-        parts.read_buf = self.read_buf.take().unwrap();
-        parts.write_buf = self.write_buf.take().unwrap();
-        let framed = Framed::from_parts(parts);
-
-        // 認証の実行
-        let is_authenticate_success = false;
-
-        if !is_authenticate_success {
-            return State::ShuttingDown;
-        }
+        let framed = self.framed.take().unwrap();
 
         // preapre to create thread
         let (framed_writer, framed_reader): (
@@ -336,25 +411,33 @@ impl ConnectionTask {
             write_loop(framed_writer, writer_rx).await
         });
 
-        assert!(self.stream.is_none());
-        assert!(self.read_buf.is_none());
-        assert!(self.write_buf.is_none());
+        assert!(self.framed.is_none());
+        // assert!(self.stream.is_none());
+        // assert!(self.read_buf.is_none());
+        // assert!(self.write_buf.is_none());
+        //
+        assert!(self.reader_tx.is_none());
+        assert!(self.writer_rx.is_none());
+        //
         State::Running
     }
 
     async fn on_running(&mut self) -> State {
+        debug!("on_running");
         let Some(ref mut reader_rx) = self.reader_rx.as_mut() else {
             return State::ShuttingDown;
         };
 
         tokio::select! {
             atom = reader_rx.recv() => {
-                let Some(atom) = atom else {
-                    return State::ShuttingDown;
-                };
-                self.on_atom(atom).await;
-
-                return State::Running
+                match atom {
+                    Some(atom) => {
+                        return self.on_atom(atom).await;
+                    },
+                    None => {
+                        return State::ShuttingDown;
+                    }
+                }
             }
             _ = self.shutdown_token.cancelled() => {
                 return State::ShuttingDown;
@@ -363,6 +446,8 @@ impl ConnectionTask {
     }
 
     async fn on_shutting_down(&mut self) -> State {
+        debug!("on_shutting_down");
+
         // send quit
         if let Some(writer_tx) = self.writer_tx.take() {
             let quit: AtomMut = QuitBuilder2::new(QuitReason::Any).build();
@@ -374,25 +459,37 @@ impl ConnectionTask {
     }
 
     async fn on_draining(&mut self) -> State {
+        debug!("on_draining");
         State::Closed
     }
 
-    async fn on_closed(&mut self) -> State {
-        let _drop = self.state_tx.take();
-
+    async fn on_closed(&mut self) -> () {
+        debug!("on_closed");
         // check
-        assert!(self.state_tx.is_none());
-        assert!(self.reader_tx.is_none());
-        assert!(self.reader_rx.is_none());
-        assert!(self.writer_tx.is_none());
-        assert!(self.writer_rx.is_none());
+        // assert!(self.reader_tx.is_none());
+        // assert!(self.reader_rx.is_none()); // TODO: どこでtake()させる？
+        // assert!(self.writer_tx.is_none());
+        // assert!(self.writer_rx.is_none());
 
-        State::Closed
+        ()
     }
 
     // HERE TO PROCEDURE
-    async fn on_atom(&mut self, atom: Atom2) {
-        let _id = atom.id();
+    async fn on_atom(&mut self, atom: Atom2) -> State {
+        match atom.id() {
+            Id4::PCP_BCST => {
+                info!(?atom, "PCP_BCST");
+                return State::Running;
+            }
+            Id4::PCP_QUIT => {
+                info!(?atom, "PCP_QUIT");
+                return State::ShuttingDown;
+            }
+            _ => {
+                error!(?atom, "Unknown Atom comming");
+                return State::Running;
+            }
+        }
     }
 }
 
@@ -504,59 +601,3 @@ struct RHandleInner {
     stats_rx: watch::Receiver<Stats>,
     command_tx: mpsc::UnboundedSender<Command>,
 }
-
-/*
-どちらがいいかな・・・
-    fn run(self) -> impl Future<Output = Result<(), libpeercast_re::error::ConnectionError>> {
-        RootConnectionTask::new(self)
-    }
-struct RootConnectionTask {
-    inner: RootEstablished,
-}
-
-impl RootConnectionTask {
-    fn new(inner: RootEstablished) -> Self {
-        Self {
-            inner,
-        }
-    }
-}
-
-impl Future for RootConnectionTask {
-    type Output = Result<(), libpeercast_re::error::ConnectionError>;
-
-    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
-        todo!()
-    }
-}
-    */
-
-// MEMO: Framedをpartsから作る方法もある
-// let mut parts = FramedParts::new::<Atom2>(stream, AtomCodec::new()); // Encoderのanotationを与える必要がある
-// parts.read_buf = read_buf;    // <-- バッファーを外部から与えられる
-// parts.write_buf = self.write_buf.take().unwrap();
-// let framed = Framed::from_parts(parts);
-
-// MEMO: Framedをsplitする方法もある
-// let framed = Framed::new(stream, AtomCodec::new());
-// let (mut tx, tr): (
-//     futures_util::stream::SplitSink<Framed<IoStream, AtomCodec>, AtomMut>,
-//     futures_util::stream::SplitStream<Framed<IoStream, AtomCodec>>,
-// ) = framed.split();
-// let item: AtomMut = (Id4::PCP_ATOM, 1_u8).into();
-// let x = tx.send(item).await;
-
-// MEMO: こうすれば、増え続けるrecieverを処理できる (つまりRootサーバーでは使わない)
-// async fn new_receiver_future(mut receiver: UnboundedReceiver<StreamManagerMessage>) -> FutureResult {
-//     let result = receiver.recv().await;
-//     FutureResult::MessageReceived {
-//         receiver,
-//         message: result,
-//     }
-// }
-// select_allはFutureのリストを処理して、最初にreadyになったfutureの値とindexを返す(loop内 futures.await)
-// https://docs.rs/futures/latest/futures/future/fn.select_all.html
-// let mut futures = select_all(vec![new_receiver_future(receiver).boxed()]);
-// select_allはtrait Futureを実装してるのでawaitできて・・・
-// let (result, _index, remaining_futures) = futures.await;
-// let mut new_futures = Vec::from(remaining_futures);

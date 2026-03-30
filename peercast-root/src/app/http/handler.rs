@@ -1,4 +1,4 @@
-use std::{any::Any, net::IpAddr, sync::Arc};
+use std::net::IpAddr;
 
 use axum::{
     Json,
@@ -9,7 +9,6 @@ use axum::{
 use axum_client_ip::ClientIp;
 use hyper::StatusCode;
 use libpeercast_re::repository::Repository;
-use mime_guess::mime;
 use minijinja::Environment;
 use peercast_root::{
     db::SqliteCheckedHostRepository,

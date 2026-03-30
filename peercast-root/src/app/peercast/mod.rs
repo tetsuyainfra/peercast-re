@@ -1,8 +1,13 @@
 use std::net::SocketAddr;
 
+use anyhow::{anyhow, bail};
 use libpeercast_re::{
     ConnectionNo,
-    pcp::connection5::{Connection, ConnectionFactory, ConnectionHandle, ConnectionManager, HandshakeConnection},
+    pcp::{
+        connection5::{Connection, ConnectionFactory, ConnectionHandle, ConnectionManager, HandshakeConnection},
+        repository,
+    },
+    repository::Repository,
 };
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -11,7 +16,11 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::app::ArcState;
-use peercast_root::{connection::RootHandshakeResult, prelude::*};
+use peercast_root::{
+    channel::RootConfig,
+    connection::{RootHandshakeConfig, RootHandshakeResult},
+    prelude::*,
+};
 
 pub async fn server_peercast(
     state: ArcState,
@@ -39,7 +48,7 @@ pub async fn server_peercast(
                 match accept {
                     Ok((stream, addr)) => {
                         println!("{}: accept connection from {}", &name, &addr);
-                        let _handle = spawner.spawn(tracker.track_future(serve_peercast(state, cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
+                        let _handle = spawner.spawn(tracker.track_future(handle_connection(state, cid, stream, addr, child_graceful_shutdown, closed_rx.clone())));
                     }
                     Err(e) => {
                         error!(?e, "something is occured in listener.accept()");
@@ -67,7 +76,7 @@ pub async fn server_peercast(
 }
 
 #[allow(unused)]
-async fn serve_peercast(
+async fn handle_connection(
     state: ArcState,
     cno: ConnectionNo,
     stream: TcpStream,
@@ -76,21 +85,58 @@ async fn serve_peercast(
     closed_send: watch::Receiver<()>,
 ) -> anyhow::Result<()> {
     info!(?cno, ?remote, "SPAWN SERVE");
-    let handshake_connection =
-        state.connection_factory.create_accepted_connection(cno, remote, Some(graceful_shutdown.child_token()), None);
+    let handshake_connection = state.connection_factory.create_accepted_connection(
+        cno,
+        remote,
+        Some(graceful_shutdown.child_token()),
+        Some(RootHandshakeConfig {
+            io: libpeercast_re::io::IoStream::Tcp(stream),
+            self_session_id: state.self_session_id,
+        }),
+    );
 
     let handshake_result = handshake_connection.handshake().await?;
     match handshake_result {
-        RootHandshakeResult::Pcp(root_established) => {
+        RootHandshakeResult::Pcp((root_established, first_bcst_info)) => {
             info!(?cno, ?remote, "Connection is PCP");
+
+            let channel_id = first_bcst_info.channel_id.ok_or(anyhow!("Needs fields nothing"))?;
+            let chan = first_bcst_info.chan.ok_or(anyhow!("Needs fields nothing"))?;
+            let chan_channel_id = chan.channel_id.ok_or(anyhow!("Needs fileds nothign"))?;
+            let broadcast_id = chan.broadcast_id.ok_or(anyhow!("Needs fields nothing"))?;
+
+            if channel_id != chan_channel_id {
+                return bail!("ChannelID different");
+            }
+
+            let valid_channel_info = chan.channel_info.and_then(|ref c| c.try_into().ok());
+            let valid_track_info = chan.track_info.and_then(|ref t| t.try_into().ok());
+
+            let channel = state
+                .repository
+                .create_or_get(
+                    channel_id,
+                    valid_channel_info,
+                    valid_track_info,
+                    Some(RootConfig {
+                        broadcast_id,
+                        tracker_addr: None,
+                    }),
+                )
+                .await;
+
+            // channel.authenticate()
+
             let handle = root_established.handle();
             let task_name = handle.task_name();
+
             let span = tracing::info_span!("Conn", ?cno);
             let _ = tokio::task::Builder::new().name(&task_name).spawn(async move {
                 let _enter = span.enter();
-                root_established.run().await
+                root_established.run().await;
             })?;
-            state.connection_manager.insert(handle);
+            state.connection_manager.insert(handle.clone());
+
             Ok(())
         }
         _ => {
