@@ -7,6 +7,7 @@ default-run = "peercast-root"
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
+peercast-atom = {version = "*", path = "../packages/peercast-atom" }
 
 anyhow = { version = "1.0.95" }
 thiserror = {version = "2.0.12"}
