@@ -1,4 +1,4 @@
-use crate::pcp::builder2::TrackInfo;
+use crate::pcp::builder2::{ChannelInfo, TrackInfo};
 ////////////////////////////////////////////////////////////////////////////////
 /// ValidChannelInfo: データが正しい事を保証されたChannelInfo
 /// 主にAtomからChannelに情報を伝達する時の中間データとして使われる
@@ -23,7 +23,7 @@ pub struct ValidChannelInfo {
     /// WMV, FLVなどのタイプ(おそらく大文字)
     pub typee: String,
 }
-/*
+
 impl From<&ChannelInfo> for ValidChannelInfo {
     fn from(c: &ChannelInfo) -> Self {
         let ChannelInfo {
@@ -71,7 +71,6 @@ impl From<&ChannelInfo> for ValidChannelInfo {
         vci
     }
 }
-*/
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ValidTrackInfo: データが正しい事を保証されたTrackInfo
@@ -90,7 +89,6 @@ pub struct ValidTrackInfo {
     pub genre: String,
 }
 
-/*
 impl From<&TrackInfo> for ValidTrackInfo {
     fn from(info: &TrackInfo) -> Self {
         let TrackInfo {
@@ -121,4 +119,3 @@ impl From<&TrackInfo> for ValidTrackInfo {
         vti
     }
 }
- */
