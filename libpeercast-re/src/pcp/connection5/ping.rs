@@ -1,4 +1,10 @@
-use std::{future::Future, io::Error, net::TcpStream, process::id, time::Duration};
+use std::{
+    future::Future,
+    io::Error,
+    net::{SocketAddr, TcpStream},
+    process::id,
+    time::Duration,
+};
 
 use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
@@ -60,6 +66,10 @@ impl<S: ConnectionSpec> Connection for Ping<S> {
 
     fn cno(&self) -> crate::ConnectionNo {
         self.cno
+    }
+
+    fn remote(&self) -> SocketAddr {
+        self.remote
     }
 
     fn handle(&self) -> <Self::Spec as super::ConnectionSpec>::Handle {

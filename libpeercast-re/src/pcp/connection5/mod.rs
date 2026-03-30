@@ -5,6 +5,7 @@ use std::{
     sync::Arc,
 };
 
+use futures_util::future::Remote;
 use tokio_util::sync::CancellationToken;
 
 use crate::{error::ConnectionError, io::Io, pcp::Atom2, ConnectionNo};
@@ -74,7 +75,15 @@ pub trait ConnectionManager {
     type Spec: ConnectionSpec<Manager = Self>;
 
     fn insert(&self, handle: <Self::Spec as ConnectionSpec>::Handle);
+    fn insert_with<F>(&mut self, cno: ConnectionNo, f: F)
+    where
+        F: FnMut() -> <Self::Spec as ConnectionSpec>::Handle;
+
     fn remove(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle>;
+
+    fn find<P>(&self, predicate: P) -> Option<(ConnectionNo, <Self::Spec as ConnectionSpec>::Handle)>
+    where
+        P: Fn(&(&ConnectionNo, &<Self::Spec as ConnectionSpec>::Handle)) -> bool;
 
     // 実装予定
     // fn report_metrics(&self) -> Vec<(ConnectionNo, Arc<ConnectionStats>)>;
@@ -110,6 +119,7 @@ pub trait Connection: Sized {
     type Spec: ConnectionSpec;
 
     fn cno(&self) -> ConnectionNo;
+    fn remote(&self) -> SocketAddr;
     fn handle(&self) -> <Self::Spec as ConnectionSpec>::Handle;
     //
     fn run(self) -> impl Future<Output = Result<(), ConnectionError>>;

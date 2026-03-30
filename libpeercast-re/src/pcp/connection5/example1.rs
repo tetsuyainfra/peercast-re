@@ -154,6 +154,10 @@ impl Connection for MyEstablishedConnection {
         self.cno
     }
 
+    fn remote(&self) -> SocketAddr {
+        self.remote
+    }
+
     fn handle(&self) -> <Self::Spec as ConnectionSpec>::Handle {
         MyConnectionHandle {
             cno: self.cno,

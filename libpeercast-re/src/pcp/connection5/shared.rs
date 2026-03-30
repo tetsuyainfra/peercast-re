@@ -34,8 +34,22 @@ where
         self.inner.lock().unwrap_or_else(mutex_poisoned).insert(handle.cno(), handle);
     }
 
+    fn insert_with<F>(&mut self, cno: ConnectionNo, f: F)
+    where
+        F: FnMut() -> <Self::Spec as ConnectionSpec>::Handle,
+    {
+        self.inner.lock().unwrap_or_else(mutex_poisoned).insert_with(cno, f)
+    }
+
     fn remove(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle> {
         self.inner.lock().unwrap_or_else(mutex_poisoned).remove(cno)
+    }
+
+    fn find<P>(&self, predicate: P) -> Option<(ConnectionNo, <Self::Spec as ConnectionSpec>::Handle)>
+    where
+        P: Fn(&(&ConnectionNo, &<Self::Spec as ConnectionSpec>::Handle)) -> bool,
+    {
+        self.inner.lock().unwrap_or_else(mutex_poisoned).find(predicate)
     }
 
     fn report_metrics(&self) -> Vec<(ConnectionNo, <Self::Spec as ConnectionSpec>::Stats)> {
@@ -81,9 +95,32 @@ impl<H> SMInner<H> {
         self.conns.insert(cno, handle);
     }
 
+    fn insert_with<F>(&mut self, cno: ConnectionNo, f: F)
+    where
+        F: FnMut() -> H,
+    {
+        let _handle = self.conns.entry(cno).or_insert_with(f);
+    }
+
     fn remove(&mut self, cno: &ConnectionNo) -> Option<H> {
         self.conns.remove(cno)
     }
+
+    fn find<P>(&self, predicate: P) -> Option<(ConnectionNo, H)>
+    where
+        P: FnMut(&(&ConnectionNo, &H)) -> bool,
+        H: Clone,
+    {
+        self.conns.iter().find(predicate).map(|(cno, handle)| (cno.clone(), handle.clone()))
+    }
+
+    // fn filter<P>(&self, predicate: P) -> Option<(ConnectionNo, H)>
+    // where
+    //     P: FnMut(&(&ConnectionNo, &H)) -> bool,
+    //     H: Clone,
+    // {
+    //     self.conns.iter().filter(predicate).map(|(cno, handle)| (cno.clone(), handle.clone()))
+    // }
 
     fn report_metrics<St>(&self) -> Vec<(ConnectionNo, St)> {
         todo!()
