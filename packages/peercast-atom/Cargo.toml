@@ -9,5 +9,5 @@ default = ["bytes"]
 bytes = []
 
 [dependencies]
-
+peercast-id4 = { path = "../peercast-id4" }
 bytes = { version = "*" }

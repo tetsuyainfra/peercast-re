@@ -6,7 +6,7 @@ members = [
   "peercast-re",
   "peercast-root",
   "peercast-utils",
-  "peercast-speedtest", "packages/peercast-atom",
+  "peercast-speedtest", "packages/peercast-atom", "packages/peercast-id4",
 ]
 default-members = ["libpeercast-re", "peercast-root", "peercast-re", "peercast-utils", "peercast-speedtest", "packages/peercast-atom"]
 
