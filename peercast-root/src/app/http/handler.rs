@@ -207,7 +207,7 @@ pub fn static_router(
 }
 
 #[cfg(not(debug_assertions))]
-async fn embed_handler(uri: hyper::Uri, State(state): State<Arc<StaticState>>) -> impl IntoResponse {
+async fn embed_handler(uri: hyper::Uri, State(state): State<std::sync::Arc<StaticState>>) -> impl IntoResponse {
     let path = uri.path();
     let path = if path.ends_with("/") {
         [path, "index.html"].concat()
