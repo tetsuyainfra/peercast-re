@@ -3,4 +3,11 @@ name = "peercast-atom"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["bytes"]
+
+bytes = []
+
 [dependencies]
+
+bytes = { version = "*" }
