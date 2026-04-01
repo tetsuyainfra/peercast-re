@@ -18,7 +18,7 @@ use peercast_root::{
 use serde::Deserialize;
 use tracing::{debug, info};
 
-use crate::app::{AppState, ArcState, EmbedTemplateCtx};
+use crate::app::{ArcState, EmbedTemplateCtx};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -153,6 +153,7 @@ pub fn static_router(
 
     #[cfg(not(debug_assertions))]
     {
+        use std::sync::Arc;
         if let Some(assets_dir) = assets_dir {
             info!("static router is ServeDir");
             // リリース時：指定ディレクトリを参照
@@ -161,6 +162,8 @@ pub fn static_router(
             ))
         } else {
             info!("static router is Assets(Embed)");
+            use std::sync::Arc;
+
             use axum::routing;
             debug!("Assets include files");
             for a in Assets::iter() {
@@ -175,7 +178,7 @@ pub fn static_router(
                         return Ok(None);
                     }
                     Some(m) => {
-                        if m.type_() != mime::TEXT {
+                        if m.type_() != mime_guess::mime::TEXT {
                             return Ok(None);
                         }
                     }
