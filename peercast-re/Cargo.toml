@@ -5,7 +5,7 @@ edition = "2024"
 default-run = "peercast-re"
 
 [dependencies]
-libpeercast-re = { version = "*", path = "../libpeercast-re" }
+libpeercast-re = { version = "*", path = "../packages/old-libpeercast-re" }
 
 # Error handling
 thiserror = { version = "*" }
