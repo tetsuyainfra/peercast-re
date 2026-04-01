@@ -1,11 +1,10 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::str::FromStr;
 
 use axum::{
     body::Body,
     extract::{Path, State},
     response::{self},
 };
-use axum_extra::extract::Host;
 use http::StatusCode;
 use libpeercast_re::{ConnectionNo, pcp::GnuId};
 
@@ -14,7 +13,6 @@ use crate::{AppState, channel::ReChannel, prelude::*, repository::Channel};
 ////////////////////////////////////////////////////////////////////
 /// /stream/{channel_id_with_extention} handler
 pub(super) async fn stream_handler(
-    Host(_host): Host,
     Path(channel_id_with_ext): Path<String>,
     State(state): State<AppState>,
 ) -> Result<axum::response::Response, StatusCode> {

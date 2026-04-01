@@ -1,11 +1,14 @@
 use serde::de;
 
-use crate::pcp::GnuId;
+use crate::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+};
 
 use super::Channel;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct DummyChannelConfig {
+pub struct DummyChannelConfig {
     session_id: GnuId,
 }
 
@@ -18,26 +21,83 @@ impl DummyChannelConfig {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct DummyChannel {
+pub struct DummyChannel {
     id: GnuId,
     config: DummyChannelConfig,
+    channel_info: Option<ValidChannelInfo>,
+    track_info: Option<ValidTrackInfo>,
 }
 
 impl Channel for DummyChannel {
     type Config = DummyChannelConfig;
 
-    fn new(id: crate::pcp::GnuId, config: Option<Self::Config>) -> Self {
+    fn new(
+        id: crate::pcp::GnuId,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
+        config: Option<Self::Config>,
+    ) -> Self {
         DummyChannel {
             id,
             config: config.unwrap_or_else(|| DummyChannelConfig::new()),
+            channel_info,
+            track_info,
         }
     }
 
-    fn id(&self) -> GnuId {
+    fn cid(&self) -> GnuId {
         self.id
     }
 
     fn after_create(&mut self) -> impl std::future::Future<Output = ()> + Send {
         async {}
+    }
+
+    fn state(&self) -> super::ChannelState {
+        todo!()
+    }
+
+    fn channel_type(&self) -> super::ChannelType {
+        todo!()
+    }
+
+    fn config(&self) -> Option<&Self::Config> {
+        todo!()
+    }
+
+    fn update_config(&mut self, config: Self::Config) {
+        todo!()
+    }
+
+    fn tracker_address(&self) -> Option<std::net::SocketAddr> {
+        todo!()
+    }
+
+    fn channel_info(&self) -> Option<ValidChannelInfo> {
+        todo!()
+    }
+
+    fn track_info(&self) -> Option<ValidTrackInfo> {
+        todo!()
+    }
+
+    fn number_of_listener(&self) -> i32 {
+        todo!()
+    }
+
+    fn number_of_relay(&self) -> i32 {
+        todo!()
+    }
+
+    fn created_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
+    }
+
+    fn updated_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
+    }
+
+    fn viewed_at(&self) -> chrono::DateTime<chrono::Utc> {
+        todo!()
     }
 }

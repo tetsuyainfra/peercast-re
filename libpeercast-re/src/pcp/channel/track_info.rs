@@ -6,7 +6,7 @@ use crate::pcp::{atom::decode::PcpTrackInfo, Atom, Id4};
 use super::merge_field;
 
 /// Channel's track info
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 pub struct TrackInfo {
     pub title: String,
     pub creator: String,

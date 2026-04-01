@@ -9,6 +9,7 @@ use crate::AppState;
         (status = 200, description = "get config")
     )
 )]
+#[allow(dead_code)]
 pub(super) async fn get_config(State(store): State<AppState>) -> impl axum::response::IntoResponse {
     let config_path = store.config_path.clone();
 
@@ -17,5 +18,7 @@ pub(super) async fn get_config(State(store): State<AppState>) -> impl axum::resp
         config_path: String,
     }
 
-    axum::Json(Config { config_path: config_path.to_string_lossy().to_string() })
+    axum::Json(Config {
+        config_path: config_path.to_string_lossy().to_string(),
+    })
 }

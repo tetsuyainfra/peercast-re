@@ -2,7 +2,7 @@ use std::{net::AddrParseError, num::ParseIntError, str::ParseBoolError};
 
 use thiserror::Error;
 
-use crate::pcp::{GnuId, GnuIdParseError};
+use crate::pcp::{builder2::InfoParseError, GnuId, GnuIdParseError};
 
 // 主に通信について
 #[derive(Debug, Error)]
@@ -26,8 +26,17 @@ pub enum HandshakeError {
     #[error("Timeout")]
     Timeout,
 
+    #[error("Connection Closed")]
+    ConnectionClosed,
+
     #[error("Parsing error {0}")]
     Parse(#[from] AtomParseError),
+
+    #[error("Parsing error {0}")]
+    Parse2(#[from] Atom2ParseError),
+
+    #[error("InfoParsing error {0}")]
+    InfoParse(#[from] InfoParseError),
 
     #[error("io error")]
     IoError(#[from] std::io::Error),
@@ -55,6 +64,21 @@ pub enum AtomParseError {
 
     #[error("unknown parse error")]
     Unknown,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Atom2ParseError {
+    #[error("不正なフォーマット")]
+    InvalidFormat,
+
+    #[error("データの終端に達した")]
+    UnexpectedEnd,
+
+    #[error("不正なデータ")]
+    MalformedData,
+
+    #[error("io error")]
+    Io(#[from] std::io::Error),
 }
 
 // 主にConfigについて

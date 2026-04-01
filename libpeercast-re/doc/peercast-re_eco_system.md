@@ -38,7 +38,7 @@ Browser -up-> YelloPage : HTTPでチャンネル情報(index.txt)を取得
 ### 注意
 - この図では配信者, リスナー1, リスナー3を省略しています
 - PCPで配信情報を取得する手段も昔あったような気がします
-
+- Tracker <--> Root間は一つの接続で複数の配信情報(チャンネル情報)を送る事ができます
 
 # 2. リレー開始の手続き
 
@@ -114,18 +114,23 @@ Atomは```Parent```と```Child```の二種類に分けられその種類によ�
 - IP
   - 192.168.10.1 -> payload : 0x01_0A_A8_C0 / 01=1, 0A=10, A8=168, C0=192  IPはLEで格納されている
   - オリジナルPeerCastがIP構造体をUInt32としてLEで書き込んでいるため逆順になっている
+  - IPv6は
+    - YT: https://github.com/plonk/peercast-yt/blob/aac7172178120c2892acb5aa09be5d2ea30c4fea/core/common/atom.h#L62
+    - PeCaSt: 
 
 # 5. PeerCastProtocol
 PeerCastで扱われる通信は3種類に分けられる。ここではその内の2種類、PCP通信とHTTP＋Upgrade通信について扱う
 1. PCP通信
-   1. ```pcp\n```で始まる通信 
-1. HTTP+Upgrade通信
+   1. ```pcp\n```で始まる通信(Atomとしてパースできる)
+      1. IPv4の場合、 1_i32
+      2. IPv6(IPv4 mappedも含む？)の場合、100_i32
+2. HTTP+Upgrade通信
    1. ```GET /stream/[ChannelID]```で通信が始まり、HTTP BODYでPCP通信に切り替わる通信
-1. その他
+3. その他
    1. HTTPを利用したストリーミング配信を再生するための通信
-   1. RTMP/HTTP Push等ストリーミング配信をPeerCastへ送るための通信
-   1. HTTPを利用したアプリケーションを操作する通信
-   1. その他PeerCastのネットワークに関しない通信
+   2. RTMP/HTTP Push等ストリーミング配信をPeerCastへ送るための通信
+   3. HTTPを利用したアプリケーションを操作する通信
+   4. その他PeerCastのネットワークに関しない通信
 
 
 ## 5.1 用語
@@ -177,6 +182,8 @@ Broadcast
 
 ## 6.1 PCPによるポート開放チェック
 PCP通信は相手のポートが開いているか確認するときに使う
+ただし、リレー開始時のタイミングでしかポート開放チェックは行われない
+TODO: もしくはROOT(YP)モードの時?
 
 ### 想定されるシナリオ
 - AからBへPcpHTTPによる通信を開始

@@ -1,5 +1,6 @@
+#![allow(unused)]
 use http::StatusCode;
-use serde::{Serialize, de};
+use serde::Serialize;
 
 // RFC 9457 Standard Error Response Format を参考にしています
 // https://www.rfc-editor.org/rfc/rfc9457.html

@@ -208,7 +208,7 @@ jobs:
       # Discordへの通知
       ## 成功した場合
       - name: Notify success to Discord
-        if: ${{ success() }}
+        if: ${{ needs.build-docker.result == 'success' }}
         env:
           ACTION_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: >-
@@ -220,7 +220,7 @@ jobs:
           ${{ secrets.DISCORD_WEBHOOK_URL }}
       ## 失敗していた場合
       - name: Notify failure to Discord
-        if: ${{ failure() }}
+        if: ${{ needs.build-docker.result == 'failure' }}
         env:
           ACTION_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
         run: >-

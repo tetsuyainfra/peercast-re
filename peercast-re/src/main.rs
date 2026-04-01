@@ -346,7 +346,7 @@ async fn rtmp_server(
     let token = tokio_util::sync::CancellationToken::new();
 
     'accept: loop {
-        let child_token = token.child_token();
+        let _child_token = token.child_token();
 
         tokio::select! {
             _ = wait_signal.cancelled() => {
@@ -361,7 +361,7 @@ async fn rtmp_server(
                         tracing::error!("Failed to accept connection: {}", e);
                         break 'accept;
                     }
-                    Ok((conn, addr)) => {
+                    Ok((conn, _addr)) => {
                         let connection = rtmp::connection::Connection::new(cno.0 as i32, manager_sender.clone());
                         tracker.spawn(connection.start_handshake(conn));
                     }

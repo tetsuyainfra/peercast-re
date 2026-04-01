@@ -239,10 +239,7 @@ mod tests {
 ///
 mod new_repository_test {
 
-    use std::{
-        any::{Any, TypeId},
-        fmt::Debug,
-    };
+    use std::fmt::Debug;
 
     use super::*;
 
@@ -353,7 +350,7 @@ mod new_repository_test {
     struct BChannelBuilder(BConfig);
     impl ChannelBuilder for BChannelBuilder {
         type Output = BChannel;
-        fn build(self, id: GnuId) -> Self::Output {
+        fn build(self, _id: GnuId) -> Self::Output {
             let ch = BChannel(self.0);
             ch
         }

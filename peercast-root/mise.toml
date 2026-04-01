@@ -1,0 +1,3 @@
+[env]
+SQLX_OFFLINE = "false"
+DATABASE_URL = "sqlite:{{env.PWD}}/temp/peercast-root.sqlite"

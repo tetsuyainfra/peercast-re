@@ -1,16 +1,12 @@
 use std::net::{IpAddr, SocketAddr};
 
-use axum_extra::extract::Host;
 use bytes::Bytes;
 use tracing::warn;
 
 use crate::{
     error::AtomParseError,
     pcp::{
-        decode::{
-            decode_bytes, decode_gnuid, decode_i16, decode_i32, decode_ip, decode_u16, decode_u32,
-            decode_u8,
-        },
+        decode::{decode_bytes, decode_gnuid, decode_i16, decode_i32, decode_ip, decode_u16, decode_u32, decode_u8},
         Atom, GnuId, Id4,
     },
 };

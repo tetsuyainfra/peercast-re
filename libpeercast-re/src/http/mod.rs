@@ -1,5 +1,5 @@
 mod api;
-mod http_svc;
+// mod http_svc;
 mod middleware;
 
 use std::{
@@ -12,7 +12,7 @@ use axum::extract::{connect_info::Connected, ConnectInfo};
 use axum_core::response::IntoResponse;
 use bytes::Bytes;
 use http::StatusCode;
-pub use http_svc::HttpSvc;
+// pub use http_svc::HttpSvc;
 use hyper_util::rt::TokioIo;
 use ipnet::IpNet;
 use pbkdf2::password_hash::errors::B64Error;

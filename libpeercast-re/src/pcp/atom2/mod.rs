@@ -9,14 +9,18 @@ use bytes::{
     BytesMut,
 };
 
-use crate::pcp::{atom2::atom_mut::AtomMut, Atom, Id4};
+use crate::{
+    error::Atom2ParseError,
+    pcp::{atom2::atom_mut::AtomMut, Atom, Id4},
+};
 
 pub mod atom_mut;
 pub mod codec;
+pub mod decode2;
 pub mod parser;
 
 #[derive(Debug, PartialEq, Eq)]
-enum Kind {
+pub enum Kind {
     Parent,
     Child,
 }
@@ -26,7 +30,7 @@ const ATOM_HEADER_POS_ID: Range<usize> = 0..4;
 const ATOM_HEADER_POS_ENCODE_LENGTH: Range<usize> = 4..8;
 const ATOM_HEADER_POS_START_PAYLOAD: usize = 8;
 
-trait AtomView {
+pub trait AtomView {
     fn raw(&self) -> &[u8];
 
     /// id
@@ -66,7 +70,8 @@ trait AtomView {
 /// Atom2
 /// Atom2が作成された時点で、内部データの完全性は保証されているものとする。
 /// 例えば、lengthフィールドが実際のデータ長と一致していることなどを含む。
-struct Atom2 {
+#[derive(Clone, PartialEq, Eq)]
+pub struct Atom2 {
     raw: bytes::Bytes,
     // verified: bool, // TODO:もしこの構造体内でデータの整合性を検証するならば、このフィールドが必要になる
 }
@@ -82,8 +87,7 @@ impl Atom2 {
 }
 
 impl Atom2 {
-    // view()のほうがいいか？
-    fn view(&self) -> Atom2Kind<'_> {
+    pub fn view(&self) -> Atom2Kind<'_> {
         match self.kind() {
             Kind::Parent => Atom2Kind::Parent(ParentView {
                 buf: &self.raw,
@@ -92,6 +96,19 @@ impl Atom2 {
                 buf: &self.raw,
             }),
         }
+    }
+
+    pub fn write_buf(&self, buf: &mut BytesMut) {
+        buf.extend_from_slice(&self.raw);
+    }
+
+    pub fn write(&self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        let raw = self.raw();
+        if buf.len() < raw.len() {
+            return Err(std::io::Error::new(std::io::ErrorKind::Other, "Buffer too small"));
+        }
+        buf[..raw.len()].copy_from_slice(raw);
+        Ok(raw.len())
     }
 }
 
@@ -103,23 +120,71 @@ impl AtomView for Atom2 {
 
 impl fmt::Debug for Atom2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Atom2 {{ id: {:?}, length: {}, kind: {:?} }}", self.id(), self.length(), self.kind())
+        match self.view() {
+            Atom2Kind::Parent(parent_view) => {
+                //
+                f.debug_struct("Atom2")
+                    .field("id", &parent_view.id())
+                    .field("length", &parent_view.length())
+                    .field("children", &parent_view.children())
+                    .finish()
+            }
+            Atom2Kind::Child(child_view) => {
+                //
+                f.debug_struct("Atom2")
+                    .field("id", &child_view.id())
+                    .field("length", &child_view.length())
+                    .field("payload", &child_view.payload())
+                    .finish()
+            }
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for Atom2 {
+    type Error = Atom2ParseError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        match parser::try_parse_atom(value) {
+            Ok(length) => {
+                let buf = bytes::Bytes::copy_from_slice(&value[0..length as usize]);
+                Ok(Atom2::new(buf))
+            }
+            Err(e) => Err(e),
+        }
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Atom2Kind
 ///
-enum Atom2Kind<'a> {
+#[derive(Debug)]
+pub enum Atom2Kind<'a> {
     Parent(ParentView<'a>),
     Child(ChildView<'a>),
+}
+
+impl AtomView for Atom2Kind<'_> {
+    fn raw(&self) -> &[u8] {
+        match self {
+            Atom2Kind::Parent(parent_view) => parent_view.raw(),
+            Atom2Kind::Child(child_view) => child_view.raw(),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildView
 ///
-struct ChildView<'a> {
+pub struct ChildView<'a> {
     buf: &'a [u8],
+}
+
+impl ChildView<'_> {
+    pub fn data(&self) -> &[u8] {
+        debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
+        &self.buf[8..]
+    }
 }
 
 impl AtomView for ChildView<'_> {
@@ -128,18 +193,33 @@ impl AtomView for ChildView<'_> {
     }
 }
 
-impl ChildView<'_> {
-    fn data(&self) -> &[u8] {
-        debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
-        &self.buf[8..]
+impl fmt::Debug for ChildView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ChildView")
+            //
+            .field("id", &self.id())
+            .field("len", &self.length())
+            .field("data", &self.data())
+            //
+            .finish()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ParentView
 ///
-struct ParentView<'a> {
+pub struct ParentView<'a> {
     buf: &'a [u8],
+}
+
+impl ParentView<'_> {
+    /// 子Atomのイテレータを返す
+    pub fn children(&self) -> ChildIter<'_> {
+        ChildIter {
+            // buf: self.payload(),
+            buf: &self.buf[8..],
+        }
+    }
 }
 
 impl AtomView for ParentView<'_> {
@@ -148,20 +228,23 @@ impl AtomView for ParentView<'_> {
     }
 }
 
-impl ParentView<'_> {
-    /// 子Atomのイテレータを返す
-    fn children(&self) -> ChildIter<'_> {
-        ChildIter {
-            // buf: self.payload(),
-            buf: &self.buf[8..],
-        }
+impl fmt::Debug for ParentView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let childrens: Vec<Atom2Kind<'_>> = self.children().collect();
+        f.debug_struct("ParentView")
+            .field("id", &self.id())
+            .field("length", &self.length())
+            .field("children", &childrens)
+            //
+            .finish()
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ChildIter
 ///
-struct ChildIter<'a> {
+#[derive(Clone)]
+pub struct ChildIter<'a> {
     buf: &'a [u8],
 }
 
@@ -206,6 +289,15 @@ impl<'a> Iterator for ChildIter<'a> {
     }
 }
 
+impl fmt::Debug for ChildIter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list()
+            //
+            .entries(self.clone())
+            .finish()
+    }
+}
+
 /*
 /// 信用されたバッファから、親Atomのバイトサイズを計算する
 fn calculate_parent_atom_bytesize(buf: &[u8]) -> usize {
@@ -237,9 +329,9 @@ fn calculate_parent_atom_bytesize(buf: &[u8]) -> usize {
 
 /*
 /// 信用されていないバッファから、Atomのバイトサイズを検証しつつ取得する
-fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
+fn verify_atom_bytes(buf: &[u8]) -> Result<usize, Atom2ParseError> {
     if buf.len() < ATOM_HEADER_LENGTH {
-        return Err(ParseError::UnexpectedEnd);
+        return Err(Atom2ParseError::UnexpectedEnd);
     }
 
     let size_and_parent = (&buf[4..8]).get_u32_le();
@@ -255,7 +347,7 @@ fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
             // ChildAtom の場合、lengthはバイトサイズそのもの
             let expected_size = ATOM_HEADER_LENGTH + length as usize;
             if buf.len() < expected_size {
-                return Err(ParseError::UnexpectedEnd);
+                return Err(Atom2ParseError::UnexpectedEnd);
             }
             Ok(expected_size)
         }
@@ -263,7 +355,7 @@ fn verify_atom_bytes(buf: &[u8]) -> Result<usize, ParseError> {
             let mut offset = ATOM_HEADER_LENGTH; // 初期値はこのAtomのヘッダサイズ
             for _ in 0..length {
                 if offset >= buf.len() {
-                    return Err(ParseError::UnexpectedEnd);
+                    return Err(Atom2ParseError::UnexpectedEnd);
                 }
                 // 子Atomを順に解析してバイトサイズを合計する
                 let child_size = verify_atom_bytes(&buf[offset..])?;
@@ -364,6 +456,7 @@ mod tests {
         };
         assert_eq!(pv.id(), Id4::PCP_HELO);
         assert_eq!(pv.length(), 3); // 子Atomが2つ
+        dbg!(&pv);
         let mut citr = pv.children();
 
         let v1 = citr.next().unwrap();

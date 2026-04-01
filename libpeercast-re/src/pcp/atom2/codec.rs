@@ -1,19 +1,29 @@
 use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
 
-use crate::pcp::atom2::{parser::ParseError, Atom2};
+use crate::{
+    error::Atom2ParseError,
+    pcp::atom2::{atom_mut::AtomMut, Atom2},
+};
 
-struct AtomCodec;
+#[derive(Debug)]
+pub struct AtomCodec {
+    max_atom_size: u64,
+    max_children_num: u64,
+}
 
 impl AtomCodec {
-    fn new() -> Self {
-        Self {}
+    pub fn new() -> Self {
+        Self {
+            max_atom_size: 1024 * 1024, // PeercastStation基準
+            max_children_num: 1024,     // PeercastStation基準
+        }
     }
 }
 
 impl Decoder for AtomCodec {
     type Item = Atom2;
-    type Error = std::io::Error;
+    type Error = Atom2ParseError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         match super::parser::try_parse_atom(src) {
@@ -22,11 +32,11 @@ impl Decoder for AtomCodec {
                 let atom_bytes = src.split_to(length);
                 Ok(Some(Atom2::new(atom_bytes.freeze())))
             }
-            Err(e) => match e {
-                ParseError::UnexpectedEnd => Ok(None),
-                ParseError::InvalidFormat => todo!(),
-                ParseError::MalformedData => todo!(),
-            },
+            Err(Atom2ParseError::UnexpectedEnd) => {
+                // データ着信途中の可能性があるので、Noneで返す
+                Ok(None)
+            }
+            Err(e) => Err(e),
         }
     }
 }
@@ -35,7 +45,18 @@ impl Encoder<Atom2> for AtomCodec {
     type Error = std::io::Error;
 
     fn encode(&mut self, item: Atom2, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // HACKME: 実装未完
+        let x = item.write_buf(dst);
+        // dbg!(&dst);
+        Ok(())
+    }
+}
+
+impl Encoder<AtomMut> for AtomCodec {
+    type Error = std::io::Error;
+
+    fn encode(&mut self, item: AtomMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let x = item.write(dst);
+        // dbg!(&dst);
         Ok(())
     }
 }

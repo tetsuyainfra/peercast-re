@@ -6,7 +6,7 @@ use super::merge_field;
 
 /// Channel's info
 /// AtomにするときはNull文字を追加するのを忘れないように
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 pub struct ChannelInfo {
     /// FLV,WMV,MP3などのタイプ
     /// ※ typeは予約語なのでtypにしている

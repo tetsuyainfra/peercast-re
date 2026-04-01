@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ EMBED_TITLE }}</title>
+</head>
+
+<body>
+
+    <div class="main">
+        <h1>{{ EMBED_YP_NAME }} powered by peercast-root</h1>
+        <p>
+            Rustで実装したPeercastのYPサーバーです。<br />
+        </p>
+        <p>
+            Pcypなどで表示するには次のURLを指定してください
+            <pre>
+                {{ EMBED_URL_HTTP }}
+            </pre>
+        </p>
+        <p>
+            PeerCastで配信するには次のアドレスを指定してください。
+        <pre>
+                {{ EMBED_URL_PCP }}
+            </pre>
+        </p>
+        <hr />
+        <button onclick="request_index()">reload</button>
+        <div id="yp-table">
+            <template id="channel-table-template">
+                <table class="yp-channels">
+                    <thead>
+                        <tr>
+                            <th scope="col">>></th>
+                            <th scope="col">Channel</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- INSERT_HERE -->
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th scope="row" colspan="2" class="result">Result <span class="result-page">200</span> of
+                                about <span class="result-all"></span>ch</th>
+                            <td scope="row" colspan="2" class="time">取得時刻:<span class="result-now"></span></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </template>
+
+            <template id="channel-table-row-template">
+                <tr>
+                    <td class="col-play">
+                        <span class="play">Play</span>
+                        <span class="direct">Direct</span>
+                    </td>
+                    <td class="col-channel">
+                        <span class="name">○○ch</span>
+                        <span class="sub">[<span class="genre">Game</span> - <span class="desc">詳細</span>]</span>
+                        <span class="comments">「<span class="comment"></span>」</span>
+                    </td>
+                    <td class="col-status">
+                        <span class="counts"><span class="listener">listener</span>/<span
+                                class="relay">relay</span></span>
+                        <!-- <span class="stats">(...)Stats</span> -->
+                        <span class="created_at">99:99</span>
+                    </td>
+                    <td class="col-type">
+                        <span class="type">TYPE(FLV,MP3,WMV)</span>
+                        <span class="speed"><span class="bitrate"></span>Kbps</span>
+                        <!-- <span class="Unknown">Free</span> -->
+                    </td>
+                </tr>
+            </template>
+        </div><!-- div#yp-table -->
+    </div>
+    <hr />
+    <div class="footer">
+        <div>
+            <p>
+                peercast-root YP develepped by <a href="https://github.com/tetsuyainfra/peercast-re">tetsuyainfra</a>
+            </p>
+        </div>
+    </div>
+
+</body>
+<script>
+    const TARGET_ID = "yp-table"
+    const tableTemplate = document.getElementById("channel-table-template");
+    const rowTemplate = document.getElementById("channel-table-row-template");
+
+    function formatNow() {
+        const now = new Date();
+
+        const hours = String(now.getHours()).padStart(2, "0");
+        const minutes = String(now.getMinutes()).padStart(2, "0");
+        const seconds = String(now.getSeconds()).padStart(2, "0");
+
+        return `${hours}:${minutes}:${seconds}`;
+    }
+
+    function dateTo(datetimeUtcString) {
+        const target = new Date(datetimeUtcString); // UTC時刻
+        const now = new Date();             // 現在時刻
+        let diffMs = now.getTime() - target.getTime();
+        // console.log(target, now, diffMs)
+
+        // マイナス対策（過去の場合）
+        diffMs = diffMs < 0 ? 0 : diffMs;
+
+        const totalMinutes = Math.floor(diffMs / (1000 * 60));
+        const days = Math.floor(totalMinutes / (60 * 24));
+        const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+        const minutes = totalMinutes % 60;
+
+        return `${String(days).padStart(2, "0")}:` +
+            `${String(hours).padStart(2, "0")}:` +
+            `${String(minutes).padStart(2, "0")}`;
+
+    }
+    function request_index() {
+        fetch('/index.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTPエラー: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(responseBody => {
+                console.info("response", responseBody)
+                renderTable(responseBody)
+            })
+            .catch(error => {
+                console.error('エラーが発生しました:', error);
+                document.getElementById('message').textContent = 'エラーが発生しました。';
+            });
+    }
+    function renderTable(data) {
+        const table = tableTemplate.content.cloneNode(true);
+        const tbody = table.querySelector("tbody")
+        const tfoot = table.querySelector("tfoot")
+        // コメント部を探して挿入先の目安にする
+        const comment_pos = [...tbody.childNodes]
+            .find(n => n.nodeType === 8 && n.nodeValue.trim() === "INSERT_HERE");
+
+        const now = new Date();
+
+        let rows = [];
+        data.forEach(ch => {
+            const rowFramgent = rowTemplate.content.cloneNode(true);
+
+            rowFramgent.querySelector('.name').textContent = ch.name;
+            rowFramgent.querySelector('.genre').textContent = ch.display_genre ? ch.display_genre : ch.genre;
+            rowFramgent.querySelector('.desc').textContent = ch.desc;
+            rowFramgent.querySelector('.comment').textContent = ch.comment;
+            // status
+            rowFramgent.querySelector('.listener').textContent = ch.number_of_listener;
+            rowFramgent.querySelector('.relay').textContent = ch.number_of_relay;
+            rowFramgent.querySelector('.created_at').textContent = dateTo(ch.created_at);
+            //
+            rowFramgent.querySelector('.type').textContent = ch.type;
+            rowFramgent.querySelector('.bitrate').textContent = ch.bitrate;
+
+            tbody.insertBefore(rowFramgent, comment_pos)
+        });
+
+        tfoot.querySelector(".result-page").textContent = data.length;
+        tfoot.querySelector(".result-all").textContent = data.length;
+        tfoot.querySelector(".result-now").textContent = formatNow();
+
+
+        // 更新
+        // document.getElementById(TARGET_ID).appendChild(table);
+        document.getElementById(TARGET_ID).replaceChildren(table);
+    }
+
+    request_index()
+</script>
+<style>
+    /* main Styles */
+    .main {
+        min-height: 100vh;
+    }
+
+    .footer {
+        min-height: 20vh;
+    }
+
+    /* Table Styles */
+    /* 直下のみBlockにする */
+    tbody td>span {
+        display: block;
+    }
+
+    td {
+        border: 1px solid grey;
+    }
+
+    tfoot {
+        font-size: small;
+        text-align: left;
+
+        th {
+            font-weight: normal;
+        }
+    }
+</style>
+
+</html>

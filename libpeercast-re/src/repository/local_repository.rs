@@ -1,6 +1,10 @@
-use std::{collections::HashMap, future::Future, marker::PhantomData};
+use std::{cell::RefCell, collections::HashMap, future::Future, marker::PhantomData};
 
-use crate::{pcp::GnuId, repository::impl_repository::_ImplRepository};
+use crate::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::{ChannelInfo, GnuId, TrackInfo},
+    repository::typical_repository::TypicalRepository,
+};
 
 use super::{Channel, Repository};
 
@@ -8,17 +12,16 @@ use super::{Channel, Repository};
 /// このリポジトリは Send(スレッド間の移動禁止) Sync(スレッド間の共有禁止)を実装していないため
 /// ローカルスレッド内でのみ使用されることを意図しています。
 pub struct LocalRepository<C> {
-    impl_: _ImplRepository<C>,
-
-    /// This marker ensures that LocalRepository is !Send and !Sync
-    _marker: PhantomData<std::rc::Rc<()>>,
+    impl_: RefCell<TypicalRepository<C>>,
+    // / This marker ensures that LocalRepository is !Send and !Sync
+    // _marker: PhantomData<std::rc::Rc<()>>,
 }
 
 impl<C: Channel> LocalRepository<C> {
     pub fn new() -> Self {
         LocalRepository {
-            impl_: _ImplRepository::<C>::new(),
-            _marker: PhantomData,
+            impl_: RefCell::new(TypicalRepository::<C>::new()),
+            // _marker: PhantomData,
         }
     }
 }
@@ -28,19 +31,31 @@ where
     C: Channel,
 {
     fn get(&self, id: crate::pcp::GnuId) -> Option<C> {
-        self.impl_.get(id)
+        self.impl_.borrow().get(id)
     }
 
     fn get_all(&self) -> Vec<C> {
-        self.impl_.get_all()
+        self.impl_.borrow().get_all()
     }
 
-    fn create(&mut self, id: GnuId, config: Option<<C as Channel>::Config>) -> (C, bool) {
-        self.impl_.create(id, config)
+    fn create(
+        &self,
+        id: GnuId,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
+        config: Option<<C as Channel>::Config>,
+    ) -> (C, bool) {
+        self.impl_.borrow_mut().create(id, channel_info, track_info, config)
     }
 
-    fn create_or_get(&mut self, id: crate::pcp::GnuId, config: Option<C::Config>) -> impl Future<Output = C> {
-        let (mut ch, is_create) = self.impl_.create(id, config);
+    fn create_or_get(
+        &self,
+        id: crate::pcp::GnuId,
+        channel_info: Option<ValidChannelInfo>,
+        track_info: Option<ValidTrackInfo>,
+        config: Option<C::Config>,
+    ) -> impl Future<Output = C> {
+        let (mut ch, is_create) = self.impl_.borrow_mut().create(id, channel_info, track_info, config);
         async move {
             if is_create {
                 ch.after_create().await;
@@ -49,36 +64,54 @@ where
         }
     }
 
-    fn delete_channel(&mut self, id: crate::pcp::GnuId) -> bool {
-        self.impl_.delete_channel(id)
+    fn delete_channel(&self, id: crate::pcp::GnuId) -> bool {
+        self.impl_.borrow_mut().delete_channel(id)
     }
 
-    fn delete_all(&mut self) {
-        self.impl_.delete_all();
+    fn delete_all(&self) {
+        self.impl_.borrow_mut().delete_all();
     }
 
-    fn map_collect<F, R>(&self, mut f: F) -> Vec<R>
+    fn filter_map_collect<F, G, R>(&self, f: F, g: G) -> Vec<R>
     where
-        F: FnMut(&GnuId, &C) -> R,
+        F: FnMut(&GnuId, &C) -> bool,
+        G: FnMut(&GnuId, &C) -> R,
     {
-        self.impl_.map_collect(f)
+        self.impl_.borrow().filter_map_collect(f, g)
     }
 }
+
+/// コンパイルエラーになることを確認するテストコード
+/// ```compile_fail
+/// use std::rc::Rc;
+///
+/// struct NotSend(Rc<()>);
+/// fn assert_send<T: Send>() {}
+/// assert_send::<NotSend>();
+/// ```
+fn _doc_example() {}
+
+/// Syncが実装されていないことを確認するテストコード
+/// ```compile_fail
+/// use libpeercast_re::repository::local_repository::LocalRepository;
+/// use libpeercast_re::repository::dummy_channel::DummyChannel;
+/// fn assert_send<T: Sync>() {}
+/// assert_send::<LocalRepository::<DummyChannel>>();
+/// ```
+fn _doc_local_repository() {}
+
+/// コンパイルが通ることを確認するテストコード
+/// ```
+/// use libpeercast_re::repository::local_repository::LocalRepository;
+/// use libpeercast_re::repository::dummy_channel::DummyChannel;
+/// let _ = LocalRepository::<DummyChannel>::new();
+/// ```
+fn _doc_local_repository_ok() {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository::{dummy_channel::DummyChannel, impl_repository::test_repository};
-
-    /// ```compile_fail
-    /// コンパイルエラーになることを確認するテストコード
-    /// use std::rc::Rc;
-    ///
-    /// struct NotSend(Rc<()>);
-    /// fn assert_send<T: Send>() {}
-    /// assert_send::<NotSend>();
-    /// ```
-    fn _doc() {}
+    use crate::repository::{dummy_channel::DummyChannel, typical_repository::test_repository};
 
     #[tokio::test]
     async fn test_local_repository() {

@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use bytes::Buf;
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group};
 
 static BUF: [u8; 8] = [0, 0, 0, 0, 1, 2, 3, 0xFF];
 

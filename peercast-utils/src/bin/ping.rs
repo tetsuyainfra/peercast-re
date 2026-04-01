@@ -4,15 +4,22 @@
 //  TODO: Rootサーバーに対してポートチェックしてもらう通信をおこなう機能を実装する
 //  TODO: Tracker/Relayに対してポートチェックしてもらう通信をおこなう機能を実装する
 //  MEMO: portcheckしてもらうにはHttpでChannelIdを通知する必要がある
-use std::time::Duration;
-
 use clap::Parser;
-use libpeercast_re::pcp::{GnuId, PcpConnectionFactory};
+use futures_util::StreamExt;
+use libpeercast_re::pcp::{AtomCodec, GnuId, procedure::handshake::OutgoingPcpHandshake};
+use tokio::net::TcpListener;
+use tokio_util::codec::Framed;
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_BIN_NAME"))]
 #[command(version, about, long_about = None)]
 pub struct Args {
+    #[arg(long, short, default_value_t = 7144)]
+    pub bind: u16,
+
+    #[arg(long)]
+    pub check_port: Option<u16>,
+
     #[arg(required = true)]
     pub ping_to: String,
 }
@@ -22,23 +29,30 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     dbg!(&args);
 
-    let factory = PcpConnectionFactory::builder(GnuId::new(), "0.0.0.0:7144".parse().unwrap())
-        .connect_timeout(Duration::from_secs(1))
-        .build();
+    let self_session_id = GnuId::new();
+    let bind = TcpListener::bind(format!("0.0.0.0:{}", args.bind)).await?;
+    let _handle = tokio::spawn(server(self_session_id, bind));
 
-    let socket = args
-        .ping_to
-        .parse()
-        .expect("Ping先アドレスの分析に失敗しました");
-    let handshake = factory.connect(socket).await?;
-    dbg!(&handshake);
+    let remote = args.ping_to.parse().expect("Ping先アドレスの分析に失敗しました");
+    let stream = tokio::net::TcpStream::connect(remote).await?;
+    // let local_addr = stream.local_addr().unwrap();
+    let handshake = OutgoingPcpHandshake::new(stream, remote, None);
+    let (oleh, ret) = handshake.ping(self_session_id, Some(args.bind), args.check_port).await?;
 
-    let ping_fut = handshake.ping();
-
-    match ping_fut.await {
-        Ok(id) => println!("{socket}へのPingが 成功 しました. RemoteGnuID: {id}"),
-        Err(_) => println!("{socket}へのPingが 失敗 しました"),
-    };
+    dbg!(&oleh);
+    dbg!(&ret);
 
     Ok(())
+}
+
+async fn server(_self_session_id: GnuId, bind: TcpListener) -> anyhow::Result<()> {
+    loop {
+        let (stream, _remote) = bind.accept().await?;
+
+        let mut framed = Framed::new(stream, AtomCodec::new());
+        let atom = framed.next().await;
+        dbg!(atom);
+
+        // TODO: return Oleh
+    }
 }

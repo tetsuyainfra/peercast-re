@@ -7,9 +7,11 @@ default-run = "peercast-root"
 
 [dependencies]
 libpeercast-re = { version = "*", path = "../libpeercast-re" }
+peercast-atom = {version = "*", path = "../packages/peercast-atom" }
 
 anyhow = { version = "1.0.95" }
 thiserror = {version = "2.0.12"}
+regex = { version = "1.12.3" }
 
 # tracing logging
 tracing = "0.1.41"
@@ -22,9 +24,8 @@ tracing-subscriber = { version = "0.3.19", features = [
 tracing-journald = "0.3.1"
 
 # Async
-futures-util = { version = "0.3.31", default-features = false, features = [
-    "alloc",
-] }
+async-trait = "0.1.89"
+futures = { version = "0.3.31", default-features = true, features = [ "alloc", ] }
 tokio = { version = "1.43.0", features = ["full", "tracing"] }
 tokio-stream = { version = "0.1.17" }
 tokio-test = { version = "0.4.4" }
@@ -35,7 +36,7 @@ console-subscriber = { version = "0.4.1" }
 axum-core = { version = "0.5.2" }
 axum = { version = "0.8.4", features = ["tokio", "form", "ws", "tracing", "macros"] }
 axum-extra = { version = "0.10.1", features = ["typed-header"] }
-axum-client-ip = "1.1.3"
+axum-client-ip = "1.3.1"
 tower = { version = "0.5.2" }
 tower-http = { version = "0.6.2", features = [
     "fs",
@@ -50,9 +51,17 @@ tower-http = { version = "0.6.2", features = [
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-util = { version = "0.1.10", features = ["full"] }
 
-bb8 = { version= "0.9.0" }
-bb8-redis = { version= "0.24.0" }
-redis = { version = "0.32.2" }
+# HTML Template Engine
+minijinja = { version = "2.17.1", features = ["loader"] }
+
+# Embed files to binary
+rust-embed = "8.11.0"
+
+# MIME
+mime_guess = "2.0.5"
+
+# DB
+sqlx = { version = "0.8", features = [ "runtime-tokio", "derive", "macros", "sqlite", "chrono", "json"] }
 
 # Serialize/Deserialize
 serde = { version = "1.0.217", features = ["derive"] }
@@ -86,6 +95,10 @@ serde_with = "3.13.0"
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
 utoipa-swagger-ui = { version = "9.0.0", features = ["axum"] }
 utoipa-axum = "0.2"
+
+
+[dev-dependencies]
+mockall = { version = "0.14.0" }
 
 [package.metadata.deb]
 maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"

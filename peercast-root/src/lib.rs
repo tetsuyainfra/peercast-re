@@ -1,12 +1,24 @@
-
-mod index_info;
-
 use clap::ValueEnum;
-pub use index_info::{IndexInfo, FooterToml};
+use thiserror::Error;
+
+pub mod channel;
+pub mod config;
+pub mod connection;
+pub mod db;
+pub mod filter;
+mod init;
+pub mod model;
+pub mod prelude;
+pub mod repository;
+pub mod service;
+pub mod test_helper;
+pub mod utils;
+
+pub use init::init;
 
 //HACKME: std::process:ExitCodeやimpl Terminateを使ったほうがいい？
 #[repr(i32)]
-pub enum ExitCode{
+pub enum ExitCode {
     Success = 0,
     Failure = 1,
 }
@@ -15,67 +27,58 @@ pub enum ExitCode{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum RestrictPortLevel {
     /// ポートチェックを行わない
-    None,
-
-    /// 疎通OK
-    PortCheck,
-
-    /// 疎通OK, 配信速度OK
-    BroadcastSpeed,
-
-    /// 疎通OK, 配信速度OK, 規制速度OK(内部の値はアップロード速度[KBps])
-    RestrictSpeed,
-}
-
-
-/// ポートチェックの制限速度で設定できる最小値（この値は含めない）
-pub static YP_LIMIT_SPEED_MIN : u32  = 499; // 500KBps
-
-/// ポートチェックされたPeerCastの疎通レベル
-#[repr(i8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PortLevel {
-    /// ポートチェックしたが疎通できなかった
-    Incomplete = -1,
-
-    /// ポートチェックが行われていない
     None = 0,
 
     /// 疎通OK
-    Welldone = 1,
+    PortCheck = 1,
 
-    // 疎通OK, 配信速度OK
-    WelldoneWithSpeed(u16) = 2
+    /// 疎通OK, 配信速度OK(配信ビットレート基準)
+    BroadcastSpeed = 2,
+
+    /// 疎通OK, 配信速度OK(YP指定規制速度OK)
+    RestrictSpeed = 3,
+}
+impl From<usize> for RestrictPortLevel {
+    fn from(value: usize) -> Self {
+        match value {
+            0 => RestrictPortLevel::None,
+            1 => RestrictPortLevel::PortCheck,
+            2 => RestrictPortLevel::BroadcastSpeed,
+            3 => RestrictPortLevel::RestrictSpeed,
+            _ => RestrictPortLevel::RestrictSpeed,
+        }
+    }
 }
 
+/// ポートチェックの制限速度で設定できる最小値（この値は含めない）
+pub static YP_LIMIT_SPEED_MIN: u32 = 499; // 500KBps
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// チャンネルリストに追加するユーザー情報の形式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum YpAppendUserStatus {
+    /// 追加しない
+    None,
+    /// 標準形式
+    Default,
+}
 
-    #[test]
-    fn test_port_restrect_level() {
-        // assert_eq!(PortRestrictLevel::None, 0_u8);
-        // assert_eq!(PortRestrictLevel::Welldone, 1_u8);
-        // assert_eq!(PortRestrictLevel::WelldoneReachedUploadSpeed , 2_u8);
-        // assert_eq!(PortRestrictLevel::WelldoneReachedRestrictSpeed(1000), 3_u8);
-    }
+/// チャンネルリストに追加するシステム情報の形式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum YpAppendSystemStatus {
+    /// 追加しない
+    None,
+    /// 標準形式
+    Default,
 
-    #[test]
-    fn test_port_level(){
-        assert!(PortLevel::Incomplete == PortLevel::Incomplete);
-        assert!(PortLevel::Incomplete < PortLevel::None);
-        assert!(PortLevel::Incomplete < PortLevel::Welldone);
-        assert!(PortLevel::Incomplete < PortLevel::WelldoneWithSpeed(0));
-        //
-        assert!(PortLevel::None < PortLevel::Welldone);
-        assert!(PortLevel::None < PortLevel::WelldoneWithSpeed(0));
-        //
-        assert!(PortLevel::Welldone < PortLevel::WelldoneWithSpeed(0));
-        //
-        assert!(PortLevel::WelldoneWithSpeed(0) < PortLevel::WelldoneWithSpeed(1));
-        assert!(PortLevel::WelldoneWithSpeed(1) > PortLevel::WelldoneWithSpeed(0));
-        assert!(PortLevel::WelldoneWithSpeed(1) == PortLevel::WelldoneWithSpeed(1));
-        assert!(PortLevel::WelldoneWithSpeed(0) != PortLevel::WelldoneWithSpeed(1));
-    }
+    /// 標準形式 + アクセスしてきたホストの情報
+    WithHost,
+}
+
+#[derive(Debug, Error)]
+pub enum TomlConfigError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("TOML deserialize error: {0}")]
+    Toml(#[from] toml::de::Error),
 }

@@ -5,6 +5,7 @@ use libpeercast_re::pcp::GnuId;
 
 use crate::prelude::*;
 
+#[allow(dead_code)]
 pub struct PcpStream {
     cid: GnuId,
     count: usize,
@@ -14,6 +15,8 @@ pub struct PcpStream {
 
 impl PcpStream {
     const DATA_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+    #[allow(dead_code)]
     pub async fn new(cid: GnuId) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<(Waker, std::time::Duration)>();
         // let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();

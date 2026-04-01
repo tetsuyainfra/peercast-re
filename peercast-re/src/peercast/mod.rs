@@ -1,12 +1,9 @@
 use std::{net::SocketAddr, sync::OnceLock};
 
-use libpeercast_re::{ConnectionNo, codec::rtmp, pcp::GnuId, rtmp::rtmp_connection};
-use tokio::sync::{
-    mpsc::{self, UnboundedReceiver, UnboundedSender},
-    oneshot,
-};
+use libpeercast_re::{ConnectionNo, pcp::GnuId};
+use tokio::sync::mpsc::UnboundedSender;
 
-use crate::repository::{Channel, ReChannelRepository};
+use crate::repository::ReChannelRepository;
 use crate::{channel::ReChannel, config::Config};
 
 static REPOSITORY: OnceLock<ReChannelRepository<ReChannel>> = OnceLock::new();
@@ -53,9 +50,9 @@ pub async fn init(
 }
 
 pub async fn serve_pcphttp(
-    cno: ConnectionNo,
-    conn: tokio::net::TcpStream,
-    remote: SocketAddr,
+    _cno: ConnectionNo,
+    _conn: tokio::net::TcpStream,
+    _remote: SocketAddr,
     _graceful_shutdown: tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
     let _read_buf = bytes::BytesMut::new();

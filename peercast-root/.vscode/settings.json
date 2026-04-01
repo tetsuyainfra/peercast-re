@@ -1,0 +1,6 @@
+{
+    "remote.autoForwardPortsFallback": 0,
+    // (このフォルダをプロジェクトとして開いたとき)
+    // ワークスペース全体のチェックを無効化する
+    "rust-analyzer.check.workspace": false
+}

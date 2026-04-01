@@ -1,6 +1,11 @@
 # PeerCastStation コードリーディングメモ
 LICENCE：GPLv3 (PeCaStがそうだからコードが含まれるこのメモもそれに従います)
 
+XXX_SourceStream : Outgoingなストリーム
+XXX_OutputStream : Incommingなストリーム
+
+Owinって何?: Open Web Interface for .NET -> つまりHTTP用のフレームワークっぽい
+
 # 下流から上流へのAtomの処理の流れ
 OutputStraemへのHTTP接続とPCP接続へのアップグレード
 ここでサービスにアタッチしてる
@@ -154,3 +159,21 @@ ctx.Upgrade(async opaqueEnv => {
   - だから何か有ってPeCaStクラッシュした後、YPに乗らない問題が起きるのかな？
 - どうなっているのがいいのか。。。
 -
+
+
+### Relay用通信
+-着信きたらここから始まる
+  - https://github.com/kumaryu/peercaststation/blob/da169b001a73a85c19426b56befdc161fa914338/PeerCastStation/PeerCastStation.PCP/PCPOutputStream.cs#L917
+- ParseRequest::Parse
+  - https://github.com/kumaryu/peercaststation/blob/da169b001a73a85c19426b56befdc161fa914338/PeerCastStation/PeerCastStation.PCP/PCPOutputStream.cs#L40
+
+
+
+#### Httpが来た時？
+https://github.com/kumaryu/peercaststation/blob/da169b001a73a85c19426b56befdc161fa914338/PeerCastStation/PeerCastStation.HTTP/HTTPOutputStream.cs#L93
+
+### PCPHeloのIncoming
+https://github.com/kumaryu/peercaststation/blob/da169b001a73a85c19426b56befdc161fa914338/PeerCastStation/PeerCastStation.PCP/PCPOutputStream.cs#L385
+
+### YP-Clientの実装
+https://github.com/kumaryu/peercaststation/blob/da169b001a73a85c19426b56befdc161fa914338/PeerCastStation/PeerCastStation.PCP/PCPYellowPageClient.cs

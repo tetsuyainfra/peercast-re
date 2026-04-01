@@ -1,0 +1,178 @@
+use std::net::SocketAddr;
+
+use chrono::{DateTime, TimeZone, Utc};
+use libpeercast_re::{model::ValidTrackInfo, pcp::GnuId};
+use serde::Serialize;
+
+//-------------------------------------------------------------------------------
+/// 公開APIで使用するChannelMeta
+//-------------------------------------------------------------------------------
+#[derive(Debug, Clone, Serialize)]
+pub struct ChannelMeta {
+    /// チャンネルID
+    pub id: GnuId,
+
+    /// チャンネル名
+    pub name: String,
+    /// 配信者アドレス(もしくは初期接続先アドレス)
+    pub tracker_addr: Option<SocketAddr>,
+    /// 連絡先URL
+    pub contact_url: String,
+    /// 生のジャンル(namespace, listener_hideableなどの指定を含む)
+    pub genre: String,
+    /// ユーザーに表示されるジャンル(変化がなければNone)
+    pub display_genre: Option<String>,
+    /// 説明文
+    pub desc: String,
+    /// コメント
+    pub comment: String,
+    /// MIME(例: video/x-flv)
+    pub stream_type: String,
+    /// 拡張子(例: .flv)
+    pub stream_ext: String,
+    /// ビットレート(kbps単位)
+    pub bitrate: i32,
+    /// WMV, FLVなどのタイプ
+    #[serde(rename = "type")]
+    pub typee: String,
+
+    /// リスナー数
+    pub number_of_listener: i32,
+    /// リレー数
+    pub number_of_relay: i32,
+    /// 作成日時
+    pub created_at: DateTime<Utc>, // FIX: 外部のCDNなどとの兼ね合いで配信時間が00:00意外になる可能性あり
+
+    /// トラック情報
+    pub track: JsonTrackInfo,
+
+    /// ネームスペース
+    pub namespace: Option<String>,
+}
+
+impl ChannelMeta {
+    pub fn to_line_of_index_txt(&self) -> String {
+        self::line_of_index_txt_from_json(self)
+    }
+
+    #[allow(non_snake_case)]
+    pub fn Empty() -> Self {
+        // println!("DATETIME              {}", Utc.timestamp_opt(0, 0).unwrap());
+        Self {
+            id: GnuId::NONE,
+            name: "".into(),
+            tracker_addr: None,
+            contact_url: "".into(),
+            genre: "".into(),
+            display_genre: None,
+            desc: "".into(),
+            comment: "".into(),
+            typee: "".into(),
+            stream_type: "".into(),
+            stream_ext: "".into(),
+            bitrate: 0,
+            number_of_listener: 0,
+            number_of_relay: 0,
+            created_at: Utc.timestamp_opt(0, 0).unwrap(),
+            // info: Default::default(),
+            track: Default::default(),
+            namespace: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct JsonTrackInfo {
+    pub title: String,
+    pub creator: String,
+    pub url: String,
+    pub album: String,
+    pub genre: String,
+}
+
+impl From<ValidTrackInfo> for JsonTrackInfo {
+    fn from(i: ValidTrackInfo) -> Self {
+        let ValidTrackInfo {
+            title,
+            creator,
+            url,
+            album,
+            genre,
+        } = i;
+        Self {
+            title,
+            creator,
+            url,
+            album,
+            genre,
+        }
+    }
+}
+
+fn line_of_index_txt_from_json(info: &ChannelMeta) -> String {
+    create_index_line(
+        &info.name,
+        &info.id,
+        &info.tracker_addr,
+        &info.contact_url,
+        &info.genre,
+        &info.desc,
+        &info.comment,
+        info.number_of_listener,
+        info.number_of_relay,
+        info.bitrate,
+        &info.typee,
+        &info.stream_type,
+        &info.stream_ext,
+        &info.created_at,
+    )
+}
+// 順番に合わせる
+// https://github.com/plonk/peercast-yt/blob/b60f176317406e79a5468ba80da8be1d83bb6126/core/common/public.cpp#L102
+fn create_index_line(
+    name: &String,
+    id: &GnuId,
+    tracker_addr: &Option<SocketAddr>,
+    contact_url: &String,
+    genre: &String,
+    desc: &String,
+    comment: &String,
+    number_of_listener: i32,
+    number_of_relay: i32,
+    bitrate: i32,
+    typee: &String,
+    _stream_type: &String,
+    _stream_ext: &String,
+    created_at: &DateTime<Utc>,
+) -> String {
+    use html_escape::{encode_quoted_attribute, encode_safe};
+    let diff_time = Utc::now() - created_at;
+    let hour = diff_time.num_hours();
+    let min = diff_time.num_minutes() % 60;
+
+    let addr = tracker_addr.as_ref().map(|a| a.to_string()).unwrap_or_default();
+
+    format!(
+        // "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<><><><><>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
+        "{name}<>{id}<>{addr}<>{contact_url}<>{genre}<>{desc}<>{number_of_listener}<>{number_of_relay}<>{bitrate}<>{typee}<>{artist}<>{album}<>{track_title}<>{track_url}<>{name_escaped}<>{time_hour}:{time_min:02}<>click<>{comment}<>0",
+        name = encode_safe(&name.clone()),
+        id = id,
+        addr = addr,
+        contact_url = encode_quoted_attribute(&contact_url),
+        genre = encode_safe(&genre),
+        desc = encode_safe(&desc),
+        number_of_listener = number_of_listener,
+        number_of_relay = number_of_relay,
+        bitrate = bitrate,
+        typee = encode_safe(&typee),
+        // TODO: track_infoの実装
+        artist = "",
+        album = "",
+        track_title = "",
+        track_url = "",
+        name_escaped = encode_safe(&name),
+        time_hour = hour,
+        time_min = min,
+        comment = comment
+    )
+}

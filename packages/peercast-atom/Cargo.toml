@@ -1,0 +1,13 @@
+[package]
+name = "peercast-atom"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = ["bytes"]
+
+bytes = []
+
+[dependencies]
+peercast-id4 = { path = "../peercast-id4" }
+bytes = { version = "*" }

@@ -6,14 +6,13 @@ use std::{
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use futures_core::Stream;
 use http::Uri;
 use libpeercast_re::{
     ConnectionNo,
     pcp::{ChannelInfo, GnuId, TrackInfo},
-    util::{mutex_poisoned, util_mpsc::mpsc_send},
+    util::mutex_poisoned,
 };
-use tokio::sync::mpsc::{self, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use super::manager;
 use super::stream;
@@ -116,7 +115,7 @@ impl ReChannel {
 
     // 操作関係
     // チャンネルにTrackerIPを通知する
-    pub async fn notify_tracker_ip(&self, tracker_ip: SocketAddr) -> anyhow::Result<()> {
+    pub async fn notify_tracker_ip(&self, _tracker_ip: SocketAddr) -> anyhow::Result<()> {
         unimplemented!()
     }
 
@@ -138,6 +137,7 @@ impl ReChannel {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct ImplReChannel {
     cid: GnuId,
@@ -179,7 +179,7 @@ impl ImplReChannel {
         track_info: Option<TrackInfo>,
         config: Option<ReConfig>,
     ) -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
         Self {
             cid: channel_id,

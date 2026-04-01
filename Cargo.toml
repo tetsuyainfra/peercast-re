@@ -6,8 +6,8 @@ members = [
   "peercast-re",
   "peercast-root",
   "peercast-utils",
-  "peercast-speedtest",
+  "peercast-speedtest", "packages/peercast-atom", "packages/peercast-id4", "packages/peercast-gnuid",
 ]
-default-members = ["libpeercast-re", "peercast-root", "peercast-re", "peercast-utils", "peercast-speedtest"]
+default-members = ["libpeercast-re", "peercast-root", "peercast-re", "peercast-utils", "peercast-speedtest", "packages/peercast-atom"]
 
 resolver = "2"
