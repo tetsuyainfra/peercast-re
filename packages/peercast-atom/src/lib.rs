@@ -16,3 +16,6 @@ mod ext_bytes;
 
 #[cfg(feature = "bytes")]
 pub use ext_bytes::AtomBytes;
+
+#[cfg(feature = "codec")]
+pub mod codec;
