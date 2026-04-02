@@ -1,0 +1,9 @@
+[package]
+name = "libpeercast-renew"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+peercast-gnuid = { path = "../peercast-gnuid" }
+peercast-atom = { path = "../peercast-atom" }
+peercast-id4 = { path = "../peercast-id4" }
