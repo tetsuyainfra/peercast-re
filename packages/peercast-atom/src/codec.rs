@@ -2,31 +2,38 @@ use bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder};
 
 use crate::{
-    Atom,
+    Atom, AtomMut,
     error::{AtomCodecError, AtomParseError},
+    parser::AtomParser,
 };
 
 #[derive(Debug)]
 pub struct AtomCodec {
-    max_atom_size: u64,
-    max_children_num: u64,
+    parser: AtomParser,
 }
 
 impl AtomCodec {
-    pub fn new() -> Self {
+    pub fn new(max_atom_size: u32, max_children_num: u32) -> Self {
         Self {
-            max_atom_size: 1024 * 1024, // PeercastStation基準
-            max_children_num: 1024,     // PeercastStation基準
+            parser: AtomParser::new(max_atom_size, max_children_num),
+        }
+    }
+}
+
+impl Default for AtomCodec {
+    fn default() -> Self {
+        Self {
+            parser: AtomParser::default(),
         }
     }
 }
 
 impl Decoder for AtomCodec {
-    type Item = Atom<bytes::Bytes>;
+    type Item = Atom;
     type Error = AtomCodecError;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        match super::parser::default_try_parse(src) {
+        match self.parser.try_parse(src) {
             Ok(length) => {
                 // MEMO: split_toでも大丈夫らしいけど本当に大丈夫なのかわからにゃい
                 let atom_bytes = src.split_to(length);
@@ -41,26 +48,23 @@ impl Decoder for AtomCodec {
     }
 }
 
-impl Encoder<Atom<bytes::Bytes>> for AtomCodec {
-    type Error = std::io::Error;
+impl Encoder<Atom> for AtomCodec {
+    type Error = AtomCodecError;
 
-    fn encode(&mut self, item: Atom<bytes::Bytes>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // TODO: Atomの内容をバイト列にシリアライズしてdstに書き込む
-        // let x = item.write_buf(dst);
-        // dbg!(&dst);
+    fn encode(&mut self, item: Atom, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let _ = item.write_to(dst);
         Ok(())
     }
 }
 
-// impl Encoder<AtomMut> for AtomCodec {
-//     type Error = std::io::Error;
+impl Encoder<AtomMut> for AtomCodec {
+    type Error = AtomCodecError;
 
-//     fn encode(&mut self, item: AtomMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
-//         let x = item.write(dst);
-//         // dbg!(&dst);
-//         Ok(())
-//     }
-// }
+    fn encode(&mut self, item: AtomMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let _ = item.write_to(dst)?;
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod t {
@@ -68,13 +72,12 @@ mod t {
 
     use super::*;
     use bytes::BufMut;
-    use futures_util::{SinkExt, StreamExt};
-    use tokio_util::codec::{Decoder, Encoder, Framed};
+    use tokio_util::codec::Framed;
 
     #[ignore]
     #[test]
     fn test_atom_codec_decode() {
-        let mut codec = AtomCodec::new();
+        let mut codec = AtomCodec::default();
         let mut buf = BytesMut::with_capacity(1024);
 
         // サンプルのAtomデータをバッファに追加
@@ -97,8 +100,8 @@ mod t {
     fn test_atom_codec_from_framed() {
         let (client, server) = tokio::io::duplex(1024);
 
-        let mut framed_server = Framed::new(server, AtomCodec::new());
-        let mut framed_client = Framed::new(client, AtomCodec::new());
+        let mut framed_server = Framed::new(server, AtomCodec::default());
+        let mut framed_client = Framed::new(client, AtomCodec::default());
 
         // client → server
         // framed_client.send(b"hello".to_vec()).await.unwrap();

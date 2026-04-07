@@ -4,19 +4,23 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
-default = ["bytes", "codec"]
+default = ["codec"]
 
-bytes = ["dep:bytes"]
 
-codec = ["bytes", "dep:tokio", "dep:tokio-util", "dep:futures-util"]
+# codec = ["dep:tokio-util", "dep:futures-util"]
+codec = ["dep:tokio-util"]
 
 [dependencies]
 peercast-id4 = { path = "../peercast-id4" }
 
 # dependency for feature "bytes"
-bytes = { version = "*", optional = true }
+bytes = { version = "1" }
 
 # dependency for feature "codec"
-tokio = { version = "*", optional = true, features = ["full"] }
-tokio-util = { version = "*", optional = true }
-futures-util = { version = "*", optional = true }
+# tokio = { version = "1", optional = true, features = ["full"] }
+tokio-util = { version = "0.7",features = ["codec"], optional = true }
+# futures-util = { version = "0.3", features = ["sink"], optional = true}
+
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }

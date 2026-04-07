@@ -1,44 +1,75 @@
-use crate::error::AtomParseError;
+use crate::{AtomKind, error::AtomParseError};
 
 const ATOM_HEADER_LENGTH: usize = 8;
-const ATOM_MAX_PAYLOAD_CHILDS_NUM: u32 = 100;
-const ATOM_MAX_PAYLOAD_LENGTH: u32 = 2 * 1024 * 1024; // 2MB
+pub const ATOM_DEFAULT_MAX_CHILDS_NUM: u32 = 100;
+pub const ATOM_DEFAULT_MAX_PAYLOAD_LENGTH: u32 = 2 * 1024 * 1024; // 2MB
+pub const ATOM_MAX_DEPTH: u32 = 128;
 
+#[derive(Debug)]
 pub struct AtomParser {
-    max_payload_length: u32,
-    max_childs_num: u32,
+    context: ParseContext,
 }
 
 impl Default for AtomParser {
     fn default() -> Self {
         Self {
-            max_payload_length: ATOM_MAX_PAYLOAD_LENGTH,
-            max_childs_num: ATOM_MAX_PAYLOAD_CHILDS_NUM,
+            context: ParseContext::default(),
         }
     }
 }
 
 impl AtomParser {
+    pub fn new(max_payload_length: u32, max_childs_num: u32) -> Self {
+        Self {
+            context: ParseContext {
+                max_payload_length,
+                max_childs_num,
+                ..Default::default()
+            },
+        }
+    }
+
     pub fn try_parse(&self, buf: &[u8]) -> Result<usize, AtomParseError> {
-        _try_parse(self.max_payload_length, self.max_childs_num, buf)
+        _try_parse(&self.context, 0, buf)
+    }
+
+    /// 信用されていないバッファから、Atomを検証しつつ取得する
+    /// 成功した場合、Atomのバイトサイズを返す
+    /// データが途中の場合、Err(AtomParseError::UnexpectedEof)を返す
+    /// 内容に不正がある場合、エラーが返ります
+    pub fn default_try_parse(buf: &[u8]) -> Result<usize, AtomParseError> {
+        _try_parse(&ParseContext::default(), 0, buf)
     }
 }
 
-/// 信用されていないバッファから、Atomを検証しつつ取得する
-/// 成功した場合、Atomのバイトサイズを返す
-/// ただし、データが途中の場合、Noneを返します
-/// 内容に不正がある場合、エラーが返ります
-pub fn default_try_parse(buf: &[u8]) -> Result<usize, AtomParseError> {
-    _try_parse(ATOM_MAX_PAYLOAD_LENGTH, ATOM_MAX_PAYLOAD_CHILDS_NUM, buf)
+#[derive(Debug)]
+struct ParseContext {
+    max_payload_length: u32,
+    max_childs_num: u32,
+    max_depth: u32,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum AtomKind {
-    Parent,
-    Child,
+impl ParseContext {
+    const fn default() -> Self {
+        Self {
+            max_payload_length: ATOM_DEFAULT_MAX_PAYLOAD_LENGTH,
+            max_childs_num: ATOM_DEFAULT_MAX_CHILDS_NUM,
+            max_depth: ATOM_MAX_DEPTH,
+        }
+    }
 }
 
-fn _try_parse(max_payload_length: u32, max_childs_num: u32, buf: &[u8]) -> Result<usize, AtomParseError> {
+impl Default for ParseContext {
+    fn default() -> Self {
+        Self::default()
+    }
+}
+
+fn _try_parse(ctx: &ParseContext, depth: usize, buf: &[u8]) -> Result<usize, AtomParseError> {
+    if depth > ctx.max_depth as usize {
+        return Err(AtomParseError::MalformedPayload);
+    }
+
     if buf.len() < ATOM_HEADER_LENGTH {
         return Err(AtomParseError::UnexpectedEof);
     }
@@ -56,7 +87,7 @@ fn _try_parse(max_payload_length: u32, max_childs_num: u32, buf: &[u8]) -> Resul
 
     match kind {
         AtomKind::Child => {
-            if length > max_payload_length {
+            if length > ctx.max_payload_length {
                 return Err(AtomParseError::MalformedPayload);
             }
             // ChildAtom の場合、lengthはバイトサイズそのもの
@@ -67,14 +98,14 @@ fn _try_parse(max_payload_length: u32, max_childs_num: u32, buf: &[u8]) -> Resul
             Ok(expected_size)
         }
         AtomKind::Parent => {
-            if length > max_childs_num {
+            if length > ctx.max_childs_num {
                 return Err(AtomParseError::MalformedPayload);
             }
 
             let mut offset = ATOM_HEADER_LENGTH; // 初期値はこのAtomのヘッダサイズ分移動した所
             for _ in 0..length {
                 // 子Atomを順に解析してバイトサイズを合計する
-                let child_size = _try_parse(max_payload_length, max_childs_num, &buf[offset..])?;
+                let child_size = _try_parse(ctx, depth + 1, &buf[offset..])?;
                 offset += child_size;
             }
             Ok(offset)
@@ -85,7 +116,7 @@ fn _try_parse(max_payload_length: u32, max_childs_num: u32, buf: &[u8]) -> Resul
 #[cfg(test)]
 mod t {
 
-    use crate::parser::{ATOM_MAX_PAYLOAD_CHILDS_NUM, ATOM_MAX_PAYLOAD_LENGTH, AtomParseError, AtomParser};
+    use crate::parser::{ATOM_DEFAULT_MAX_CHILDS_NUM, ATOM_DEFAULT_MAX_PAYLOAD_LENGTH, AtomParseError, AtomParser};
 
     #[test]
     fn test_parser() {
@@ -115,7 +146,7 @@ mod t {
         assert_eq!(byte_size, Ok(8));
 
         /* タグと長さはあって、データがないが、異常に長い場合/閾値上/Child  */
-        let payload_length = ATOM_MAX_PAYLOAD_LENGTH;
+        let payload_length = ATOM_DEFAULT_MAX_PAYLOAD_LENGTH;
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&payload_length.to_le_bytes());
@@ -123,7 +154,7 @@ mod t {
         assert_eq!(byte_size, Err(AtomParseError::UnexpectedEof));
 
         /* タグと長さはあって、データがないが、異常に長い場合/閾値越え/Child  */
-        let payload_length = ATOM_MAX_PAYLOAD_LENGTH + 1;
+        let payload_length = ATOM_DEFAULT_MAX_PAYLOAD_LENGTH + 1;
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&payload_length.to_le_bytes());
@@ -131,7 +162,7 @@ mod t {
         assert_eq!(r_byte_size, Err(AtomParseError::MalformedPayload));
 
         /* タグと長さはあって、データがないが、異常に長い場合/閾値上/Parent  */
-        let child_length = ATOM_MAX_PAYLOAD_CHILDS_NUM | 0x8000_0000;
+        let child_length = ATOM_DEFAULT_MAX_CHILDS_NUM | 0x8000_0000;
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&child_length.to_le_bytes());
@@ -139,7 +170,7 @@ mod t {
         assert_eq!(r_byte_size, Err(AtomParseError::UnexpectedEof));
 
         /* タグと長さはあって、データがないが、異常に長い場合/閾値越え/Parent  */
-        let child_length = (ATOM_MAX_PAYLOAD_CHILDS_NUM + 1) | 0x8000_0000;
+        let child_length = (ATOM_DEFAULT_MAX_CHILDS_NUM + 1) | 0x8000_0000;
         let mut bytes = Vec::<u8>::new();
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&child_length.to_le_bytes());

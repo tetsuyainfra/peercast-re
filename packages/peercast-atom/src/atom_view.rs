@@ -1,6 +1,8 @@
 use std::{fmt, ops::Range};
 
-use crate::error::AtomParseError;
+use peercast_id4::Id4;
+
+use crate::{AtomMut, atom_mut::AtomData, error::AtomParseError, parser::AtomParser};
 
 pub(crate) const ATOM_HEADER_LENGTH: usize = 8;
 pub(crate) const ATOM_HEADER_POS_ID: Range<usize> = 0..4;
@@ -14,10 +16,10 @@ pub trait AtomView {
     /// Atomの生データを返す。これを型で実装することで、AtomViewの機能を利用できるようになる
     fn raw(&self) -> &[u8];
 
-    fn id(&self) -> [u8; 4] {
+    fn id(&self) -> Id4 {
         let mut arr = [0u8; 4];
         arr.copy_from_slice(&self.raw()[ATOM_HEADER_POS_ID]);
-        arr
+        Id4::from(arr)
     }
 
     /// DON'T USE THIS DIRECTLY. Use length() instead.
@@ -69,7 +71,7 @@ pub enum AtomKind {
 ////////////////////////////////////////////////////////////////////////////////
 /// KindView
 /// Atomの種類に応じたビューを表す列挙型
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub enum KindView<'a> {
     Parent(ParentView<'a>),
     Child(ChildView<'a>),
@@ -80,6 +82,29 @@ impl AtomView for KindView<'_> {
         match self {
             KindView::Parent(view) => view.raw(),
             KindView::Child(view) => view.raw(),
+        }
+    }
+}
+
+impl From<KindView<'_>> for AtomMut {
+    fn from(view: KindView<'_>) -> Self {
+        match view {
+            KindView::Parent(parent_view) => {
+                let children: Vec<AtomMut> = parent_view.children().map(|child| child.into()).collect();
+                AtomMut::new(parent_view.id(), AtomData::Parent(children))
+            }
+            KindView::Child(child_view) => {
+                let payload = bytes::Bytes::copy_from_slice(child_view.data());
+                AtomMut::new(child_view.id(), AtomData::Child(payload))
+            }
+        }
+    }
+}
+impl fmt::Debug for KindView<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            KindView::Parent(view) => f.debug_tuple("KindView::Parent").field(view).finish(),
+            KindView::Child(view) => f.debug_tuple("KindView::Child").field(view).finish(),
         }
     }
 }
@@ -110,7 +135,7 @@ impl fmt::Debug for ChildView<'_> {
         f.debug_struct("ChildView")
             //
             .field("id", &self.id())
-            .field("len", &self.length())
+            .field("length", &self.length())
             .field("data", &self.data())
             //
             .finish()
@@ -142,15 +167,13 @@ impl AtomView for ParentView<'_> {
 }
 
 impl fmt::Debug for ParentView<'_> {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // let childrens: Vec<AtomView<'_>> = self.children().collect();
-        // f.debug_struct("ParentView")
-        //     .field("id", &self.id())
-        //     .field("length", &self.length())
-        //     .field("children", &childrens)
-        //     //
-        //     .finish()
-        todo!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let childrens: Vec<KindView<'_>> = self.children().collect();
+        f.debug_struct("ParentView")
+            .field("id", &self.id())
+            .field("length", &self.length())
+            .field("children", &childrens)
+            .finish()
     }
 }
 
@@ -194,7 +217,7 @@ impl<'a> Iterator for AtomIter<'a> {
             AtomKind::Parent => {
                 // ParentAtom の処理（lengthがバイトサイズじゃないので注意）
                 // MEMO: View内のバッファは正常であることが保証されているのでunwrapしてよい
-                let this_atoms_bytesize = crate::parser::default_try_parse(self.buf).unwrap();
+                let this_atoms_bytesize = AtomParser::default_try_parse(self.buf).unwrap();
                 let (view_buf, rest) = self.buf.split_at(this_atoms_bytesize);
                 self.buf = rest;
 
@@ -207,20 +230,73 @@ impl<'a> Iterator for AtomIter<'a> {
 }
 
 impl fmt::Debug for AtomIter<'_> {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // f.debug_list()
-        //     //
-        //     .entries(self.clone())
-        //     .finish()
-        todo!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.clone()).finish()
     }
 }
 
-////////////////////////////////////////////////////////////////////////////////
-/// TryParse
-///
-pub trait AtomTryParse: AtomView {
-    fn try_parse(buf: &[u8]) -> Result<(Self, &[u8]), AtomParseError>
-    where
-        Self: Sized;
+#[cfg(test)]
+mod t {
+    use crate::Atom;
+
+    use super::*;
+
+    #[test]
+    fn test_atom_view_child() {
+        let mut buf = Vec::<u8>::new();
+        buf.extend_from_slice(b"pcp\n");
+        buf.extend_from_slice(&0x0000_0004_u32.to_le_bytes());
+        buf.extend_from_slice(b"abcd");
+
+        let atom = Atom::new(buf.clone().into());
+        assert_eq!(atom.raw(), &buf);
+
+        let view = atom.view();
+        match view {
+            KindView::Child(child_view) => {
+                assert_eq!(child_view.id(), [b'p', b'c', b'p', b'\n'].into());
+                assert_eq!(child_view.length(), 4);
+                assert_eq!(child_view.data(), b"abcd");
+                dbg!(child_view);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn test_atom_view_parent() {
+        let mut buf = Vec::<u8>::new();
+        buf.extend_from_slice(b"pcp\n");
+        buf.extend_from_slice(&0x8000_0002_u32.to_le_bytes());
+        {
+            buf.extend_from_slice(b"pcpa");
+            buf.extend_from_slice(&0x0000_0001_u32.to_le_bytes());
+            buf.extend_from_slice(b"a");
+        }
+        {
+            buf.extend_from_slice(b"pcpb");
+            buf.extend_from_slice(&0x0000_0001_u32.to_le_bytes());
+            buf.extend_from_slice(b"b");
+        }
+
+        let atom = Atom::new(buf.clone().into());
+        let view = atom.view();
+        match view {
+            KindView::Parent(parent_view) => {
+                assert_eq!(parent_view.id(), [b'p', b'c', b'p', b'\n'].into());
+                assert_eq!(parent_view.length(), 2);
+
+                let mut children = parent_view.children();
+                let child0 = children.next().unwrap();
+                assert_eq!(child0.id(), [b'p', b'c', b'p', b'a'].into());
+                assert_eq!(child0.payload(), b"a");
+                let child1 = children.next().unwrap();
+                assert_eq!(child1.id(), [b'p', b'c', b'p', b'b'].into());
+                assert_eq!(child1.payload(), b"b");
+
+                dbg!(parent_view);
+            }
+            _ => unreachable!(),
+        }
+    }
 }
