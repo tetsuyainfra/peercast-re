@@ -92,7 +92,7 @@ mod t {
                 assert_eq!(atom.kind(), crate::AtomKind::Child);
             }
             Ok(None) => unreachable!(),
-            Err(e) => unreachable!(),
+            Err(_e) => unreachable!(),
         }
     }
 
@@ -100,8 +100,8 @@ mod t {
     fn test_atom_codec_from_framed() {
         let (client, server) = tokio::io::duplex(1024);
 
-        let mut framed_server = Framed::new(server, AtomCodec::default());
-        let mut framed_client = Framed::new(client, AtomCodec::default());
+        let _framed_server = Framed::new(server, AtomCodec::default());
+        let _framed_client = Framed::new(client, AtomCodec::default());
 
         // client → server
         // framed_client.send(b"hello".to_vec()).await.unwrap();

@@ -1,4 +1,4 @@
-use crate::{AtomKind, AtomMut, AtomView, atom_mut::AtomData};
+use crate::{AtomMut, AtomView};
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Atom

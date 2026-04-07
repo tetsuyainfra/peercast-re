@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use peercast_id4::Id4;
 
 use crate::{
-    Atom, AtomKind, AtomView,
+    Atom, AtomKind,
     atom_view::ATOM_HEADER_LENGTH,
     error::{AtomFreezeError, AtomMutError},
 };
@@ -194,6 +194,7 @@ impl TryFrom<AtomMut> for Atom {
 #[cfg(test)]
 mod t {
     use super::*;
+    use crate::AtomView;
 
     #[test]
     fn test_freeze_child() {

@@ -2,7 +2,7 @@ use std::{fmt, ops::Range};
 
 use peercast_id4::Id4;
 
-use crate::{AtomMut, atom_mut::AtomData, error::AtomParseError, parser::AtomParser};
+use crate::{AtomMut, atom_mut::AtomData, parser::AtomParser};
 
 pub(crate) const ATOM_HEADER_LENGTH: usize = 8;
 pub(crate) const ATOM_HEADER_POS_ID: Range<usize> = 0..4;
