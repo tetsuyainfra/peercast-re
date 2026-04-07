@@ -10,7 +10,7 @@ async fn main() {
 
     let file = File::open(filename).await.expect("file not found");
 
-    let framed = Framed::new(file, AtomCodec::new());
+    let framed = Framed::new(file, AtomCodec::default());
     let _ = framed
         .try_for_each(|atom| async move {
             println!("Atom: kind={:?}, length={}, payload={:?}", atom.kind(), atom.length(), atom.payload());
