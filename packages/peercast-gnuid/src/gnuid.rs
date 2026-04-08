@@ -80,6 +80,12 @@ impl From<u128> for GnuId {
     }
 }
 
+impl From<[u8; 16]> for GnuId {
+    fn from(item: [u8; 16]) -> Self {
+        GnuId(u128::from_be_bytes(item))
+    }
+}
+
 impl From<GnuId> for u128 {
     fn from(item: GnuId) -> Self {
         item.0
