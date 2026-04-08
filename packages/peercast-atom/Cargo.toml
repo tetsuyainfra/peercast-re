@@ -12,6 +12,7 @@ codec = ["dep:tokio-util"]
 
 [dependencies]
 peercast-id4 = { path = "../peercast-id4" }
+peercast-gnuid = { path = "../peercast-gnuid" }
 
 # dependency for feature "bytes"
 bytes = { version = "1" }

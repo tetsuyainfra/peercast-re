@@ -1,5 +1,6 @@
 use std::{fmt, ops::Range};
 
+use peercast_gnuid::GnuId;
 use peercast_id4::Id4;
 
 use crate::{AtomMut, atom_mut::AtomData, parser::AtomParser};
@@ -121,6 +122,101 @@ impl ChildView<'_> {
     pub fn data(&self) -> &[u8] {
         debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
         &self.buf[8..]
+    }
+
+    pub fn try_decode_u8(&self) -> Option<u8> {
+        if self.length() != 1 {
+            return None;
+        }
+        Some(self.payload()[0])
+    }
+
+    pub fn try_decode_i8(&self) -> Option<i8> {
+        if self.length() != 1 {
+            return None;
+        }
+        Some(self.payload()[0] as i8)
+    }
+
+    pub fn try_decode_u16(&self) -> Option<u16> {
+        if self.length() != 2 {
+            return None;
+        }
+        let mut arr = [0u8; 2];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(u16::from_le_bytes(arr))
+    }
+    pub fn try_decode_u16_be(&self) -> Option<u16> {
+        if self.length() != 2 {
+            return None;
+        }
+        let mut arr = [0u8; 2];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(u16::from_be_bytes(arr))
+    }
+
+    pub fn try_decode_u32(&self) -> Option<u32> {
+        if self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(u32::from_le_bytes(arr))
+    }
+    pub fn try_decode_u32_be(&self) -> Option<u32> {
+        if self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(u32::from_be_bytes(arr))
+    }
+
+    pub fn try_decode_i32(&self) -> Option<i32> {
+        if self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(i32::from_le_bytes(arr))
+    }
+    pub fn try_decode_i32_be(&self) -> Option<i32> {
+        if self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(i32::from_be_bytes(arr))
+    }
+
+    pub fn try_decode_vec(&self) -> Option<Vec<u8>> {
+        if self.length() == 0 {
+            return None;
+        }
+        Some(self.payload().to_vec())
+    }
+
+    pub fn try_decode_bytes(&self) -> Option<bytes::Bytes> {
+        if self.length() == 0 {
+            return None;
+        }
+        Some(bytes::Bytes::copy_from_slice(self.payload()))
+    }
+
+    pub fn try_decode_gnuid(&self) -> Option<GnuId> {
+        if self.length() != 16 {
+            return None;
+        }
+        let mut arr = [0u8; 16];
+        let payload = self.payload();
+        arr.copy_from_slice(payload);
+        Some(GnuId::from(arr))
     }
 }
 
