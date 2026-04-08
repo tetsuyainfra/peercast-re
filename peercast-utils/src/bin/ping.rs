@@ -5,7 +5,7 @@
 //  TODO: Tracker/Relayに対してポートチェックしてもらう通信をおこなう機能を実装する
 //  MEMO: portcheckしてもらうにはHttpでChannelIdを通知する必要がある
 use clap::Parser;
-use libpeercast_renew::GnuId;
+use libpeercast_re::GnuId;
 
 #[derive(Parser, Debug)]
 #[command(name = env!("CARGO_BIN_NAME"))]
