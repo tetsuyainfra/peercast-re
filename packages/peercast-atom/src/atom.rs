@@ -53,7 +53,7 @@ pub(crate) mod test {
         assert_eq!(atom.raw_length(), 0);
         assert_eq!(atom.length(), 0);
         assert_eq!(atom.kind(), AtomKind::Child);
-        assert_eq!(atom.payload(), &[]);
+        assert_eq!(atom.raw_payload(), &[]);
     }
 
     #[test]
@@ -65,7 +65,7 @@ pub(crate) mod test {
         assert_eq!(atom.raw_length(), 2);
         assert_eq!(atom.length(), 2);
         assert_eq!(atom.kind(), AtomKind::Child);
-        assert_eq!(atom.payload(), &[0xFF, 0xFE]);
+        assert_eq!(atom.raw_payload(), &[0xFF, 0xFE]);
     }
 
     #[test]
@@ -81,7 +81,7 @@ pub(crate) mod test {
         assert_eq!(atom.raw_length(), 0x8000_0000);
         assert_eq!(atom.length(), 0);
         assert_eq!(atom.kind(), AtomKind::Parent);
-        assert_eq!(atom.payload(), &[]);
+        assert_eq!(atom.raw_payload(), &[]);
     }
 
     #[test]
@@ -124,7 +124,7 @@ pub(crate) mod test {
         assert_eq!(atom.raw_length(), 0x8000_0004);
         assert_eq!(atom.length(), 4);
         assert_eq!(atom.kind(), AtomKind::Parent);
-        assert_eq!(atom.payload().len(), 10 + 10 + 8 + (8 + (8 + 1)));
+        assert_eq!(atom.raw_payload().len(), 10 + 10 + 8 + (8 + (8 + 1)));
         let parent_view = match atom.view() {
             KindView::Child(_) => unreachable!(),
             KindView::Parent(parent_view) => parent_view,
@@ -133,22 +133,22 @@ pub(crate) mod test {
 
         let child0 = children.next().unwrap();
         assert_eq!(child0.id(), [b'a', b'b', b'c', b'd'].into());
-        assert_eq!(child0.payload(), &[0xFF, 0xFE]);
+        assert_eq!(child0.raw_payload(), &[0xFF, 0xFE]);
         assert_eq!(child0.kind(), AtomKind::Child);
 
         let child1 = children.next().unwrap();
         assert_eq!(child1.id(), [b'b', b'e', b'e', b'f'].into());
-        assert_eq!(child1.payload(), &[0xFD, 0xFC]);
+        assert_eq!(child1.raw_payload(), &[0xFD, 0xFC]);
         assert_eq!(child1.kind(), AtomKind::Child);
 
         let child2 = children.next().unwrap();
         assert_eq!(child2.id(), [b'c', b'a', b'f', b'e'].into());
-        assert_eq!(child2.payload(), &[]);
+        assert_eq!(child2.raw_payload(), &[]);
         assert_eq!(child2.kind(), AtomKind::Parent);
 
         let child3 = children.next().unwrap();
         assert_eq!(child3.id(), [b'd', b'e', b'a', b'd'].into());
-        assert_eq!(child3.payload().len(), 9);
+        assert_eq!(child3.raw_payload().len(), 9);
         assert_eq!(child3.kind(), AtomKind::Parent);
         {
             let KindView::Parent(child3_view) = child3.view() else {
@@ -157,7 +157,7 @@ pub(crate) mod test {
             let mut child3_children = child3_view.children();
             let child3_child0 = child3_children.next().unwrap();
             assert_eq!(child3_child0.id(), [b'b', b'e', b'e', b'f'].into());
-            assert_eq!(child3_child0.payload(), &[0xAB]);
+            assert_eq!(child3_child0.raw_payload(), &[0xAB]);
             assert_eq!(child3_child0.kind(), AtomKind::Child);
         }
 

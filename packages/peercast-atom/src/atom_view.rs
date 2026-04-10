@@ -30,6 +30,11 @@ pub trait AtomView {
         u32::from_le_bytes(arr)
     }
 
+    /// DONT USE THIS DIRECTLY. Use view() and try_decode_* instead.
+    fn raw_payload(&self) -> &[u8] {
+        &self.raw()[ATOM_HEADER_START_PAYLOAD..]
+    }
+
     /// payload length
     /// 注意: 親Atomの場合、子Atomの個数となります(バイト数ではありません)
     fn length(&self) -> u32 {
@@ -53,10 +58,6 @@ pub trait AtomView {
                 buf: self.raw(),
             }),
         }
-    }
-
-    fn payload(&self) -> &[u8] {
-        &self.raw()[ATOM_HEADER_START_PAYLOAD..]
     }
 }
 
@@ -128,14 +129,14 @@ impl ChildView<'_> {
         if self.length() != 1 {
             return None;
         }
-        Some(self.payload()[0])
+        Some(self.raw_payload()[0])
     }
 
     pub fn try_decode_i8(&self) -> Option<i8> {
         if self.length() != 1 {
             return None;
         }
-        Some(self.payload()[0] as i8)
+        Some(self.raw_payload()[0] as i8)
     }
 
     pub fn try_decode_u16(&self) -> Option<u16> {
@@ -143,7 +144,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 2];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(u16::from_le_bytes(arr))
     }
@@ -152,7 +153,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 2];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(u16::from_be_bytes(arr))
     }
@@ -162,7 +163,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 4];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(u32::from_le_bytes(arr))
     }
@@ -171,7 +172,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 4];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(u32::from_be_bytes(arr))
     }
@@ -181,7 +182,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 4];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(i32::from_le_bytes(arr))
     }
@@ -190,7 +191,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 4];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(i32::from_be_bytes(arr))
     }
@@ -199,14 +200,14 @@ impl ChildView<'_> {
         if self.length() == 0 {
             return None;
         }
-        Some(self.payload().to_vec())
+        Some(self.raw_payload().to_vec())
     }
 
     pub fn try_decode_bytes(&self) -> Option<bytes::Bytes> {
         if self.length() == 0 {
             return None;
         }
-        Some(bytes::Bytes::copy_from_slice(self.payload()))
+        Some(bytes::Bytes::copy_from_slice(self.raw_payload()))
     }
 
     pub fn try_decode_gnuid(&self) -> Option<GnuId> {
@@ -214,7 +215,7 @@ impl ChildView<'_> {
             return None;
         }
         let mut arr = [0u8; 16];
-        let payload = self.payload();
+        let payload = self.raw_payload();
         arr.copy_from_slice(payload);
         Some(GnuId::from(arr))
     }
@@ -385,10 +386,10 @@ mod t {
                 let mut children = parent_view.children();
                 let child0 = children.next().unwrap();
                 assert_eq!(child0.id(), [b'p', b'c', b'p', b'a'].into());
-                assert_eq!(child0.payload(), b"a");
+                assert_eq!(child0.raw_payload(), b"a");
                 let child1 = children.next().unwrap();
                 assert_eq!(child1.id(), [b'p', b'c', b'p', b'b'].into());
-                assert_eq!(child1.payload(), b"b");
+                assert_eq!(child1.raw_payload(), b"b");
 
                 dbg!(parent_view);
             }

@@ -86,7 +86,7 @@ mod t {
         // デコードを試みる
         match codec.decode(&mut buf) {
             Ok(Some(atom)) => {
-                assert_eq!(atom.payload().len(), 8);
+                assert_eq!(atom.raw_payload().len(), 8);
                 // assert_eq!(atom.id(), Id4::from(*b"abcd"));
                 assert_eq!(atom.length(), 0);
                 assert_eq!(atom.kind(), crate::AtomKind::Child);
