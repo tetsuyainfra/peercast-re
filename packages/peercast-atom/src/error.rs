@@ -8,17 +8,40 @@ pub enum AtomParseError {
     UnexpectedEof,
 
     // /// 不正なフォーマット
-    // InvalidFormat,
+    // // InvalidFormat,
     /// 不正なデータ(制限容量以上)
     /// 制限以上の子Atom数、制限以上のペイロードサイズ、過剰な入れ子の深さなど
-    MalformedPayload,
-    // MalformedPayload(&'static str)
+    MalformedPayload {
+        reason: &'static str,
+    },
+}
+impl std::error::Error for AtomParseError {}
+
+impl std::fmt::Display for AtomParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AtomParseError::UnexpectedEof => write!(f, "Unexpected end of input"),
+            AtomParseError::MalformedPayload {
+                reason,
+            } => write!(f, "Malformed payload: {}", reason),
+        }
+    }
 }
 
 /// AtomMut構造操作時のエラー
 #[derive(Debug)]
 pub enum AtomMutError {
     NotAParent,
+}
+
+impl std::error::Error for AtomMutError {}
+
+impl std::fmt::Display for AtomMutError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AtomMutError::NotAParent => write!(f, "Not a parent"),
+        }
+    }
 }
 
 /// AtomMutからAtomへの変換時のエラー

@@ -67,7 +67,9 @@ impl Default for ParseContext {
 
 fn _try_parse(ctx: &ParseContext, depth: usize, buf: &[u8]) -> Result<usize, AtomParseError> {
     if depth > ctx.max_depth as usize {
-        return Err(AtomParseError::MalformedPayload);
+        return Err(AtomParseError::MalformedPayload {
+            reason: "Exceeded maximum atom's recursive depth",
+        });
     }
 
     if buf.len() < ATOM_HEADER_LENGTH {
@@ -88,7 +90,9 @@ fn _try_parse(ctx: &ParseContext, depth: usize, buf: &[u8]) -> Result<usize, Ato
     match kind {
         AtomKind::Child => {
             if length > ctx.max_payload_length {
-                return Err(AtomParseError::MalformedPayload);
+                return Err(AtomParseError::MalformedPayload {
+                    reason: "Exceeded maximum payload length",
+                });
             }
             // ChildAtom の場合、lengthはバイトサイズそのもの
             let expected_size = ATOM_HEADER_LENGTH + length as usize;
@@ -99,7 +103,9 @@ fn _try_parse(ctx: &ParseContext, depth: usize, buf: &[u8]) -> Result<usize, Ato
         }
         AtomKind::Parent => {
             if length > ctx.max_childs_num {
-                return Err(AtomParseError::MalformedPayload);
+                return Err(AtomParseError::MalformedPayload {
+                    reason: "Exceeded maximum childs num",
+                });
             }
 
             let mut offset = ATOM_HEADER_LENGTH; // 初期値はこのAtomのヘッダサイズ分移動した所
@@ -159,7 +165,7 @@ mod t {
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&payload_length.to_le_bytes());
         let r_byte_size = parser.try_parse(&bytes);
-        assert_eq!(r_byte_size, Err(AtomParseError::MalformedPayload));
+        assert!(matches!(r_byte_size, Err(AtomParseError::MalformedPayload { .. })));
 
         /* タグと長さはあって、データがないが、異常に長い場合/閾値上/Parent  */
         let child_length = ATOM_DEFAULT_MAX_CHILDS_NUM | 0x8000_0000;
@@ -175,7 +181,7 @@ mod t {
         bytes.extend_from_slice(b"pcp\n");
         bytes.extend_from_slice(&child_length.to_le_bytes());
         let byte_size = parser.try_parse(&bytes);
-        assert_eq!(byte_size, Err(AtomParseError::MalformedPayload));
+        assert!(matches!(byte_size, Err(AtomParseError::MalformedPayload { .. })));
     }
 
     #[test]
