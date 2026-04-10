@@ -34,11 +34,17 @@ impl fmt::Display for ConnectionNo {
     }
 }
 
-impl From<i32> for ConnectionNo {
-    fn from(value: i32) -> Self {
-        Self(value)
-    }
-}
+// もし必要なら、i32からConnectionNoへの変換を実装できますが、現時点では必要ないため、コメントアウトしています。
+// 下のfrom_raw関数の方が明示的でわかりやすいかもしれません。
+// impl From<i32> for ConnectionNo {
+//     fn from(value: i32) -> Self {
+//         Self(value)
+//     }
+// }
+// From<i32> の代わりに明示的な名前にする案
+// pub fn from_raw(value: i32) -> Self {
+//     Self(value)
+// }
 
 #[cfg(test)]
 mod t {
