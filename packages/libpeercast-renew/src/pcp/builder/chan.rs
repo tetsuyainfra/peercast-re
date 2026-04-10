@@ -1,6 +1,7 @@
+use peercast_atom::Atom;
 use tracing::warn;
 
-use crate::atom::{AtomView, ChildView, KindView, ParentView};
+use crate::atom::{AtomView, KindView, ParentView};
 use crate::pcp::builder::error::InfoParseError;
 use crate::{GnuId, Id4};
 
@@ -18,7 +19,7 @@ impl TryFrom<&ParentView<'_>> for ChanInfo {
     type Error = InfoParseError;
 
     fn try_from(parent: &ParentView<'_>) -> Result<Self, Self::Error> {
-        if (parent.id() != Id4::PCP_CHAN) {
+        if parent.id() != Id4::PCP_CHAN {
             return Err(InfoParseError::TargetNotFound);
         }
 
@@ -46,26 +47,25 @@ impl TryFrom<&ParentView<'_>> for ChanInfo {
     }
 }
 
-// impl TryFrom<&Atom2> for ChanInfo {
-//     type Error = InfoParseError;
+impl TryFrom<&Atom> for ChanInfo {
+    type Error = InfoParseError;
 
-//     fn try_from(atom: &Atom2) -> Result<Self, Self::Error> {
-//         if (atom.id() != Id4::PCP_CHAN) {
-//             return Err(InfoParseError::TargetNotFound);
-//         }
+    fn try_from(atom: &Atom) -> Result<Self, Self::Error> {
+        if atom.id() != Id4::PCP_CHAN {
+            return Err(InfoParseError::TargetNotFound);
+        }
 
-//         let Atom2Kind::Parent(pv) = atom.view() else {
-//             return Err(InfoParseError::TargetNotFound);
-//         };
+        let KindView::Parent(pv) = atom.view() else {
+            return Err(InfoParseError::TargetNotFound);
+        };
 
-//         ChanInfo::try_from(&pv)
-//     }
-// }
+        ChanInfo::try_from(&pv)
+    }
+}
 
-// ////////////////////////////////////////////////////////////////////////////////
-// //  ChanChannelInfo
-// //
-
+////////////////////////////////////////////////////////////////////////////////
+//  ChanChannelInfo
+//
 #[derive(Debug, Default)]
 pub struct ChannelInfo {
     // FLV, WMV, RAWなどのタイプ・・・
@@ -117,10 +117,9 @@ impl TryFrom<&ParentView<'_>> for ChannelInfo {
     }
 }
 
-// ////////////////////////////////////////////////////////////////////////////////
-// //  ChanTrackInfo
-// //
-
+////////////////////////////////////////////////////////////////////////////////
+//  ChanTrackInfo
+//
 #[derive(Debug, Default)]
 pub struct TrackInfo {
     pub title: Option<Vec<u8>>,

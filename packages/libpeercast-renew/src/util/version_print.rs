@@ -11,13 +11,11 @@ where
     F: Fn(&mut BTreeMap<&'static str, Option<&'static str>>) -> (),
 {
     let mut build_envs = vergen_pretty::vergen_pretty_env!();
-    // build_envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
-    // build_envs.insert("VERGEN_BIN_VERSION", Some(crate::PKG_VERSION));
     build_envs.insert("VERGEN_PKG_VERSION", Some(crate::PKG_VERSION));
-    // build_envs.insert("VERGEN_PKG_VERSION_MAJOR", Some(crate::PKG_VERSION_MAJOR));
-    // build_envs.insert("VERGEN_PKG_VERSION_MINOR", Some(crate::PKG_VERSION_MINOR));
-    // build_envs.insert("VERGEN_PKG_VERSION_PATCH", Some(crate::PKG_VERSION_PATCH));
-    // build_envs.insert("VERGEN_PKG_AGENT", Some(crate::PKG_AGENT));
+    build_envs.insert("VERGEN_PKG_VERSION_MAJOR", Some(crate::PKG_VERSION_MAJOR));
+    build_envs.insert("VERGEN_PKG_VERSION_MINOR", Some(crate::PKG_VERSION_MINOR));
+    build_envs.insert("VERGEN_PKG_VERSION_PATCH", Some(crate::PKG_VERSION_PATCH));
+    build_envs.insert("VERGEN_PKG_AGENT", Some(crate::PKG_AGENT));
 
     f(&mut build_envs);
 

@@ -8,12 +8,21 @@ peercast-gnuid = { path = "../peercast-gnuid" }
 peercast-atom = { path = "../peercast-atom" }
 peercast-id4 = { path = "../peercast-id4" }
 
-
 anyhow = { version = "1.0.95" }
+
 tracing = { version = "0.1.41" }
 
 serde = { version = "1.0.188", features = ["derive"] }
 serde_json = "1.0.102"
 
+chrono = { version = "0.4.26", features = ["serde"] }
+
+chardetng = { version = "1.0.0" }
+encoding_rs = { version = "0.8.35" }
 
 vergen-pretty = { version = "9.1.0", features = ["header"] }
+
+[build-dependencies]
+# Buildtime generate info
+vergen = { version = "9.1.0", features = ["build", "cargo", "rustc"] }
+vergen-git2 = { version = "9.1.0" }
