@@ -2,6 +2,7 @@ pub use peercast_atom as atom;
 pub use peercast_gnuid::GnuId;
 pub use peercast_id4::Id4;
 
+pub mod connection;
 pub mod model;
 pub mod pcp;
 pub mod util;
@@ -20,3 +21,6 @@ pub const PKG_SERVANT_VERSION_VP: u32 = 27;
 //     assert!(major < 10 && minor < 100);
 //     major * 100 + minor
 // });
+
+#[cfg(test)]
+mod test_helper;
