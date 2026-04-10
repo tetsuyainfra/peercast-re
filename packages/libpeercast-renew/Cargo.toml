@@ -8,9 +8,12 @@ peercast-gnuid = { path = "../peercast-gnuid" }
 peercast-atom = { path = "../peercast-atom" }
 peercast-id4 = { path = "../peercast-id4" }
 
-anyhow = { version = "1.0.95" }
+anyhow = { version = "1.0.102" }
+thiserror = { version = "2.0.18" }
 
 async-trait = { version = "0.1.89" }
+
+tokio-util = { version = "0.7.18" }
 
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.23", features = [
