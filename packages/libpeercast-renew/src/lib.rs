@@ -5,7 +5,7 @@ pub use peercast_id4::Id4;
 pub mod connection;
 pub mod model;
 pub mod pcp;
-pub mod util;
+pub mod utils;
 
 pub const PKG_VERSION: &'static str = env!("CARGO_PKG_VERSION");
 pub const PKG_VERSION_MAJOR: &'static str = env!("CARGO_PKG_VERSION_MAJOR");
