@@ -7,7 +7,7 @@ pub mod parser;
 
 pub use atom::Atom;
 pub use atom_mut::AtomMut;
-pub use atom_view::{AtomIter, AtomKind, AtomView, ChildView, KindView, ParentView};
+pub use atom_view::{AtomIter, AtomKind, AtomTryDecode, AtomView, ChildView, KindView, ParentView};
 
 #[cfg(feature = "codec")]
 pub mod codec;

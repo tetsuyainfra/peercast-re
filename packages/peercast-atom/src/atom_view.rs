@@ -71,6 +71,107 @@ pub enum AtomKind {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+/// AtomTryDecode
+/// Atomのpayloadを特定の型にデコードするためのトレイト
+/// このトレイトを実装することで、AtomViewのtry_decode_*メソッドを利用できるようになる
+pub trait AtomTryDecode: AtomView {
+    fn try_decode_u8(&self) -> Option<u8> {
+        if self.kind() != AtomKind::Child || self.length() != 1 {
+            return None;
+        }
+        Some(self.raw_payload()[0])
+    }
+
+    fn try_decode_i8(&self) -> Option<i8> {
+        if self.kind() != AtomKind::Child || self.length() != 1 {
+            return None;
+        }
+        Some(self.raw_payload()[0] as i8)
+    }
+
+    fn try_decode_u16(&self) -> Option<u16> {
+        if self.kind() != AtomKind::Child || self.length() != 2 {
+            return None;
+        }
+        let mut arr = [0u8; 2];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(u16::from_le_bytes(arr))
+    }
+    fn try_decode_u16_be(&self) -> Option<u16> {
+        if self.kind() != AtomKind::Child || self.length() != 2 {
+            return None;
+        }
+        let mut arr = [0u8; 2];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(u16::from_be_bytes(arr))
+    }
+
+    fn try_decode_u32(&self) -> Option<u32> {
+        if self.kind() != AtomKind::Child || self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(u32::from_le_bytes(arr))
+    }
+    fn try_decode_u32_be(&self) -> Option<u32> {
+        if self.kind() != AtomKind::Child || self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(u32::from_be_bytes(arr))
+    }
+
+    fn try_decode_i32(&self) -> Option<i32> {
+        if self.kind() != AtomKind::Child || self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(i32::from_le_bytes(arr))
+    }
+    fn try_decode_i32_be(&self) -> Option<i32> {
+        if self.kind() != AtomKind::Child || self.length() != 4 {
+            return None;
+        }
+        let mut arr = [0u8; 4];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(i32::from_be_bytes(arr))
+    }
+
+    fn try_decode_vec(&self) -> Option<Vec<u8>> {
+        if self.kind() != AtomKind::Child || self.length() == 0 {
+            return None;
+        }
+        Some(self.raw_payload().to_vec())
+    }
+
+    fn try_decode_bytes(&self) -> Option<bytes::Bytes> {
+        if self.kind() != AtomKind::Child || self.length() == 0 {
+            return None;
+        }
+        Some(bytes::Bytes::copy_from_slice(self.raw_payload()))
+    }
+
+    fn try_decode_gnuid(&self) -> Option<GnuId> {
+        if self.kind() != AtomKind::Child || self.length() != 16 {
+            return None;
+        }
+        let mut arr = [0u8; 16];
+        let payload = self.raw_payload();
+        arr.copy_from_slice(payload);
+        Some(GnuId::from(arr))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 /// KindView
 /// Atomの種類に応じたビューを表す列挙型
 #[derive(PartialEq, Eq)]
@@ -87,6 +188,8 @@ impl AtomView for KindView<'_> {
         }
     }
 }
+
+impl AtomTryDecode for KindView<'_> {}
 
 impl From<KindView<'_>> for AtomMut {
     fn from(view: KindView<'_>) -> Self {
@@ -124,101 +227,6 @@ impl ChildView<'_> {
         debug_assert_eq!(self.length() as usize, self.raw().len() - 8);
         &self.buf[8..]
     }
-
-    pub fn try_decode_u8(&self) -> Option<u8> {
-        if self.length() != 1 {
-            return None;
-        }
-        Some(self.raw_payload()[0])
-    }
-
-    pub fn try_decode_i8(&self) -> Option<i8> {
-        if self.length() != 1 {
-            return None;
-        }
-        Some(self.raw_payload()[0] as i8)
-    }
-
-    pub fn try_decode_u16(&self) -> Option<u16> {
-        if self.length() != 2 {
-            return None;
-        }
-        let mut arr = [0u8; 2];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(u16::from_le_bytes(arr))
-    }
-    pub fn try_decode_u16_be(&self) -> Option<u16> {
-        if self.length() != 2 {
-            return None;
-        }
-        let mut arr = [0u8; 2];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(u16::from_be_bytes(arr))
-    }
-
-    pub fn try_decode_u32(&self) -> Option<u32> {
-        if self.length() != 4 {
-            return None;
-        }
-        let mut arr = [0u8; 4];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(u32::from_le_bytes(arr))
-    }
-    pub fn try_decode_u32_be(&self) -> Option<u32> {
-        if self.length() != 4 {
-            return None;
-        }
-        let mut arr = [0u8; 4];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(u32::from_be_bytes(arr))
-    }
-
-    pub fn try_decode_i32(&self) -> Option<i32> {
-        if self.length() != 4 {
-            return None;
-        }
-        let mut arr = [0u8; 4];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(i32::from_le_bytes(arr))
-    }
-    pub fn try_decode_i32_be(&self) -> Option<i32> {
-        if self.length() != 4 {
-            return None;
-        }
-        let mut arr = [0u8; 4];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(i32::from_be_bytes(arr))
-    }
-
-    pub fn try_decode_vec(&self) -> Option<Vec<u8>> {
-        if self.length() == 0 {
-            return None;
-        }
-        Some(self.raw_payload().to_vec())
-    }
-
-    pub fn try_decode_bytes(&self) -> Option<bytes::Bytes> {
-        if self.length() == 0 {
-            return None;
-        }
-        Some(bytes::Bytes::copy_from_slice(self.raw_payload()))
-    }
-
-    pub fn try_decode_gnuid(&self) -> Option<GnuId> {
-        if self.length() != 16 {
-            return None;
-        }
-        let mut arr = [0u8; 16];
-        let payload = self.raw_payload();
-        arr.copy_from_slice(payload);
-        Some(GnuId::from(arr))
-    }
 }
 
 impl AtomView for ChildView<'_> {
@@ -226,6 +234,8 @@ impl AtomView for ChildView<'_> {
         self.buf
     }
 }
+
+impl AtomTryDecode for ChildView<'_> {}
 
 impl fmt::Debug for ChildView<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -378,6 +388,8 @@ mod t {
 
         let atom = Atom::new(buf.clone().into());
         let view = atom.view();
+        assert_eq!(view.try_decode_bytes(), None); // ParentAtomはデコードできないことを確認
+
         match view {
             KindView::Parent(parent_view) => {
                 assert_eq!(parent_view.id(), [b'p', b'c', b'p', b'\n'].into());
@@ -387,9 +399,14 @@ mod t {
                 let child0 = children.next().unwrap();
                 assert_eq!(child0.id(), [b'p', b'c', b'p', b'a'].into());
                 assert_eq!(child0.raw_payload(), b"a");
+                assert_eq!(child0.try_decode_bytes(), Some(bytes::Bytes::from_static(b"a")));
+                assert_eq!(child0.try_decode_u8(), Some(b'a'));
+
                 let child1 = children.next().unwrap();
                 assert_eq!(child1.id(), [b'p', b'c', b'p', b'b'].into());
                 assert_eq!(child1.raw_payload(), b"b");
+                assert_eq!(child1.try_decode_bytes(), Some(bytes::Bytes::from_static(b"b")));
+                assert_eq!(child1.try_decode_u8(), Some(b'b'));
 
                 dbg!(parent_view);
             }

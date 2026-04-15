@@ -63,6 +63,18 @@ pub enum AtomCodecError {
     Freeze(AtomFreezeError),
 }
 
+impl std::fmt::Display for AtomCodecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AtomCodecError::Io(e) => write!(f, "IO error: {}", e),
+            AtomCodecError::Parse(e) => write!(f, "Atom parse error: {}", e),
+            AtomCodecError::Freeze(e) => write!(f, "Atom freeze error: {:?}", e),
+        }
+    }
+}
+
+impl std::error::Error for AtomCodecError {}
+
 impl From<std::io::Error> for AtomCodecError {
     fn from(e: std::io::Error) -> Self {
         Self::Io(e)
