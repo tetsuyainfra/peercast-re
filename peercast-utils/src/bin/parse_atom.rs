@@ -13,7 +13,7 @@ async fn main() {
     let framed = Framed::new(file, AtomCodec::default());
     let _ = framed
         .try_for_each(|atom| async move {
-            println!("Atom: kind={:?}, length={}, payload={:?}", atom.kind(), atom.length(), atom.payload());
+            println!("Atom: kind={:?}, length={}, raw_payload={:?}", atom.kind(), atom.length(), atom.raw_payload());
             Ok(())
         })
         .await;
