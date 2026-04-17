@@ -160,6 +160,43 @@ pub trait AtomTryDecode: AtomView {
         Some(bytes::Bytes::copy_from_slice(self.raw_payload()))
     }
 
+    fn try_decode_ipaddr(&self) -> Option<std::net::IpAddr> {
+        if self.kind() != AtomKind::Child {
+            return None;
+        }
+        let payload = self.raw_payload();
+        if payload.len() == 4 {
+            Some(std::net::IpAddr::V4(std::net::Ipv4Addr::from(u32::from_le_bytes(payload.try_into().ok()?))))
+        } else if payload.len() == 16 {
+            Some(std::net::IpAddr::V6(std::net::Ipv6Addr::from(u128::from_be_bytes(payload.try_into().ok()?)))) // BE
+        } else {
+            None
+        }
+    }
+
+    fn try_decode_ipv4addr(&self) -> Option<std::net::Ipv4Addr> {
+        if self.kind() != AtomKind::Child {
+            return None;
+        }
+        let payload = self.raw_payload();
+        if payload.len() == 4 {
+            Some(std::net::Ipv4Addr::from(u32::from_le_bytes(payload.try_into().ok()?)))
+        } else {
+            None
+        }
+    }
+    fn try_decode_ipv6addr(&self) -> Option<std::net::Ipv6Addr> {
+        if self.kind() != AtomKind::Child {
+            return None;
+        }
+        let payload = self.raw_payload();
+        if payload.len() == 16 {
+            Some(std::net::Ipv6Addr::from(u128::from_be_bytes(payload.try_into().ok()?))) // BE
+        } else {
+            None
+        }
+    }
+
     fn try_decode_gnuid(&self) -> Option<GnuId> {
         if self.kind() != AtomKind::Child || self.length() != 16 {
             return None;
