@@ -4,7 +4,7 @@
 pub struct Id4(pub u32);
 
 impl Id4 {
-    // 定数の定義はファイル下部にあり
+    // 定数は下部のdef_id4!マクロで定義される
 }
 
 // Conversion: * -> Id4
@@ -21,12 +21,6 @@ impl From<[u8; 4]> for Id4 {
 }
 
 // Conversion: Id4 -> *
-// これ無い方がいいのでは？
-// impl From<Id4> for u32 {
-//     fn from(value: Id4) -> Self {
-//         value.0
-//     }
-// }
 
 impl From<Id4> for [u8; 4] {
     fn from(value: Id4) -> Self {
@@ -43,41 +37,41 @@ impl From<Id4> for u32 {
 impl std::fmt::Debug for Id4 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Id4(")?;
-        internal::fmt(self.0, f)?;
-        write!(f, ")")?;
-        Ok(())
+        fmt_bytes(self.0, f)?;
+        write!(f, ")")
+    }
+}
+impl std::fmt::Display for Id4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        fmt_bytes(self.0, f)
     }
 }
 
-mod internal {
-    use std::fmt::Write;
+fn fmt_bytes(val: u32, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    use std::fmt::Write as _;
 
-    pub(super) fn fmt(val: u32, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // write!(f, "b\"")?;
-        let bs = val.to_be_bytes();
-        for b in bs {
-            match b {
-                b'A'..=b'Z' | b'a'..=b'z' => {
-                    f.write_char(b as char)?;
-                }
-                b'\n' => f.write_str("\\n")?,
-                b'\r' => f.write_str("\\r")?,
-                b'\t' => f.write_str("\\t")?,
-                b'\\' => f.write_str("\\\\")?,
-                b'\0' => f.write_str("\\0")?,
-                _ => write!(f, "\\x{:02x}", b)?,
-            }
-            // https://doc.rust-lang.org/reference/tokens.html#byte-escapes
+    let bs = val.to_be_bytes();
+    for b in bs {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' => f.write_char(b as char)?,
+            b'\n' => f.write_str("\\n")?,
+            b'\r' => f.write_str("\\r")?,
+            b'\t' => f.write_str("\\t")?,
+            b'\\' => f.write_str("\\\\")?,
+            b'\0' => f.write_str("\\0")?,
+            _ => write!(f, "\\x{:02x}", b)?,
         }
-        Ok(())
+        // https://doc.rust-lang.org/reference/tokens.html#byte-escapes
     }
+    Ok(())
 }
 
 // 定数の定義
 // #[allow(non_snake_case)]
 // #[allow(non_upper_case_globals)]
 macro_rules! def_id4 {
-  ($($KEY:ident = $VAL:expr),*,) => {
+//   ($($KEY:ident = $VAL:expr),*,) => {
+  ($($KEY:ident = $VAL:expr),* $(,)?) => {
       impl Id4 {
         $(
           pub const $KEY: Id4 = Id4(u32::from_be_bytes(*$VAL));
@@ -213,7 +207,7 @@ mod tests {
     #[test]
     fn test_id4() {
         assert_eq!(Id4::PCP_OK.0, u32::from_be_bytes(*b"ok\0\0"));
-        let b: [u8; 4] = Id4::PCP_OK.clone().into();
+        let b: [u8; 4] = Id4::PCP_OK.into();
         assert_eq!(b[0], b'o');
         assert_eq!(b[1], b'k');
         assert_eq!(b[2], b'\0');
