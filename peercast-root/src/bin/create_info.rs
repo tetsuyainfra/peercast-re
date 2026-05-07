@@ -1,14 +1,20 @@
 use chrono::{DateTime, Utc};
 use clap::{Parser, builder::TypedValueParser};
-use libpeercast_re::pcp::GnuId;
+use libpeercast_re::GnuId;
 use peercast_root::{config::FooterToml, model::IndexInfo};
 
 fn main() {
     let args = Args::parse();
-    // dbg!(&args);
+
+    if let Some(test_path) = args.test {
+        let content = std::fs::read_to_string(&test_path)
+            .expect(&format!("Failed to read the specified file: {}", test_path.display()));
+        let footer: FooterToml = toml::from_str(&content).expect("Failed to parse the specified file");
+        println!("{:#?}", footer);
+        return;
+    }
 
     let info: IndexInfo = args.into();
-    // dbg!(&info);
 
     let mut footer = FooterToml::default();
     footer.infomations = vec![info];
@@ -37,9 +43,9 @@ peercast-root_footer.tomlを出力するためのプログラム
 pub struct Args {
     /// 配信者名
     #[arg()]
-    pub name: String,
+    pub name: Option<String>,
 
-    #[arg(long, default_value_t=GnuId::zero())]
+    #[arg(long, default_value_t = GnuId::zero(), value_parser = clap::builder::StringValueParser::new().try_map(parse_gnuid))]
     pub id: GnuId,
 
     #[arg(long = "addr")]
@@ -75,15 +81,21 @@ pub struct Args {
     #[arg(long, default_value_t = 0)]
     pub number_of_relay: i32,
 
+    /// RFC3339形式の日時、もしくは日付を指定する。日付のみの場合は00:00:00とみなされる。
+    /// 例: "2024-01-01T12:00:00Z"、"2024-01-01"
     #[arg(long, value_parser = clap::builder::StringValueParser::new().try_map(parse_datetime),)]
     pub created_at: Option<DateTime<Utc>>,
+
+    /// 指定したファイルを読み込み、テストする。
+    #[arg(short, long, value_name = "FOOTER_FILE")]
+    test: Option<std::path::PathBuf>,
 }
 
 impl From<Args> for IndexInfo {
     fn from(v: Args) -> Self {
         let mut i: IndexInfo = IndexInfo::default();
         i.id = v.id;
-        i.name = v.name;
+        i.name = v.name.unwrap_or("チャンネル名".into());
         i.tracker_addr = v.tracker_addr;
         i.contact_url = v.contact_url;
         i.genre = v.genre;
@@ -99,6 +111,10 @@ impl From<Args> for IndexInfo {
 
         i
     }
+}
+
+pub fn parse_gnuid(value: String) -> Result<GnuId, String> {
+    value.parse::<GnuId>().map_err(|err| format!("valid GnuId: {err}"))
 }
 
 pub fn parse_datetime(value: String) -> Result<DateTime<Utc>, String> {

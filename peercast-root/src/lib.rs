@@ -23,56 +23,8 @@ pub enum ExitCode {
     Failure = 1,
 }
 
-/// ポートチェック制限レベル
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum RestrictPortLevel {
-    /// ポートチェックを行わない
-    None = 0,
-
-    /// 疎通OK
-    PortCheck = 1,
-
-    /// 疎通OK, 配信速度OK(配信ビットレート基準)
-    BroadcastSpeed = 2,
-
-    /// 疎通OK, 配信速度OK(YP指定規制速度OK)
-    RestrictSpeed = 3,
-}
-impl From<usize> for RestrictPortLevel {
-    fn from(value: usize) -> Self {
-        match value {
-            0 => RestrictPortLevel::None,
-            1 => RestrictPortLevel::PortCheck,
-            2 => RestrictPortLevel::BroadcastSpeed,
-            3 => RestrictPortLevel::RestrictSpeed,
-            _ => RestrictPortLevel::RestrictSpeed,
-        }
-    }
-}
-
 /// ポートチェックの制限速度で設定できる最小値（この値は含めない）
 pub static YP_LIMIT_SPEED_MIN: u32 = 499; // 500KBps
-
-/// チャンネルリストに追加するユーザー情報の形式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum YpAppendUserStatus {
-    /// 追加しない
-    None,
-    /// 標準形式
-    Default,
-}
-
-/// チャンネルリストに追加するシステム情報の形式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum YpAppendSystemStatus {
-    /// 追加しない
-    None,
-    /// 標準形式
-    Default,
-
-    /// 標準形式 + アクセスしてきたホストの情報
-    WithHost,
-}
 
 #[derive(Debug, Error)]
 pub enum TomlConfigError {

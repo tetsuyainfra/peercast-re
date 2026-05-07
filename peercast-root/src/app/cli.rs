@@ -2,7 +2,7 @@ use std::process::exit;
 
 use axum_client_ip::ClientIpSource;
 use clap::{Parser, Subcommand};
-use peercast_root::{RestrictPortLevel, YpAppendSystemStatus, YpAppendUserStatus};
+use peercast_root::config::{RestrictPortLevel, YpAppendSystemStatus, YpAppendUserStatus};
 use url::Url;
 
 #[cfg(not(debug_assertions))]
@@ -231,7 +231,7 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
         Some(Commands::Version {
             json,
         }) => {
-            libpeercast_re::util::version_print_with(json, |envs| {
+            libpeercast_re::utils::version_print_with(json, |envs| {
                 envs.insert("VERGEN_BIN_NAME", Some(env!("CARGO_BIN_NAME")));
                 envs.insert("VERGEN_BIN_VERSION", Some(env!("CARGO_PKG_VERSION")));
             })?;
@@ -246,6 +246,7 @@ pub fn version_print(args: &Args) -> anyhow::Result<()> {
                 // let repo = SqliteCheckedHostRepository::new(pool);
                 // repo.migrate().await?;
                 // println!("Database migration completed successfully.");
+                todo!("DB migration is not implemented yet.")
             }
         },
         _ => {}

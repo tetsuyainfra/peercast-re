@@ -6,8 +6,7 @@ default-run = "peercast-root"
 
 
 [dependencies]
-libpeercast-re = { version = "*", path = "../packages/old-libpeercast-re" }
-peercast-atom = {version = "*", path = "../packages/peercast-atom" }
+libpeercast-re = { package = "libpeercast-renew", version = "*", path = "../packages/libpeercast-renew" }
 
 anyhow = { version = "1.0.95" }
 thiserror = {version = "2.0.12"}
@@ -99,6 +98,7 @@ utoipa-axum = "0.2"
 
 [dev-dependencies]
 mockall = { version = "0.14.0" }
+libpeercast-re = { package = "libpeercast-renew", version = "*", path = "../packages/libpeercast-renew", features = ["mock"] }
 
 [package.metadata.deb]
 maintainer = "tetsuyainfra <tetsuyainfra@007144.xyz>"

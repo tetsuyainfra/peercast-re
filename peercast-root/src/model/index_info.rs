@@ -1,10 +1,8 @@
 use std::net::SocketAddr;
 
 use chrono::{DateTime, Utc};
-use libpeercast_re::pcp::GnuId;
+use libpeercast_re::{GnuId, model::ChannelMeta};
 use serde::{Deserialize, Serialize};
-
-use crate::model::ChannelMeta;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct IndexInfo {
@@ -78,7 +76,7 @@ impl From<&IndexInfo> for ChannelMeta {
         j.typee = typee.clone();
         j.name = name.clone();
         j.tracker_addr = tracker_addr.clone();
-        j.contact_url = contact_url.clone();
+        j.url = contact_url.clone();
         j.genre = genre.clone();
         j.display_genre = Some(genre.clone());
         j.desc = desc.clone();

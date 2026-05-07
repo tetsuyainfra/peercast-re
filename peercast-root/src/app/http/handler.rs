@@ -1,24 +1,22 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, time::Duration};
 
 use axum::{
     Json,
     extract::{Query, State},
     response::IntoResponse,
 };
-
 use axum_client_ip::ClientIp;
 use hyper::StatusCode;
-use libpeercast_re::repository::Repository;
-use minijinja::Environment;
-use peercast_root::{
-    db::SqliteCheckedHostRepository,
+use libpeercast_re::{
     model::ChannelMeta,
-    service::{HostCheckService, PingPortChecker},
+    repository::traits::{ChannelHandle, ChannelRepository},
+    service::PortCheckerService,
 };
+use peercast_root::{db::SqliteCheckedHostRepository, service::HostCheckService};
 use serde::Deserialize;
-use tracing::{debug, info};
+use tracing::info;
 
-use crate::app::{ArcState, EmbedTemplateCtx};
+use crate::app::state::{ArcState, EmbedTemplateCtx};
 
 pub struct ApiError(anyhow::Error);
 // Tell axum how to convert `AppError` into a response.
@@ -39,20 +37,33 @@ where
     }
 }
 
+// /// Utility function for mapping any error into a `500 Internal Server Error` response.
+// #[allow(dead_code)]
+// fn internal_error<E>(err: E) -> (StatusCode, String)
+// where
+//     E: std::error::Error,
+// {
+//     (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
+// }
+
+pub async fn index_txt(ClientIp(_client_ip): ClientIp, State(_state): State<ArcState>) -> Result<String, ApiError> {
+    Ok("index.txt".into())
+}
+
 //-------------------------------------------------------------------------------
 // Api Handlers
 //-------------------------------------------------------------------------------
 /// /index.txtを提供するハンドラー
-pub async fn index_txt(
-    ClientIp(client_ip): ClientIp,
-    Query(params): Query<IndexTextParams>,
-    State(state): State<ArcState>,
-) -> Result<String, ApiError> {
-    let channels = _get_index(client_ip, params.Host, state).await?;
-    let string_channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
+// pub async fn index_txt(
+//     ClientIp(client_ip): ClientIp,
+//     Query(params): Query<IndexTextParams>,
+//     State(state): State<ArcState>,
+// ) -> Result<String, ApiError> {
+//     let channels = _get_index(client_ip, params.Host, state).await?;
+//     let string_channels: Vec<String> = channels.iter().map(|c| c.to_line_of_index_txt()).collect();
 
-    Ok(itertools::join(string_channels, "\n"))
-}
+//     Ok(itertools::join(string_channels, "\n"))
+// }
 
 /// /index.jsonを提供するハンドラー
 pub async fn index_json(
@@ -77,24 +88,17 @@ async fn _get_index(
     };
 
     let repo = SqliteCheckedHostRepository::new(state.db_pool.clone());
-    let port_checker = PingPortChecker::new(&state.connection_factory);
+    let port_checker = PortCheckerService::new(state.self_session_id.clone(), Duration::from_secs(5));
     let checker = HostCheckService::new(repo, port_checker);
 
     let host = checker.do_check(target_ip, target_port).await?;
 
-    let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
+    // let channels: Vec<ChannelMeta> = state.repository.map_collect(|_id, ch| ch.channel_meta());
+    // let channels = state.yellow_page.filter_channel_meta(&host, channels);
+    let channels = state.channel.repository.list_channels().iter().map(|h| h.channel_meta()).collect();
     let channels = state.yellow_page.filter_channel_meta(&host, channels);
 
     Ok(channels)
-}
-
-/// Utility function for mapping any error into a `500 Internal Server Error` response.
-#[allow(dead_code)]
-fn internal_error<E>(err: E) -> (StatusCode, String)
-where
-    E: std::error::Error,
-{
-    (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
 }
 
 //-------------------------------------------------------------------------------
@@ -134,6 +138,8 @@ where
 struct Assets;
 
 #[cfg(not(debug_assertions))]
+use minijinja::Environment;
+#[cfg(not(debug_assertions))]
 struct StaticState {
     env: Environment<'static>,
     template_ctx: EmbedTemplateCtx,
@@ -145,6 +151,7 @@ pub fn static_router(
 ) -> axum::Router {
     #[cfg(debug_assertions)]
     {
+        info!("static router is ServeDir (debug mode)");
         // 開発時：ローカルディレクトリをそのまま配信
         axum::Router::new().fallback_service(axum::routing::get_service(
             tower_http::services::ServeDir::new("src/public").append_index_html_on_directories(true),
@@ -162,9 +169,9 @@ pub fn static_router(
             ))
         } else {
             info!("static router is Assets(Embed)");
-            use std::sync::Arc;
-
             use axum::routing;
+            use std::sync::Arc;
+            use tracing::debug;
             debug!("Assets include files");
             for a in Assets::iter() {
                 debug!("- {}", a.as_ref());

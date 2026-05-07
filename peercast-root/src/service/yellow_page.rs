@@ -1,10 +1,11 @@
 use std::fmt;
 
 use chrono::Utc;
+use libpeercast_re::model::ChannelMeta;
 
 use crate::{
-    RestrictPortLevel,
-    model::{ChannelMeta, CheckedHost, IndexInfo, PortLevel},
+    config::RestrictPortLevel,
+    model::{CheckedHost, IndexInfo, PortLevel},
     utils::process_uptime,
 };
 
@@ -67,9 +68,9 @@ impl YellowPageService {
 }
 
 impl YellowPageService {
-    const MSG_PORT_CHECK: &'static str = "- [要ポート開放]";
-    const MSG_UPLOAD_NEEDS_TEST: &'static str = "- [要帯域測定]";
-    const MSG_UPLOAD_NOT_EXCEED_LIMIT: &'static str = "- [帯域不足]";
+    const MSG_PORT_CHECK: &'static str = "[要ポート開放]";
+    const MSG_UPLOAD_NEEDS_TEST: &'static str = "[要帯域測定]";
+    const MSG_UPLOAD_NOT_EXCEED_LIMIT: &'static str = "[帯域不足]";
 
     pub fn filter_channel_meta(&self, host: &CheckedHost, channels: Vec<ChannelMeta>) -> Vec<ChannelMeta> {
         let filtered_channels = Self::filter_channels(&self.config, &host, channels);
@@ -189,8 +190,7 @@ impl YellowPageService {
 }
 
 /// YpAppendUserStatus::Defaultの関数を作成する
-#[allow(non_snake_case)]
-pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
+pub fn create_user_status_default_function(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆UserStatus", config.yp_name.to_ascii_uppercase());
 
     let f = move |host: &CheckedHost| -> Option<ChannelMeta> {
@@ -218,8 +218,7 @@ pub fn createUserStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
 }
 
 /// YpAppendSystemStatus::Defaultの関数を作成する
-#[allow(non_snake_case)]
-pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
+pub fn create_system_status_default_function(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
 
     let f = move |_host: &CheckedHost| -> Option<ChannelMeta> {
@@ -244,8 +243,7 @@ pub fn createSystemStatusDefaultFunction(config: &SiteConfig) -> YpStatusFunc {
 }
 
 /// YpAppendSystemStatus::WithStatusの関数を作成する
-#[allow(non_snake_case)]
-pub fn createSystemStatusWithHostInfoFunction(config: &SiteConfig) -> YpStatusFunc {
+pub fn create_system_status_with_host_info_function(config: &SiteConfig) -> YpStatusFunc {
     let name = format!("{}◆Status", config.yp_name.to_ascii_uppercase());
 
     let f = move |host: &CheckedHost| -> Option<ChannelMeta> {

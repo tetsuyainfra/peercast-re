@@ -1,14 +1,13 @@
-use std::time::Duration;
+use std::{net::IpAddr, time::Duration};
 
 use anyhow::anyhow;
-use libpeercast_re::service::PortChecker;
 
 use crate::{
     db::CheckedHostRepository,
     model::{CheckedHost, PortLevel},
+    service::port_checker::PortChecker,
 };
 
-// TODO: これもっとシンプルにする
 #[derive(thiserror::Error, Debug)]
 pub enum HostCheckServiceError {
     #[error("再実行までの時間が経過していないため、ポートチェックをスキップします")]
@@ -51,23 +50,13 @@ where
     /// # Errors
     /// - `HostCheckServiceError::InternalDB`: データベース操作中にエラーが発生した場合
     /// - `HostCheckServiceError::Internal`: その他の内部エラーが発生した場合
-    pub async fn do_check(
-        &self,
-        target_addr: std::net::IpAddr,
-        target_port: u16,
-    ) -> Result<CheckedHost, HostCheckServiceError> {
+    pub async fn do_check(&self, target_addr: IpAddr, target_port: u16) -> Result<CheckedHost, HostCheckServiceError> {
         let now = chrono::Utc::now();
         let host = self.repo.find_by_ip_port(target_addr, target_port).await?;
 
         let Some(host) = host else {
             // テーブルになかった場合、単にチェックして結果を保存して返す
-            let result = self
-                .port_checker
-                .check(target_addr, target_port)
-                .await
-                .map(|_| PortLevel::Welldone)
-                .unwrap_or(PortLevel::Incomplete);
-
+            let result = self.port_checker.check(target_addr, target_port).await;
             let id = self.repo.insert(target_addr, target_port, result, None).await?;
             let host = self.repo.find_by_id(id).await?.ok_or_else(|| {
                 anyhow!("Inserted a row and obtained its ID, but no row with that ID was found. id: {}", id)
@@ -89,13 +78,7 @@ where
 
         // ポートチェックして結果を保存して返す
         let mut host = host;
-        let result_level = self
-            .port_checker
-            .check(target_addr, target_port)
-            .await
-            .map(|_| PortLevel::Welldone)
-            .unwrap_or(PortLevel::Incomplete);
-
+        let result_level = self.port_checker.check(target_addr, target_port).await;
         host.port_level = result_level;
         let _ = self.repo.update(&mut host).await?;
 
@@ -105,18 +88,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::net::IpAddr;
-    //
     use chrono::{TimeDelta, Utc};
     use mockall::predicate::{self, *};
-    //
-    use libpeercast_re::service::MockPortChecker;
-    //
-    use crate::{
-        db::MockCheckedHostRepository,
-        model::{CheckedHost, DbIpAddr, PortLevel},
-        service::HostCheckService,
-    };
+
+    use crate::{db::MockCheckedHostRepository, model::DbIpAddr, service::port_checker::MockPortChecker};
+
+    use super::*;
 
     // テーブルにホストがなく、pingを送って成功する場合
     #[tokio::test]
@@ -136,11 +113,12 @@ mod tests {
 
         port_checker
             .expect_check()
+            //
             .with(predicate::eq(ip_address), predicate::eq(port))
             .times(1)
-            .return_once(|_, _| Ok(()));
+            .return_once(|_, _| PortLevel::Welldone);
 
-        // // 結果をテーブルに登録
+        // 結果をテーブルに登録
         repo.expect_insert()
             //
             .with(
@@ -181,7 +159,6 @@ mod tests {
         dbg!(host);
     }
 
-    /*
     // テーブルにホストがなく、pingを送って失敗する場合
     #[tokio::test]
     async fn test_no_host_on_table_then_fail() {
@@ -517,6 +494,4 @@ mod tests {
         assert_eq!(host.ip_address.0, ip_address);
         assert_eq!(host.port_level, PortLevel::Incomplete);
     }
-
-    */
 }

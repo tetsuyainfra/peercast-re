@@ -62,6 +62,7 @@ cargo sqlx prepare
 - peercast-db-cli : peercast-rootが作成するDBを読み書きできるCLIです
 
 ## TODO
+- IndexInfoを保存しているのをChannelMetaを保存するように変更する
 - PCPで受け取ったデータでチャンネル情報を更新する
 - 5分後にチャンネルを削除する機能をつける
 - Dockerを作る
