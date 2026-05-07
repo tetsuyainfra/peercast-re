@@ -1,8 +1,12 @@
 use std::{future::Future, net::SocketAddr, sync::Arc};
 
+use peercast_gnuid::GnuId;
 use tokio_util::sync::CancellationToken;
 
-use crate::connection::{ConnectionNo, error::ConnectionError};
+use crate::{
+    connection::{ConnectionNo, error::ConnectionError},
+    io::IoStream,
+};
 
 /// Connection型の特性を定義するtrait
 pub trait ConnectionSpec {
@@ -28,8 +32,8 @@ pub trait HandshakeConnection: Sized {
 
     fn new(
         cno: ConnectionNo,
+        stream: IoStream,
         remote: SocketAddr,
-        shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
         manager: <Self::Spec as ConnectionSpec>::Manager,
     ) -> Self;
@@ -50,6 +54,7 @@ pub trait ConnectionHandle {
     type Spec: ConnectionSpec<Handle = Self>;
 
     fn cno(&self) -> ConnectionNo;
+    fn manager(&self) -> &<Self::Spec as ConnectionSpec>::Manager;
 
     fn task_name(&self) -> Arc<String>;
     //  {
@@ -68,13 +73,9 @@ pub trait ConnectionHandle {
 pub trait ConnectionManager {
     type Spec: ConnectionSpec<Manager = Self>;
 
-    fn insert(&self, handle: <Self::Spec as ConnectionSpec>::Handle);
-    fn insert_with<F>(&mut self, cno: ConnectionNo, f: F)
-    where
-        F: FnMut() -> <Self::Spec as ConnectionSpec>::Handle;
-
-    fn remove(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle>;
-
+    fn get(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle>;
+    fn delete(&self, cno: &ConnectionNo) -> Option<<Self::Spec as ConnectionSpec>::Handle>;
+    fn list(&self) -> Vec<(ConnectionNo, <Self::Spec as ConnectionSpec>::Handle)>;
     fn find<P>(&self, predicate: P) -> Option<(ConnectionNo, <Self::Spec as ConnectionSpec>::Handle)>
     where
         P: Fn(&(&ConnectionNo, &<Self::Spec as ConnectionSpec>::Handle)) -> bool;
@@ -91,19 +92,60 @@ pub trait ConnectionFactory {
     type Spec: ConnectionSpec;
     type Handshake: HandshakeConnection;
 
+    fn self_session_id(&self) -> GnuId;
+
     fn manager(&self) -> &<Self::Spec as ConnectionSpec>::Manager;
 
     fn create_accepted_connection(
         &self,
         cno: ConnectionNo,
+        stream: IoStream,
         remote: std::net::SocketAddr,
-        shutdown_token: Option<CancellationToken>,
         config: Option<<Self::Spec as ConnectionSpec>::HandshakeConfig>,
     ) -> Self::Handshake;
 
     fn create_outgoing<C>(&self, remote: std::net::SocketAddr, config: Option<<C as OutgoingConnection>::Config>) -> C
     where
         C: OutgoingConnection<Spec = Self::Spec>;
+
+    // fn ping_to(
+    //     &self,
+    //     remote: std::net::SocketAddr,
+    //     remote_session_id: Option<GnuId>,
+    // ) -> impl Future<Output = Result<(), PingError>> {
+    //     async {
+    //         //
+    //         let atoms = PingBuilder::new(self.self_session_id()).port(None).port_check(None).build();
+
+    //         // let mut framed = Framed::new(stream, AtomCodec::new());
+    //         // for a in atoms {
+    //         //     dbg!("send:  {:?}", &a);
+    //         //     framed.send(a).await?;
+    //         // }
+
+    //         // let mut atom = framed.next().await;
+    //         // let oleh_candidate = match atom {
+    //         //     None => todo!(),
+    //         //     Some(Err(e)) => todo!(),
+    //         //     Some(Ok(a)) => a,
+    //         // };
+
+    //         // let oleh = OlehInfo::try_from(&oleh_candidate).map_err(|_| HandshakeError::Failed)?;
+
+    //         // let parts = PartsWrapFramed {
+    //         //     cno,
+    //         //     remote,
+    //         //     framed,
+    //         // };
+    //         // let ret = HandshakeResult {
+    //         //     parts,
+    //         // };
+
+    //         // Ok((oleh, ret))
+
+    //         Ok(())
+    //     }
+    // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////

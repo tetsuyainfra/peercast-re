@@ -3,7 +3,11 @@ use std::net::SocketAddr;
 use peercast_gnuid::GnuId;
 use serde::Serialize;
 
-use crate::model::{ValidChannelInfo, ValidTrackInfo};
+use crate::{
+    model::{ValidChannelInfo, ValidTrackInfo},
+    pcp::builder::TrackInfo,
+    repository::traits::Channel,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 /// ChannelMeta: データが正しい事を保証されたChannelInfo
@@ -20,7 +24,7 @@ pub struct ChannelMeta {
     /// チャンネル名
     pub name: String,
     /// 連絡先URL
-    pub contact_url: String,
+    pub url: String,
     /// 生のジャンル(namespace, listener_hideableなどの指定を含む)
     pub genre: String,
     /// ユーザーに表示されるジャンル(変化がなければNone)
@@ -55,27 +59,46 @@ pub struct ChannelMeta {
 }
 
 impl ChannelMeta {
-    pub fn from_info(id: GnuId, ch: ValidChannelInfo, track: ValidTrackInfo) -> Self {
+    pub fn Empty() -> Self {
         Self {
-            id,
+            id: GnuId::zero(), // <-- 0は特別なID
             tracker_addr: None,
-
-            name: ch.name,
-            genre: ch.genre.clone(),
+            name: String::new(),
+            genre: String::new(),
             display_genre: None,
-            desc: ch.desc,
-            comment: ch.comment,
-            contact_url: ch.url,
-            stream_type: ch.stream_type,
-            stream_ext: ch.stream_ext,
-            bitrate: ch.bitrate,
-            typee: ch.typee,
-            track: TrackMeta::from_info(track),
-            //
+            desc: String::new(),
+            comment: String::new(),
+            url: String::new(),
+            stream_type: String::new(),
+            stream_ext: String::new(),
+            bitrate: 0,
+            typee: String::new(),
+            track: TrackMeta::default(),
             number_of_listener: 0,
             number_of_relay: 0,
             created_at: chrono::Utc::now(),
-            //
+            namespace: None,
+        }
+    }
+
+    pub fn with_valid(id: GnuId, valid_info: ValidChannelInfo, valid_track: ValidTrackInfo) -> Self {
+        Self {
+            id,
+            tracker_addr: None,
+            name: valid_info.name,
+            genre: valid_info.genre,
+            display_genre: None,
+            desc: valid_info.desc,
+            comment: valid_info.comment,
+            url: valid_info.url,
+            stream_type: valid_info.stream_type,
+            stream_ext: valid_info.stream_ext,
+            bitrate: valid_info.bitrate,
+            typee: valid_info.typee,
+            track: TrackMeta::from_info(valid_track),
+            number_of_listener: 0,
+            number_of_relay: 0,
+            created_at: chrono::Utc::now(),
             namespace: None,
         }
     }

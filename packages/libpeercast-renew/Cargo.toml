@@ -3,6 +3,9 @@ name = "libpeercast-renew"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+mock = ["mockall"]
+
 [dependencies]
 peercast-gnuid = { path = "../peercast-gnuid" }
 peercast-atom = { path = "../peercast-atom" }
@@ -12,8 +15,10 @@ anyhow = { version = "1.0.102" }
 thiserror = { version = "2.0.18" }
 
 async-trait = { version = "0.1.89" }
+futures = { version = "0.3.32" }
 
-tokio-util = { version = "0.7.18" }
+tokio = { version = "1.51.1", features = ["full"] }
+tokio-util = { version = "0.7.18", features = ["full"] }
 
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.23", features = [
@@ -32,6 +37,11 @@ chardetng = { version = "1.0.0" }
 encoding_rs = { version = "0.8.35" }
 
 vergen-pretty = { version = "9.1.0", features = ["header"] }
+
+mockall = { version = "0.14.0", optional = true }
+
+[dev-dependencies]
+
 
 [build-dependencies]
 # Buildtime generate info

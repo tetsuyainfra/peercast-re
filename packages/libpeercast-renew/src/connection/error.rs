@@ -39,3 +39,9 @@ pub enum HandshakeError {
     #[error("failed")]
     Failed,
 }
+
+#[derive(Debug, Error)]
+pub enum PingError {
+    #[error("IoError")]
+    IoError(#[from] std::io::Error),
+}

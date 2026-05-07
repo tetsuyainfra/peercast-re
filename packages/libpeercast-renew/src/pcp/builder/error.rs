@@ -5,5 +5,6 @@ pub enum InfoParseError {
     #[error("Target not found")]
     TargetNotFound,
     // MissingField(&'static str),
-    // InvalidField(&'static str),
+    #[error("Unknown value type")]
+    UnknownValueType,
 }

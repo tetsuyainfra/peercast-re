@@ -1,4 +1,4 @@
-use peercast_atom::Atom;
+use peercast_atom::{Atom, AtomTryDecode};
 use tracing::warn;
 
 use crate::atom::{AtomView, KindView, ParentView};

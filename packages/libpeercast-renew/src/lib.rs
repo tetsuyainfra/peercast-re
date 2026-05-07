@@ -3,8 +3,12 @@ pub use peercast_gnuid::GnuId;
 pub use peercast_id4::Id4;
 
 pub mod connection;
+pub mod io;
 pub mod model;
 pub mod pcp;
+pub mod repository;
+pub mod runtime;
+pub mod service;
 pub mod utils;
 
 pub const PKG_VERSION: &'static str = env!("CARGO_PKG_VERSION");
